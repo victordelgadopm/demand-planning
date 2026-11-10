@@ -1,12 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Demand Planning Assistant</title>
-<style>:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mute:#5d6877;--line:#dfe3ea;--brand:#2b4cc7;--brand-d:#1f3a9e;
+<style>:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2430;--mute:#434e5f;--line:#dfe3ea;--brand:#2b4cc7;--brand-d:#1f3a9e;
 --risk:#b3261e;--risk-bg:#fdecea;--med:#b45309;--med-bg:#fff3e0;--watch:#6d4fb3;--watch-bg:#f0ebfa;--much:#0b6aa8;--much-bg:#e5f2fb;--ok:#2e7d32;--ok-bg:#e8f5e9;
 --shadow:0 1px 2px rgba(20,30,50,.08),0 4px 14px rgba(20,30,50,.06);--r:12px}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10151c;--card:#19212c;--ink:#e8edf4;--mute:#9aa7b8;--line:#2a3544;--brand:#7d9bff;--brand-d:#a9bcff;
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#10151c;--card:#19212c;--ink:#e8edf4;--mute:#d0d8e4;--line:#2a3544;--brand:#7d9bff;--brand-d:#a9bcff;
 --risk:#ff8a80;--risk-bg:#3a1c1a;--med:#ffb55a;--med-bg:#3a2a12;--watch:#c0abf5;--watch-bg:#2a2340;--much:#7cc4f2;--much-bg:#12293a;--ok:#7bd48a;--ok-bg:#16301b;--shadow:0 1px 2px rgba(0,0,0,.4)}}
-:root[data-theme=dark]{--bg:#10151c;--card:#19212c;--ink:#e8edf4;--mute:#9aa7b8;--line:#2a3544;--brand:#7d9bff;--brand-d:#a9bcff;
+:root[data-theme=dark]{--bg:#10151c;--card:#19212c;--ink:#e8edf4;--mute:#d0d8e4;--line:#2a3544;--brand:#7d9bff;--brand-d:#a9bcff;
 --risk:#ff8a80;--risk-bg:#3a1c1a;--med:#ffb55a;--med-bg:#3a2a12;--watch:#c0abf5;--watch-bg:#2a2340;--much:#7cc4f2;--much-bg:#12293a;--ok:#7bd48a;--ok-bg:#16301b;--shadow:0 1px 2px rgba(0,0,0,.4)}
 *{box-sizing:border-box}html{font-size:16px}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.45}
@@ -239,6 +239,11 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .sec-sub{color:var(--mute);margin:-4px 0 10px}
 #app .sec-h{margin:22px 0 4px;font-size:1.3rem}
 #app .pg-h+.pg-sub+.sec-h{margin-top:6px}
+/* readability: body text in cards uses the main text color */
+.step p,.step .mini,.step .quote,.routebox p,.routebox .conf,.pg-sub,.sec-sub,.hero p,.path p,.hist p,.hist li,.recipe li,.recipe p,.who p,.card p{color:var(--ink)}
+.step .quote{color:var(--ink)}
+.conf,.mute,.simnote{color:var(--mute)}
+.optl{color:var(--brand)}
 </style></head>
 <body>
 <header class="top"><div class="top-in">
