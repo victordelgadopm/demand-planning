@@ -20,7 +20,7 @@ const COLS={
 const DEFAULT=['status','sku','product','sub','going','todo','dollars','conf'];
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
 const saveCols=()=>{try{localStorage.setItem(CK,JSON.stringify(cols))}catch(e){}};
-let rowsMode='attn',tab='today';
+let rowsMode='attn',tab='dash';
 function val(k,r){
   const m=r.metrics,sk=A.skuOf(r.id),n=r.acceptedFlags&&r.acceptedFlags[0]&&r.acceptedFlags[0].note;
   switch(k){
@@ -36,6 +36,25 @@ function val(k,r){
 }
 function sheetRows(mode){
   return st.res.rows.filter(r=>mode==='all'||r.headline).sort((a,b)=>E.TIER_ORDER[a.tier]-E.TIER_ORDER[b.tier]||b.dollars-a.dollars);
+}
+const ALLD='All decisions',DECKEYS=Object.keys(A.DEC),DECL=DECKEYS.map(k=>A.DEC[k][0]);
+const STAT=()=>['Needs attention',...A.TIERS.map(t=>A.tn(t)),'All statuses'];
+const dName=r=>r.decision?A.DEC[r.decision][0]:'';
+let dashDec=ALLD,dashStat='Needs attention';
+const dashMatch=r=>(dashDec===ALLD||dName(r)===dashDec)&&(dashStat==='All statuses'||(dashStat==='Needs attention'&&r.headline)||A.tn(r.tier)===dashStat);
+const TCLASS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Too much':'t-much','No risk':'t-ok'};
+function dashHtml(){
+  const all=sheetRows('all'),rows=all.filter(dashMatch);
+  const boxes=DECKEYS.map((k,i)=>{const lab=DECL[i],it=all.filter(r=>dName(r)===lab),dol=Math.round(it.reduce((t,r)=>t+(r.dollars>0?r.dollars:0),0));
+    return `<div class="dbox${dashDec===lab?' sel':''}"><div class="dbt">${esc(lab)}</div><div class="dbn">${it.length}</div><div class="dbs">${money(dol)} at stake</div></div>`}).join('');
+  const body=rows.map(r=>`<tr data-open="${r.id}" tabindex="0"><td class="st ${TCLASS[r.tier]||'t-ok'}">${esc(A.tn(r.tier))}</td><td class="c">${esc(r.id)}</td><td>${esc(r.name)}</td><td class="wide">${esc(val('going',r))}</td><td class="money">${r.dollars>0?money(r.dollars):'-'}</td><td class="c">${r.headline?esc(r.confidence):''}</td></tr>`).join('');
+  return `<div class="dash"><h3>Daily Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
+   <p class="dnote">Pick a decision and a status in the two yellow cells. The four boxes show the decision counts, and the list below rebuilds itself. This is the same dashboard that opens first in the downloaded sheet.</p>
+   <div class="dpick"><label>Decision <select id="dd">${[ALLD,...DECL].map(o=>`<option ${o===dashDec?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
+   <label>Status <select id="ds">${STAT().map(o=>`<option ${o===dashStat?'selected':''}>${esc(o)}</option>`).join('')}</select></label></div>
+   <div class="dboxes">${boxes}</div>
+   <div class="dcount">Items matching your choices: <b>${rows.length}</b></div>
+   <div class="xl-scroll"><table class="xt dtab"><thead><tr class="heads"><th>Status</th><th>SKU</th><th>Product</th><th>What Is Going On</th><th>$ At Risk</th><th>Confidence</th></tr></thead><tbody>${body||'<tr><td colspan="6">Nothing matches these choices.</td></tr>'}</tbody></table></div></div>`;
 }
 /* ---------- since / notes / recipe data ---------- */
 function sinceItems(){
@@ -74,7 +93,8 @@ function todayGrid(){
 function renderSheet(){
   const v=$('#v-sheet'),total=st.res.total;
   let inner,count='';
-  if(tab==='today'){const g=todayGrid();inner=g.html;count=`${g.n} of ${total} items`}
+  if(tab==='dash'){inner=dashHtml();count='Interactive'}
+  else if(tab==='today'){const g=todayGrid();inner=g.html;count=`${g.n} of ${total} items`}
   else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail'].map(t=>({t})),it.map(r=>({id:r[2],c:r.map(t=>({t}))})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
   else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map(t=>({t:String(t)}))})),{empty:'No notes yet.'});count=it.length+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
@@ -85,10 +105,11 @@ function renderSheet(){
     <button class="btn sm" id="sh-custom">Add or remove columns</button>
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${inner}
-   <div class="xl-tabs" role="tablist">${[['today','Today'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']].map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Today is what needs you. Since Yesterday is what changed. Notes is the decisions you logged. Recipe is how the sheet is built.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <div class="xl-tabs" role="tablist">${[['dash','Dashboard'],['today','Today'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']].map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
+   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Dashboard is the interactive view that opens first. Today is the list of what needs you. Since Yesterday is what changed. Notes is the decisions you logged. Recipe is how the sheet is built. The download also has an All Items tab with every item.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
+  const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
   $$('[data-open]',v).forEach(e=>{e.onclick=()=>A.openSku(e.dataset.open);e.onkeydown=ev=>{if(ev.key==='Enter')A.openSku(e.dataset.open)}});
   $('#sh-dl').onclick=downloadXlsx;$('#sh-custom').onclick=()=>go('custom');
 }
@@ -105,18 +126,16 @@ function downloadXlsx(){
   const since=sinceItems(),notes=noteItems(),rec=recipeItems();
   /* ---- interactive dashboard: pickers, live count boxes, and a list that rebuilds itself ---- */
   const allRows=sheetRows('all'),N=allRows.length,nc=cols.length;
-  const DECL=Object.keys(A.DEC).map(k=>A.DEC[k][0]),STAT=['Needs attention',...A.TIERS.map(t=>A.tn(t)),'All statuses'];
-  const dName=r=>r.decision?A.DEC[r.decision][0]:'';
-  const D0='All decisions',S0='Needs attention';
+  const STATL=STAT(),D0=dashDec,S0=dashStat;
   const H=['Status','Decision','Needs Attention','SKU','Product','What Is Going On','Dollars','Confidence','Show'];
   const hc=H.map((_,i)=>MiniXlsx.col(nc+i)),L=i=>hc[i];
   const dataSheet=mk(allRows,'All Items');
-  const matches=r=>(D0==='All decisions'||dName(r)===D0)&&(S0==='All statuses'||(S0==='Needs attention'&&r.headline)||A.tn(r.tier)===S0);
+  const matches=dashMatch;
   let run=0;const showVal=allRows.map(r=>matches(r)?++run:'');
   dataSheet.rows[0].push(...H.map(t=>({v:t,s:'head'})));
   allRows.forEach((r,i)=>{const row=dataSheet.rows[i+1],er=i+2;
     row.push({v:A.tn(r.tier),s:'txt'},{v:dName(r),s:'txt'},{v:r.headline?'Yes':'No',s:'txt'},{v:r.id,s:'txt'},{v:r.name,s:'txt'},{v:val('going',r),s:'txt'},{v:Math.round(r.dollars>0?r.dollars:0),s:'money'},{v:r.headline?r.confidence:'',s:'txt'},
-     {f:`IF(AND(OR(Dashboard!$B$4="${D0}",${L(1)}${er}=Dashboard!$B$4),OR(Dashboard!$G$4="All statuses",AND(Dashboard!$G$4="Needs attention",${L(2)}${er}="Yes"),${L(0)}${er}=Dashboard!$G$4)),MAX(${L(8)}$1:${L(8)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
+     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${L(1)}${er}=Dashboard!$B$4),OR(Dashboard!$G$4="All statuses",AND(Dashboard!$G$4="Needs attention",${L(2)}${er}="Yes"),${L(0)}${er}=Dashboard!$G$4)),MAX(${L(8)}$1:${L(8)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
   dataSheet.widths=[...dataSheet.widths,...H.map(()=>14)];
   dataSheet.hide=H.map((_,i)=>nc+i);
   const rng=i=>`'All Items'!$${L(i)}$2:$${L(i)}$${N+1}`;
@@ -130,7 +149,7 @@ function downloadXlsx(){
   put(2,0,{v:'Pick a decision and a status in the two yellow cells. The four boxes show the decision counts, and the list below rebuilds itself. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first.',s:'note'});dash.merges.push('A2:L2');R(2).h=34;
   put(4,0,{v:'Decision',s:'label'});put(4,1,{v:D0,s:'pick'});fill(4,2,3,'pick');dash.merges.push('B4:D4');
   put(4,5,{v:'Status',s:'label'});put(4,6,{v:S0,s:'pick'});fill(4,7,8,'pick');dash.merges.push('G4:I4');R(4).h=24;
-  dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[D0,...DECL].join(',')+'"'},{ref:'G4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STAT.join(',')+'"'});
+  dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[ALLD,...DECL].join(',')+'"'},{ref:'G4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STATL.join(',')+'"'});
   const keys=Object.keys(A.DEC);
   BOX.forEach(([c0,c1],i)=>{const lab=A.DEC[keys[i]][0],cnt=allRows.filter(r=>dName(r)===lab).length,dol=Math.round(allRows.filter(r=>dName(r)===lab).reduce((t,r)=>t+(r.dollars>0?r.dollars:0),0));
     put(6,c0,{v:lab,s:'boxT'});fill(6,c0+1,c1,'boxT');dash.merges.push(`${C(c0)}6:${C(c1)}6`);
