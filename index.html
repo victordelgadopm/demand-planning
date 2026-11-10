@@ -1143,11 +1143,10 @@ function downloadXlsx(){
 }
 /* ---------- home ---------- */
 const ROUTES={
- live:['Live Connection','Best when it exists','The AI connects straight to Anaplan or Tableau and reads fresh numbers each morning. Both companies now publish connectors, but whether your approved AI tool is allowed to use them is a question for IT.','IT approves the access. Nothing to build on the planning side.'],
- folder:['Shared Folder','The safe default','Anaplan and Tableau can already save a scheduled export to a folder. The AI opens the newest files each morning, checks them, and saves the finished sheet back in the same folder.','One folder that both the export and the AI can reach.'],
- email:['Scheduled Email','Works, with a catch','A scheduled report arrives in a mailbox the AI can read. Tableau emails are often a picture and a link instead of the data, so ask for an attached data export.','A mailbox the AI is allowed to read.'],
+ folder:['Shared Folder','The reliable route','Both systems put their data into one shared folder each morning, and the AI reads the newest files, checks them and saves the finished sheet back there. It works with any approved AI tool. Neither Anaplan nor Tableau saves straight into SharePoint on its own, so IT builds one small step to move the files (details in the IT box below).','One shared folder, and one IT-built step to move each export into it.'],
+ copilot:['Copilot Connection','Second choice, depends on what is available','Microsoft Copilot can reach both systems directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','IT approval, plus a quick test to see what the connection can actually read.'],
  manual:['Drag And Drop','Good for week one','You drop the files into the chat each morning. No IT work at all, so it is the fastest way to prove the idea.','Nothing. You can start today.']};
-let route='live';
+let route='folder';
 function renderHome(){
   const r=ROUTES[route];
   $('#v-home').innerHTML=`<div class="page">
@@ -1163,20 +1162,22 @@ function renderHome(){
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap" ><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
   </div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
-  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Live connection</span><span class="arrow">→</span><span><b>2.</b> Shared folder</span><span class="arrow">→</span><span><b>3.</b> Email</span><span class="mute">Use drag and drop to start on day one.</span></div>
+  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Shared folder</span><span class="arrow">→</span><span><b>2.</b> Copilot connection</span><span class="mute">Use drag and drop to start on day one.</span></div>
   <div class="who"><div class="card"><h3>You</h3><p>Say what you need and what you are not seeing. Decide what to do about each flagged item.</p></div>
    <div class="card"><h3>The AI</h3><p>Reads the files, checks them, builds the sheet, writes the morning summary, and keeps your preferences.</p></div>
    <div class="card"><h3>IT</h3><p>Approves one way to get the data in. That is the only thing they have to do.</p></div></div>
-  <details class="card it"><summary>For The IT Conversation: What Connects To What</summary>
-   <ul>
-    <li><b>Tableau:</b> Tableau publishes an official connector for Tableau Cloud. Each person signs in with their own Tableau login. Tableau's setup guide lists ChatGPT and Claude.</li>
-    <li><b>Anaplan:</b> Anaplan's AI Gateway offers a connector that names Claude, Gemini and Microsoft Copilot. ChatGPT is not named. Outside bridges exist, but each one is another vendor to approve.</li>
-    <li><b>ChatGPT connectors:</b> They need a hosted server, and each person signs in with their own account. A pasted API key does not work. Writing back to a system is limited to some business plans.</li>
-    <li><b>ChatGPT scheduled tasks:</b> Up to 10 active tasks, and they cannot take file uploads. For an unattended daily run, the files need to sit where the AI can reach them.</li>
-    <li><b>Bottom line:</b> If no approved live connection exists, the shared folder and email routes have no such limit. The AI only needs permission to read one folder or mailbox.</li>
-   </ul>
-   <p class="conf">Vendor pages change often. Last checked November 2026. Confirm with IT before relying on any of this.</p>
-   <p class="conf">Sources: <a href="https://mcp.tableau.com" target="_blank" rel="noopener">Tableau hosted connector</a> · <a href="https://www.anaplan.com/platform/anaplan-ai-gateway/" target="_blank" rel="noopener">Anaplan AI Gateway</a> · <a href="https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-connectors" target="_blank" rel="noopener">OpenAI connectors help</a> · <a href="https://help-lb.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt" target="_blank" rel="noopener">OpenAI scheduled tasks</a> · <a href="https://www.cdata.com/ai/connect/anaplan-to-chatgpt/" target="_blank" rel="noopener">CData bridge for Anaplan</a></p></details>
+  <details class="card it"><summary>For The IT Conversation: What Each System Can Do</summary>
+   <p><b>Shared folder route</b></p><ul>
+    <li><b>Anaplan:</b> Its scheduled integrations (CloudWorks) export to Amazon S3, Azure Blob or Google BigQuery. SharePoint and OneDrive are not listed, so a step is needed to move the file.</li>
+    <li><b>Tableau:</b> Scheduled subscriptions are email only, as a PNG image or PDF, not a data file. Other options are Tableau Prep flows that output files, or the REST API, which returns summary-level view data as CSV to people with export permission.</li>
+    <li><b>Excel:</b> The Power Automate Excel connector cannot create a workbook or format one directly. It can add rows to a copy of a template and run Office Scripts.</li></ul>
+   <p><b>Copilot route</b></p><ul>
+    <li><b>Anaplan:</b> The AI Gateway names Microsoft Copilot as a client. Its page is inconsistent on read-only versus write-back, and does not state licensing.</li>
+    <li><b>Tableau:</b> Microsoft's Tableau Cloud connector indexes published sheets and details such as name, project, workbook and tags. It needs Tableau Cloud (not Server), a Microsoft 365 AI admin and a Tableau site admin. Microsoft's pages do not say whether the numbers behind a dashboard are included.</li>
+    <li><b>Daily runs:</b> Copilot Studio agents can run on a repeating schedule. Runs use Copilot Credits, use the maker's sign-in, and admins can block them.</li>
+    <li><b>Not confirmed:</b> That Copilot can produce a fully formatted Excel file on its own. This is the first thing to test in a pilot.</li></ul>
+   <p class="conf">Last checked November 2026 from the vendors' own pages. Confirm with IT before relying on any of this.</p>
+   <p class="conf">Sources: <a href="https://help.anaplan.com/cloudworks-96f951fe-52fc-45a3-b6cb-16b7fe38e1aa" target="_blank" rel="noopener">Anaplan CloudWorks</a> · <a href="https://help.tableau.com/current/online/en-us/subscribe_user.htm" target="_blank" rel="noopener">Tableau subscriptions</a> · <a href="https://help.tableau.com/current/online/en-us/prep_conductor_schedule_flow_task.htm" target="_blank" rel="noopener">Tableau Prep flows</a> · <a href="https://learn.microsoft.com/en-us/connectors/excelonlinebusiness/" target="_blank" rel="noopener">Excel connector</a> · <a href="https://www.anaplan.com/platform/anaplan-ai-gateway/" target="_blank" rel="noopener">Anaplan AI Gateway</a> · <a href="https://learn.microsoft.com/en-us/microsoft-365/copilot/connectors/tableau-cloud-deployment" target="_blank" rel="noopener">Tableau connector for Copilot</a> · <a href="https://learn.microsoft.com/microsoft-copilot-studio/authoring-triggers-about" target="_blank" rel="noopener">Copilot Studio triggers</a></p></details>
   <details class="card it"><summary>Extras</summary><p class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="x-load">Replay Today's Data Check</button><button class="btn" id="x-flow">Data Flow Map</button><button class="btn" id="x-email">Daily Email Preview</button><button class="btn" id="x-set">Advanced Thresholds</button><button class="btn" id="x-csv">Download CSV</button><button class="btn" id="x-reset">Reset Demo</button></p></details>
   </div>`;
   const h=$('#v-home');
