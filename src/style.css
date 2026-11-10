@@ -200,3 +200,21 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .shead .optl{margin:0 0 0 auto;background:color-mix(in srgb,var(--brand) 12%,var(--card));border-radius:99px;padding:2px 10px}
 .step .quote{font-style:italic;color:var(--mute);margin:0}.step{gap:10px}
 .step .route{padding:7px 10px;font-size:.86rem}
+/* round 2: fill space */
+.routes{display:grid;grid-template-columns:1fr;gap:8px}
+.route{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;font-size:1rem;text-align:left}
+.route b{font-size:1.02rem}.route span{font-weight:500;font-size:.85rem;color:var(--mute)}
+.route[aria-pressed=true] span{color:var(--brand)}
+.mini-sheet{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.ms-r{display:grid;grid-template-columns:84px 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line);font-size:.88rem}
+.ms-r:last-child{border-bottom:0}
+.ms-st{border-radius:6px;padding:2px 8px;font-weight:700;font-size:.8rem;text-align:center}
+.ms-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ms-d{font-weight:700}
+.quotes{display:flex;flex-direction:column;gap:8px}
+.step .quote{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--bg)}
+.leftcol{display:flex;flex-direction:column;gap:14px}.chat-wrap{align-items:start}
+.msgs{min-height:150px;max-height:260px}
+.datepill{background:color-mix(in srgb,var(--brand) 12%,var(--card));color:var(--brand);border-radius:99px;padding:3px 12px;font-weight:700;font-size:.85rem}
+.morebar{padding:12px;text-align:center;border-top:1px solid var(--line)}
+#app .sec-h{margin:6px 0 10px}
+#app{padding-top:18px}

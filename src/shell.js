@@ -80,7 +80,7 @@ function renderSheet(){
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
    <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. Download it to open in Excel with the same colors and formatting.</p>
-   <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data) ${esc(A.snap().meta.asOf)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
+   <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
     ${tab==='today'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
     <button class="btn sm" id="sh-custom">Add or remove columns</button>
     <button class="btn dl" id="sh-dl">Download Excel</button></div>
@@ -108,7 +108,7 @@ function downloadXlsx(){
    {name:'Notes',widths:[11,30,18,20,60,10,10,14],rows:[hdr(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===7?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
    {name:'Recipe',widths:[22,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}])],freeze:1}];
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.snap().meta.today+'.xlsx';document.body.appendChild(a);a.click();
+  a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
 }
 /* ---------- home ---------- */
@@ -119,6 +119,11 @@ const ROUTES={
  chatgpt:['ChatGPT Connection','Second choice, depends on what is available','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','IT approval for the Tableau connector, plus a built connector or bridge for Anaplan. ChatGPT scheduled tasks cannot take file uploads, so a daily unattended run is not confirmed.']
 };
 let route='manual';
+const RTAG={manual:'Safest, always works',folder:'Reliable, needs IT',copilot:'Second choice',chatgpt:'Second choice'};
+function miniSheet(){
+  const rows=sheetRows('attn').slice(0,3);
+  return `<div class="mini-sheet" aria-hidden="true">${rows.map(r=>`<div class="ms-r"><span class="ms-st ${({'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Too much':'t-much'})[r.tier]||'t-ok'}">${esc(val('status',r))}</span><span class="ms-n">${esc(val('product',r))}</span><span class="ms-d">${r.dollars?money(r.dollars):''}</span></div>`).join('')}</div>`;
+}
 function renderHome(){
   const r=ROUTES[route];
   $('#v-home').innerHTML=`<div class="page">
@@ -126,14 +131,15 @@ function renderHome(){
   <p>Four steps. No code. You explain what you want to the AI in plain words, and an Excel sheet shows up each morning.</p></div>
   <div class="steps">
    <div class="card step"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Choose how your files reach the AI. Details appear below.</p>
-    <div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div></div>
+    <div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}"><b>${ROUTES[k][0].replace(' Connection','')}</b><span>${RTAG[k]}</span></button>`).join('')}</div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Prompt Your AI Agent</h2></div><p>Most of the work happens here.</p>
     <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. The agent hears the voice of the customer (VOC) here.</li></ul>
     <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
    <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning, with the items that need you at the top.</p>
+    ${miniSheet()}
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
    <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
-    <p class="quote">“I don't see how many weeks of stock we have.”</p><button class="btn go" data-nav="custom">Try It Now</button></div>
+    <div class="quotes"><p class="quote">“I don't see how many weeks of stock we have.”</p><p class="quote">“Add who owns each item.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">Try It Now</button></div>
   </div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <h2 class="sec-h">What Connects To What</h2>
@@ -151,7 +157,7 @@ function renderHome(){
     <td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. IT adds a step.</span></td></tr>
   </tbody></table></div>
   <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Start here, then automate:</span><span><b>1.</b> Manual export (always works)</span><span class="arrow">→</span><span><b>2.</b> Shared folder</span><span class="arrow">→</span><span><b>3.</b> Copilot or ChatGPT connection, whichever IT approves</span></div>
-  <p style="margin-top:18px"><button class="btn pri" data-nav="options">See All Options And Limits</button></p>
+  <p style="margin-top:18px"><button class="btn pri" data-nav="options">See Setup Options And Limits</button></p>
   </div>`;
   const h=$('#v-home');
   $$('[data-route]',h).forEach(b=>b.onclick=()=>{route=b.dataset.route;renderHome()});
@@ -159,9 +165,9 @@ function renderHome(){
   $('#h-dl').onclick=downloadXlsx;
 }
 function renderOptions(){
-  $('#v-options').innerHTML=`<div class="page"><div class="pg-h"><h1>All Options And Limits</h1></div>
-  <p class="pg-sub">Every way to connect, what each can do for Anaplan and Tableau, and what limits it. Checked against each company's own pages in November 2026.</p>
-  <h2 class="sec-h" style="margin-top:8px">All Connection Options</h2>
+  $('#v-options').innerHTML=`<div class="page"><div class="pg-h"><h1>Setup Options</h1></div>
+  <p class="pg-sub">This is the detail behind Step 1. It lists every way to connect, how to run it each morning, how to bring Anaplan and Tableau together, and why history matters. Checked against each company's own pages in November 2026.</p>
+  <h2 class="sec-h" style="margin-top:8px">Ways To Connect</h2>
   <div class="card mx-wrap"><table class="mx"><thead><tr><th>Option</th><th>Anaplan</th><th>Tableau</th><th>Main Limit</th></tr></thead><tbody>
    <tr><th>Manual Export<small>The safest route</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every day. Also how history is loaded.</td></tr>
    <tr><th>Shared Folder<small>Any approved AI tool</small></th><td class="part"><b>▲ Partly</b><span>Exports to S3, Azure Blob or BigQuery. IT moves them to the folder.</span></td><td class="part"><b>▲ Partly</b><span>Prep file output or REST API. IT moves them to the folder.</span></td><td>IT builds one step per system.</td></tr>
@@ -245,15 +251,15 @@ function reply(text){
 function renderCustom(){
   $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize</h1></div>
   <p class="pg-sub">You shape the sheet by talking to the AI, not by editing settings. Start with a full prompt about what you want, then adjust anytime by saying what you are not seeing. It remembers for next time.</p>
-  <div class="chat-wrap"><div class="card chat"><div class="chat-h"><span>Chat With The AI</span><span class="conf">Demo only: simulated replies</span></div>
+  <div class="chat-wrap"><div class="leftcol"><div class="card chat"><div class="chat-h"><span>Chat With The AI</span><span class="conf">Demo only: simulated replies</span></div>
    <div class="msgs" id="msgs" aria-live="polite">${msgs.map(m=>`<div class="msg ${m.w}">${m.w==='you'?esc(m.t):m.t}</div>`).join('')}</div>
    <div class="sug">${SUG.map((s,i)=>`<button class="chip" data-sug="${i}">${esc(s)}</button>`).join('')}</div>
    <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Type what you are not seeing" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
+   <div class="card recipe" style="margin-top:14px"><h3>Example Prompts To Start With</h3><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the daily sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div></div>
   <div><div class="card recipe"><h3>Your Recipe</h3><p class="conf" style="margin:0 0 8px">The AI's memory of how your sheet is built. Scheduled runs read it every morning.</p>
    <ol>${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
    <p style="margin:10px 0 0"><b>Rows:</b> ${rowsMode==='all'?'All items':'Items that need attention'}</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Sheet</button><button class="btn" id="c-reset">Reset Columns</button></div></div>
-   <div class="card recipe" style="margin-top:14px"><h3>Example Prompts To Start With</h3><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the daily sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div>
    <div class="card recipe" style="margin-top:14px"><h3>How This Works In Real Life</h3><ol><li>You describe what you want, or what you are not seeing, in your own words.</li><li>The AI finds the field in your data, or asks you where it lives.</li><li>It updates the recipe and rebuilds the sheet.</li><li>Tomorrow's scheduled run uses the saved recipe.</li></ol>
    <p style="margin:10px 0 0"><button class="btn sm" id="c-adv">Advanced Thresholds</button></p></div></div></div></div>`;
   const v=$('#v-custom'),box=$('#msgs');box.scrollTop=box.scrollHeight;

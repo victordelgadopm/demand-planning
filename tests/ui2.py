@@ -13,7 +13,7 @@ with sync_playwright() as p:
     pg.click('[data-tier="No risk"]');ok('No risk list shows 106',pg.locator('#cnt').inner_text().startswith('106'));pg.click('[data-tier=attn]')
     pg.fill('#q','Treehouse');ok('search',pg.locator('tr.r').count()==1);pg.fill('#q','')
     # drill
-    pg.locator('tr.r',has_text='Holiday Ball Gown').click();pg.wait_for_timeout(500)
+    (pg.locator('#showmore').click() if pg.locator('#showmore').count() else None);pg.locator('tr.r',has_text='Holiday Ball Gown').click();pg.wait_for_timeout(500)
     pg.screenshot(path=SP+'/d1.png')
     pg.evaluate("document.getElementById('drawer').scrollTop=700");pg.wait_for_timeout(200);pg.screenshot(path=SP+'/d2.png')
     # add note
@@ -23,7 +23,7 @@ with sync_playwright() as p:
     # persistence
     pg.reload();pg.click('nav [data-nav=visual]');pg.wait_for_selector('.dtile');ok('note persists after reload',' (2)' in pg.locator('[data-tab=acc]').inner_text())
     pg.click('[data-tab=acc]');pg.wait_for_timeout(200);pg.screenshot(path=SP+'/acc.png')
-    pg.locator('tr.r',has_text='Holiday Ball Gown').click();pg.wait_for_timeout(400)
+    (pg.locator('#showmore').click() if pg.locator('#showmore').count() else None);pg.locator('tr.r',has_text='Holiday Ball Gown').click();pg.wait_for_timeout(400)
     pg.click('[data-rm]');pg.click('[id^=rc-]');pg.wait_for_timeout(300)
     ok('remove note keeps history',pg.locator('.hist li').count()>=2,pg.locator('.hist li').count())
     pg.click('#d-close');ok('accepted back to 1',' (1)' in pg.locator('[data-tab=acc]').inner_text())
