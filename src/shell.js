@@ -79,7 +79,7 @@ function renderSheet(){
   else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map(t=>({t:String(t)}))})),{empty:'No notes yet.'});count=it.length+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
-   <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. Download it to open in Excel with the same colors and formatting.</p>
+   <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. Download it to open in Excel with the same colors and formatting. The download opens on an interactive Dashboard: pick a decision or a status from the yellow dropdowns and the count boxes and the list update.</p>
    <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
     ${tab==='today'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
     <button class="btn sm" id="sh-custom">Add or remove columns</button>
@@ -95,7 +95,7 @@ function renderSheet(){
 /* ---------- xlsx ---------- */
 function downloadXlsx(){
   const hdr=ks=>Object.assign(ks.map(t=>({v:t,s:'head'})),{h:32});
-  const mk=(rows,name,onlyCols)=>{
+  const mk=(rows,name)=>{
     const ws=cols.map(k=>COLS[k].w);
     const data=rows.map(r=>cols.map(k=>{const v=val(k,r),C=COLS[k];
       if(k==='status')return {v,s:TS[r.tier]};if(k==='dollars')return {v,s:'money'};
@@ -103,13 +103,66 @@ function downloadXlsx(){
     return {name,widths:ws,rows:[hdr(cols.map(k=>COLS[k].h)),...data],freeze:1,filter:data.length+1};
   };
   const since=sinceItems(),notes=noteItems(),rec=recipeItems();
-  const sheets=[mk(sheetRows('attn'),'Today'),mk(sheetRows('all'),'All Items'),
+  /* ---- interactive dashboard: pickers, live count boxes, and a list that rebuilds itself ---- */
+  const allRows=sheetRows('all'),N=allRows.length,nc=cols.length;
+  const DECL=Object.keys(A.DEC).map(k=>A.DEC[k][0]),STAT=['Needs attention',...A.TIERS.map(t=>A.tn(t)),'All statuses'];
+  const dName=r=>r.decision?A.DEC[r.decision][0]:'';
+  const D0='All decisions',S0='Needs attention';
+  const H=['Status','Decision','Needs Attention','SKU','Product','What Is Going On','Dollars','Confidence','Show'];
+  const hc=H.map((_,i)=>MiniXlsx.col(nc+i)),L=i=>hc[i];
+  const dataSheet=mk(allRows,'All Items');
+  const matches=r=>(D0==='All decisions'||dName(r)===D0)&&(S0==='All statuses'||(S0==='Needs attention'&&r.headline)||A.tn(r.tier)===S0);
+  let run=0;const showVal=allRows.map(r=>matches(r)?++run:'');
+  dataSheet.rows[0].push(...H.map(t=>({v:t,s:'head'})));
+  allRows.forEach((r,i)=>{const row=dataSheet.rows[i+1],er=i+2;
+    row.push({v:A.tn(r.tier),s:'txt'},{v:dName(r),s:'txt'},{v:r.headline?'Yes':'No',s:'txt'},{v:r.id,s:'txt'},{v:r.name,s:'txt'},{v:val('going',r),s:'txt'},{v:Math.round(r.dollars>0?r.dollars:0),s:'money'},{v:r.headline?r.confidence:'',s:'txt'},
+     {f:`IF(AND(OR(Dashboard!$B$4="${D0}",${L(1)}${er}=Dashboard!$B$4),OR(Dashboard!$G$4="All statuses",AND(Dashboard!$G$4="Needs attention",${L(2)}${er}="Yes"),${L(0)}${er}=Dashboard!$G$4)),MAX(${L(8)}$1:${L(8)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
+  dataSheet.widths=[...dataSheet.widths,...H.map(()=>14)];
+  dataSheet.hide=H.map((_,i)=>nc+i);
+  const rng=i=>`'All Items'!$${L(i)}$2:$${L(i)}$${N+1}`;
+  const W=13,BOX=[[0,2],[3,5],[6,8],[9,11]];
+  const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:Array(12).fill(W),rows:[],merges:[],cf:[],dv:[]};
+  const R=(n)=>{while(dash.rows.length<n)dash.rows.push([]);return dash.rows[n-1]};
+  const put=(r,c,o)=>{R(r)[c]=o};
+  const fill=(r,c0,c1,sty)=>{for(let c=c0;c<=c1;c++)if(!R(r)[c])put(r,c,{v:'',s:sty})};
+  const C=MiniXlsx.col;
+  put(1,0,{v:'Daily Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});dash.merges.push('A1:L1');R(1).h=26;
+  put(2,0,{v:'Pick a decision and a status in the two yellow cells. The four boxes show the decision counts, and the list below rebuilds itself. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first.',s:'note'});dash.merges.push('A2:L2');R(2).h=34;
+  put(4,0,{v:'Decision',s:'label'});put(4,1,{v:D0,s:'pick'});fill(4,2,3,'pick');dash.merges.push('B4:D4');
+  put(4,5,{v:'Status',s:'label'});put(4,6,{v:S0,s:'pick'});fill(4,7,8,'pick');dash.merges.push('G4:I4');R(4).h=24;
+  dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[D0,...DECL].join(',')+'"'},{ref:'G4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STAT.join(',')+'"'});
+  const keys=Object.keys(A.DEC);
+  BOX.forEach(([c0,c1],i)=>{const lab=A.DEC[keys[i]][0],cnt=allRows.filter(r=>dName(r)===lab).length,dol=Math.round(allRows.filter(r=>dName(r)===lab).reduce((t,r)=>t+(r.dollars>0?r.dollars:0),0));
+    put(6,c0,{v:lab,s:'boxT'});fill(6,c0+1,c1,'boxT');dash.merges.push(`${C(c0)}6:${C(c1)}6`);
+    put(7,c0,{f:`COUNTIF(${rng(1)},${C(c0)}6)`,v:cnt,s:'boxN'});fill(7,c0+1,c1,'boxN');dash.merges.push(`${C(c0)}7:${C(c1)}7`);
+    put(8,c0,{f:`SUMIFS(${rng(6)},${rng(1)},${C(c0)}6)`,v:dol,s:'boxS'});fill(8,c0+1,c1,'boxS');dash.merges.push(`${C(c0)}8:${C(c1)}8`);
+    dash.cf.push({ref:`${C(c0)}6:${C(c1)}8`,rules:[{type:'expression',dxf:5,formula:`$B$4=$${C(c0)}$6`}]})});
+  R(6).h=22;R(7).h=40;R(8).h=20;
+  put(10,0,{v:'Items matching your choices:',s:'label'});dash.merges.push('A10:C10');
+  put(10,3,{f:`COUNT(${rng(8)})`,v:run,s:'boxN'});R(10).h=24;
+  const hd=[['Status',0,0],['SKU',1,1],['Product',2,4],['What Is Going On',5,9],['$ At Risk',10,10],['Confidence',11,11]];
+  hd.forEach(([t,c0,c1])=>{put(11,c0,{v:t,s:'head'});fill(11,c0+1,c1,'head');if(c1>c0)dash.merges.push(`${C(c0)}11:${C(c1)}11`)});R(11).h=26;
+  const pull=(hcol,r)=>`IFERROR(INDEX(${rng(hcol)},MATCH(ROW()-11,${rng(8)},0)),"")`;
+  const first=12,last=11+N;
+  for(let i=0;i<N;i++){const row=first+i,k=i+1,src=allRows.filter(matches)[i],tier=src?A.tn(src.tier):'';
+    const f=h=>`IFERROR(INDEX(${rng(h)},MATCH(${k},${rng(8)},0)),"")`;
+    put(row,0,{f:f(0),v:src?A.tn(src.tier):'',s:'ctr'});
+    put(row,1,{f:f(3),v:src?src.id:'',s:'ctr'});
+    put(row,2,{f:f(4),v:src?src.name:'',s:'txt'});fill(row,3,4,'txt');dash.merges.push(`C${row}:E${row}`);
+    put(row,5,{f:f(5),v:src?val('going',src):'',s:'txt'});fill(row,6,9,'txt');dash.merges.push(`F${row}:J${row}`);
+    put(row,10,{f:f(6),v:src?Math.round(src.dollars>0?src.dollars:0):'',s:'money0'});
+    put(row,11,{f:f(7),v:src?(src.headline?src.confidence:''):'',s:'ctr'});R(row).h=32}
+  const TN=['At risk','Medium','Watch','Too much','No risk'];
+  dash.cf.push({ref:`A${first}:A${last}`,rules:TN.map((t,i)=>({type:'cellIs',op:'equal',dxf:i,formula:`"${A.tn(t)}"`}))});
+  dash.freeze=4;
+  const sheets=[dash,mk(sheetRows('attn'),'Today'),dataSheet,
    {name:'Since Yesterday',widths:[16,32,11,70],rows:[hdr(['Change','Product','SKU','Detail']),...since.map(r=>r.map(t=>({v:t,s:'txt'})))],freeze:1},
    {name:'Notes',widths:[11,30,18,20,60,10,10,14],rows:[hdr(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===7?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
-   {name:'Recipe',widths:[22,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}])],freeze:1}];
+   {name:'Recipe',widths:[22,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the All Items sheet feed it, so do not delete them.',s:'txt'}]],freeze:1}];
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
+  return sheets;
 }
 /* ---------- home ---------- */
 const ROUTES={

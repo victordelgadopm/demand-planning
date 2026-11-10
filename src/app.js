@@ -82,7 +82,7 @@ function sinceHtml(){
     ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-fixed','Fixed','An order was placed or the gap closed',d.recovered,i=>`<li>${lk(i)}</li>`)}
-    ${col('c-still','Still At Risk','Same as yesterday, no change',still,i=>`<li>${lk(i)}</li>`,4)}
+    ${col('c-still','Still At Risk','Same as yesterday, no change',still,i=>`<li>${lk(i)}</li>`)}
    </div>`;
 }
 function bindApp(){

@@ -18,7 +18,7 @@ with sync_playwright() as p:
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Today']
-    ok('xlsx 5 sheets',wb.sheetnames==['Today','All Items','Since Yesterday','Notes','Recipe'])
+    ok('xlsx 6 sheets',wb.sheetnames==['Dashboard','Today','All Items','Since Yesterday','Notes','Recipe'])
     ok('xlsx includes added column','Weeks Of Supply' in [c.value for c in ws[1]])
     ok('xlsx frozen+filter',ws.freeze_panes=='A2' and ws.auto_filter.ref is not None)
     ok('xlsx status colored',ws['A2'].fill.fgColor.rgb=='FFF8D7DA')
