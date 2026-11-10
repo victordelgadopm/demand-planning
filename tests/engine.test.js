@@ -3,7 +3,7 @@ const d=JSON.parse(fs.readFileSync('data/data.json'));const I=d.ids;let pass=0;
 const T=(n,f)=>{try{f();pass++;console.log('ok  ',n)}catch(e){console.log('FAIL',n,'-',e.message);process.exitCode=1}};
 const run=(notes=[],s={})=>E.compute(d.today,s,notes);const R=run(d.seedNotes);const row=(id,r=R)=>r.rows.find(x=>x.id===id);
 const exp={HG1:['Medium','history_gap'],MO1:['At risk','missed_order'],MO2:['Medium','missed_order'],LP1:['At risk','late_po'],LP2:['Medium','late_po'],LP2b:['Medium','late_po'],
- PR1:['Medium','promo_repeat'],PR2:['Watch','promo_repeat'],OP1:['Medium','pos_outpacing'],OP2:['Watch','pos_outpacing'],OV1:['Too much','overstock'],OV2:['Too much','overstock'],
+ PR1:['Medium','promo_repeat'],PR2:['Watch','promo_repeat'],OP1:['Medium','pos_outpacing'],OP2:['Watch','pos_outpacing'],OV1:['Overstocked','overstock'],OV2:['Overstocked','overstock'],
  CF1:['Watch','channel_fill'],DQ1:['Watch','check_data'],DQ2:['Watch','check_data'],NI1:['Medium','newitem_gap'],HG3:['Medium','history_gap']};
 for(const [k,[tier,type]] of Object.entries(exp))T('planted '+k+' -> '+tier+'/'+type,()=>{const r=row(I[k]);assert.equal(r.tier,tier);assert.equal(r.headlineType,type);});
 for(const k of ['SP1','NF1','HN1','HN2','HN3','LU1','LU2','LU3','RC1','NI2','NI3'])T('hard negative '+k+' stays No risk',()=>assert.equal(row(I[k]).tier,'No risk'));

@@ -10,7 +10,7 @@
     flags: { missed_order: true, late_po: true, history_gap: true, promo_repeat: true, pos_outpacing: true,
              overstock: true, channel_fill: true, newitem_gap: true, check_data: true }
   };
-  const TIER_ORDER = { 'At risk': 0, 'Medium': 1, 'Watch': 2, 'Too much': 3, 'No risk': 4 };
+  const TIER_ORDER = { 'At risk': 0, 'Medium': 1, 'Watch': 2, 'Overstocked': 3, 'No risk': 4 };
   const DECISION_OF = { missed_order: 'order_more', late_po: 'order_more', history_gap: 'order_more', promo_repeat: 'order_more',
     pos_outpacing: 'order_more', overstock: 'too_much', channel_fill: 'too_much', newitem_gap: 'forecast_off', check_data: 'check_data' };
   const FLAG_LABEL = { missed_order: 'Missed order', late_po: 'Lead time risk', history_gap: 'Short vs last year', promo_repeat: 'Promo repeat',
@@ -115,6 +115,23 @@
     const metrics = { wos, onHand: inv.onHand, transit: transitQty, openPO: poQty, supply, needPlan, needHist, lyRaw: hd ? sum(hd.rawLY) : 0,
       posVsFcst: last4f > 0 ? last4 / last4f - 1 : 0, ytdRatio: hd ? hd.ratio : 0, lift: hd ? hd.lift : 0, lt };
     const add = f => flags.push(f);
+    // planner fields shown in every view (display only, no flags depend on them)
+    { const sh8 = sum(sku.ship.y2026, 37, 45), pp8 = sum(pos26, 37, 45), a13 = sum(pos26, 32, 45), f13 = sum(f26, 32, 45);
+      let err = 0; for (let i = 32; i < 45; i++) err += Math.abs(pos26[i] - f26[i]);
+      Object.assign(metrics, { fcstWk: meanF, sales4: sum(pos26, 42, 45), fcst4: sum(f26, 42, 45), price, shipRatio: pp8 > 0 ? sh8 / pp8 : null,
+        acc13: a13 > 0 ? Math.max(0, 1 - err / a13) : null, bias13: a13 > 0 ? (f13 - a13) / a13 : null, fcstValue: needPlan * price });
+      const arr = [].concat((inv.transit || []).map(t => ({ h: t.etaH, qty: t.qty })), (inv.pos || []).map(p => ({ h: p.etaH, qty: p.qty })));
+      arr.sort((a, b) => a.h - b.h);
+      metrics.nextArr = arr.length ? { h: arr[0].h, qty: arr[0].qty, date: fmtDate(weekStart(snap, arr[0].h)) } : null;
+      metrics.stockOutH = null; metrics.orderBy = null; metrics.shortUnits = 0;
+      if (inv.onHand >= 0 && !sku.isNew) {
+        const pj = project(sku, snap, { demand: F, slip: 0 });
+        metrics.shortUnits = pj.short;
+        if (pj.first !== null) {
+          metrics.stockOutH = pj.first; metrics.stockOutDate = fmtDate(weekStart(snap, pj.first));
+          if (lt) { const d = addDays(weekStart(snap, pj.first), -Math.round(lt.use * 7)); metrics.orderBy = d <= parseDay(snap.meta.today) ? 'Now' : fmtDate(d); }
+        }
+      } }
 
     // data checks
     const issues = (sku.dataIssues || []).slice();
@@ -177,12 +194,12 @@
       if (!sku.lumpy && S.flags.overstock && wos > S.overstockWOS) {
         const trend = sum(pos26, 41, 45) / Math.max(1, sum(pos26, 37, 41));
         if (trend < 0.9) { const ex = Math.max(0, inv.onHand + transitQty - 12 * meanF);
-          add({ type: 'overstock', tier: 'Too much', dollars: ex * price * 0.25, gapUnits: ex, confidence: 'High',
+          add({ type: 'overstock', tier: 'Overstocked', dollars: ex * price, gapUnits: ex, confidence: 'High',
             text: fmtNum(wos) + ' weeks of supply and sales are slowing (' + Math.round((trend - 1) * 100) + '%)' }); }
       }
       const sh = sum(sku.ship.y2026, 37, 45), pp = sum(pos26, 37, 45);
       if (!sku.lumpy && S.flags.channel_fill && pp > 0 && sh > S.channelRatio * pp)
-        add({ type: 'channel_fill', tier: 'Watch', dollars: (sh - pp) * price * 0.25, gapUnits: sh - pp, confidence: 'High',
+        add({ type: 'channel_fill', tier: 'Watch', dollars: (sh - pp) * price, gapUnits: sh - pp, confidence: 'High',
           text: 'Shipping ' + Math.round((sh / pp - 1) * 100) + '% ahead of sell-through over 8 weeks. Retailers may be building stock' });
     }
     if (sku.isNew && S.flags.newitem_gap) {
@@ -191,7 +208,7 @@
         const r = needPlan / an.mean;
         if (r < 0.75) add({ type: 'newitem_gap', tier: 'Medium', dollars: (an.mean - needPlan) * price, gapUnits: an.mean - needPlan, confidence: 'Medium',
           text: 'Forecast is ' + Math.round((1 - r) * 100) + '% below similar past launches (' + fmtNum(needPlan) + ' vs ' + fmtNum(an.mean) + ' units in 12 weeks)' });
-        else if (r > 1.33) add({ type: 'newitem_gap', tier: 'Watch', dollars: (needPlan - an.mean) * price * 0.25, gapUnits: needPlan - an.mean, confidence: 'Medium',
+        else if (r > 1.33) add({ type: 'newitem_gap', tier: 'Watch', dollars: (needPlan - an.mean) * price, gapUnits: needPlan - an.mean, confidence: 'Medium',
           text: 'Forecast is ' + Math.round((r - 1) * 100) + '% above similar past launches (' + fmtNum(needPlan) + ' vs ' + fmtNum(an.mean) + ' units)' });
       }
     }
@@ -213,7 +230,7 @@
     const allSorted = flags.slice().sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || b.dollars - a.dollars);
     return { id: sku.id, name: sku.name, sub: sku.sub, price, isNew: !!sku.isNew, lumpy: !!sku.lumpy,
       tier: top ? top.tier : 'No risk', decision: top ? top.decision : null, headline: top ? top.text : null, headlineType: top ? top.type : null,
-      dollars: top ? top.dollars : 0, flags: allSorted, acceptedFlags: accepted, isAccepted: !top && accepted.length > 0, reAlert,
+      dollars: top ? top.dollars : 0, gapUnits: top ? Math.round(top.gapUnits || 0) : 0, flags: allSorted, acceptedFlags: accepted, isAccepted: !top && accepted.length > 0, reAlert,
       confidence: top ? top.confidence : 'High', metrics };
   }
 
@@ -221,11 +238,19 @@
     const S = Object.assign({}, DEFAULTS, settings || {}); S.flags = Object.assign({}, DEFAULTS.flags, (settings || {}).flags || {});
     const notes = activeNotes(noteEvents || []);
     const rows = snap.skus.map(s => evalSku(s, snap, S, notes));
-    const tiers = { 'At risk': 0, 'Medium': 0, 'Watch': 0, 'Too much': 0, 'No risk': 0 };
+    const tiers = { 'At risk': 0, 'Medium': 0, 'Watch': 0, 'Overstocked': 0, 'No risk': 0 };
     const dec = { order_more: { n: 0, d: 0 }, too_much: { n: 0, d: 0 }, forecast_off: { n: 0, d: 0 }, check_data: { n: 0, d: 0 } };
+    // ABC class by share of 12-week forecast sales value (80 / 15 / 5)
+    const totVal = sum(rows.map(r => r.metrics.fcstValue)); let cum = 0;
+    rows.slice().sort((a, b) => b.metrics.fcstValue - a.metrics.fcstValue).forEach(r => { r.abc = totVal > 0 && cum / totVal < 0.8 ? 'A' : totVal > 0 && cum / totVal < 0.95 ? 'B' : 'C'; cum += r.metrics.fcstValue; });
     let accepted = 0;
     rows.forEach(r => { tiers[r.tier]++; if (r.decision) { dec[r.decision].n++; dec[r.decision].d += r.dollars; } if (r.isAccepted) accepted++; });
-    return { rows, tiers, dec, accepted, settings: S, total: rows.length };
+    const act = rows.filter(r => r.metrics.fcstWk > 0 && !r.isNew);
+    const kpi = { items: rows.length, onHand: sum(rows.map(r => r.metrics.onHand)), transit: sum(rows.map(r => r.metrics.transit)), openPO: sum(rows.map(r => r.metrics.openPO)),
+      onHandValue: sum(rows.map(r => r.metrics.onHand * r.price)), fcstWk: sum(rows.map(r => Math.round(r.metrics.fcstWk))),
+      lowCover: act.filter(r => r.metrics.onHand >= 0 && r.metrics.wos < 4).length, highCover: act.filter(r => r.metrics.wos > S.overstockWOS).length };
+    kpi.wos = kpi.fcstWk > 0 ? (kpi.onHand + kpi.transit) / kpi.fcstWk : 0;
+    return { rows, tiers, dec, accepted, kpi, settings: S, total: rows.length };
   }
 
   function diff(prev, cur, tol = 0.05) {
@@ -248,11 +273,19 @@
     Object.keys(bySub).forEach(k => {
       const A = new Array(13).fill(0), F = new Array(13).fill(0);
       bySub[k].forEach(s => { for (let i = 0; i < 13; i++) { A[i] += s.pos.y2026[32 + i]; F[i] += s.forecast26[32 + i]; } });
-      const sa = sum(A), sf = sum(F); const wmape = sum(A.map((a, i) => Math.abs(a - F[i]))) / sa; const bias = (sf - sa) / sa;
+      let se = 0; bySub[k].forEach(s => { for (let i = 32; i < 45; i++) se += Math.abs(s.pos.y2026[i] - s.forecast26[i]); });
+      const sa = sum(A), sf = sum(F); const wmape = se / sa; const bias = (sf - sa) / sa;
       const e = A.slice(5).map((a, i) => a - F[5 + i]); const t = mean(e) / ((sd(e) / Math.sqrt(8)) || 1e-9);
       out[k] = { wmape, bias, t, possible: Math.abs(t) > 3 && Math.abs(bias) > 0.03, direction: bias < 0 ? 'under' : 'over', n: bySub[k].length };
     });
     return out;
+  }
+
+  function accuracyTotal(snap) {
+    // SKU-by-week error (what finance calls WMAPE): sum of |actual - forecast| over every SKU and week, divided by total actual
+    let err = 0, act = 0, fc = 0, n = 0;
+    snap.skus.forEach(s => { if (s.isNew) return; n++; for (let i = 32; i < 45; i++) { const a = s.pos.y2026[i], f = s.forecast26[i]; err += Math.abs(a - f); act += a; fc += f; } });
+    return { n, wmape: err / act, bias: (fc - act) / act };
   }
 
   function options(sku, snap, res) {
@@ -289,6 +322,6 @@
     return o;
   }
 
-  return { H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, analogsFor, activeNotes, leadWeeks, options,
+  return { H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, analogsFor, activeNotes, leadWeeks, options,
     weekStart, weekNum, fmtDate, fmtNum, fmtMoney, parseDay, addDays, sum, mean, sd };
 });

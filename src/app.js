@@ -4,10 +4,10 @@ const D=window.__DATA__, E=window.Engine;
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=E.fmtNum, money=E.fmtMoney, KEY='dpa.v1';
-const TIERS=['At risk','Medium','Watch','Too much','No risk'];
-const TCLS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Too much':'t-much','No risk':'t-ok'};
-const TICON={'At risk':'▲','Medium':'◆','Watch':'◉','Too much':'■','No risk':'✔'};
-const DEC={order_more:['Order more or expedite','Stock will run short'],too_much:['Too much','Cash tied up in stock'],forecast_off:['Forecast looks off','Sales moving away from plan'],check_data:['Check the data','Something looks wrong in a source']};
+const TIERS=['At risk','Medium','Watch','Overstocked','No risk'];
+const TCLS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
+const TICON={'At risk':'▲','Medium':'◆','Watch':'◉','Overstocked':'■','No risk':'✔'};
+const DEC={order_more:['Order more or expedite','Stock will run short'],too_much:['Too much stock','Cash tied up in stock'],forecast_off:['Forecast looks off','Sales moving away from plan'],check_data:['Check the data','Something looks wrong in a source']};
 const SRC={planning:'Planning system',bi:'Reporting tool',sharepoint:'Shared file',calc:'Calculated'};
 const REASONS=['Budget','Focus is on another line','Supplier constraint','Planned promo change','Other'];
 const DEFSET={...E.DEFAULTS,flags:{...E.DEFAULTS.flags},minDollars:0,tierNames:{},cols:{sub:true,conf:true,dollars:true},profile:'Planner'};
@@ -21,6 +21,43 @@ const RULES={
  channel_fill:['Shipping ahead of sales','Shipments to retailers are well above what shoppers bought over 8 weeks, so retailers may be building stock.'],
  newitem_gap:['New item forecast','The forecast for a new item is far from what similar past launches sold in their first 12 weeks.'],
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
+
+/* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
+const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int'};
+const r3=x=>Math.round(x*10000)/10000;
+const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
+function pv(k,r){const m=r.metrics,nw=r.isNew;
+  switch(k){
+   case 'onhand':return m.onHand;case 'transit':return m.transit;case 'openpo':return m.openPO;case 'onorder':return m.transit+m.openPO;case 'supply':return Math.round(m.supply||0);
+   case 'fcstwk':return Math.round(m.fcstWk);case 'sales4':return nw?'':Math.round(m.sales4);
+   case 'salesvs':return nw||!(m.fcst4>0)?'':r3(m.sales4/m.fcst4-1);
+   case 'wos':return nw||m.wos==null?'':Math.round(m.wos*10)/10;
+   case 'stockout':return nw||m.onHand<0?'n/a':(m.stockOutDate||'None');
+   case 'orderby':return nw||m.onHand<0?'n/a':(m.orderBy||'None');
+   case 'nextarr':return m.nextArr?m.nextArr.date+' ('+fmt(m.nextArr.qty)+')':'None';
+   case 'gap':return r.headline?r.gapUnits:'';case 'gaptype':return r.decision?GAPT[r.decision]:'';
+   case 'dollars':return r.dollars>0?Math.round(r.dollars):0;case 'price':return r.price;
+   case 'acc':return m.acc13==null?'':r3(m.acc13);case 'bias':return m.bias13==null?'':r3(m.bias13);
+   case 'ship':return m.shipRatio==null?'':Math.round(m.shipRatio*100)/100;
+   case 'abc':return r.abc;}
+  return '';}
+function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!=='number')return String(v);
+  switch(t){case 'int':return fmt(v);case 'dec1':return v.toFixed(1);case 'pct':return Math.round(v*100)+'%';case 'pctS':return (v>0?'+':'')+Math.round(v*100)+'%';
+   case 'money':return v>0?money(v):'—';case 'money2':return '$'+v.toFixed(2);case 'x2':return v.toFixed(2)+'x';}
+  return String(v)}
+function pcls(k,v){if(v===''||v==null)return '';
+  if(k==='wos'&&typeof v==='number')return v<4?'bad':v>st.settings.overstockWOS?'ovr':'';
+  if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
+  if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
+  if(k==='onhand'&&v<0)return 'bad';return ''}
+const pctN=(v,d=1)=>(v*100).toFixed(d)+'%',pctSN=(v,d=1)=>(v>0?'+':'')+(v*100).toFixed(d)+'%';
+
+function snapTiles(){const r=st.res,K=r.kpi,AC=E.accuracyTotal(snap()),attn=r.rows.filter(x=>x.headline).length;
+  return [['Items Tracked',fmt(K.items),attn+' need attention today'],['Units On Hand',fmt(K.onHand),money(K.onHandValue)+' at unit price'],
+    ['On Order',fmt(K.transit+K.openPO),fmt(K.transit)+' transit + '+fmt(K.openPO)+' PO'],
+    ['Weeks Of Supply',K.wos.toFixed(1),K.lowCover+' items under 4 weeks, '+K.highCover+' over '+st.settings.overstockWOS],
+    ['Forecast Accuracy',pctN(1-AC.wmape),'Miss (WMAPE) '+pctN(AC.wmape)+', last 13 weeks'],
+    ['Forecast Bias',pctSN(AC.bias),AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high']]}
 
 /* ---------- state ---------- */
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
@@ -51,14 +88,16 @@ function renderApp(){
    <div class="card health" data-g="health"><span class="ok-t">✔ ${D.sources.length} sources combined and checked</span>
    ${st.snap==='today'&&q?`<span class="warn-t">▲ ${q} file held back (units look wrong)</span>`:''}
    <a href="#" id="l-load" style="color:var(--brand)">See today's data check</a></div>`;
+  const snapHtml=`<h2 class="sec-h" style="margin-top:6px">Portfolio Snapshot</h2><p class="sec-sub">Where the whole portfolio stands today, before any single item. Weeks of supply is on hand plus in transit divided by the average weekly forecast. Forecast accuracy is one minus the miss (WMAPE) across every SKU and week.</p>
+   <div class="snap" data-g="snap">${snapTiles().map(([t,n,sub])=>`<div class="snapt"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>`;
   const dsum=Object.entries(r.dec).map(([k,v])=>`<button class="dtile" aria-pressed="${st.dec===k}" data-dec="${k}">
      <div class="t">${DEC[k][0]}</div><div class="n">${v.n}</div><div class="d">${DEC[k][1]}</div>
      <div class="h">${v.d>0?money(v.d)+' at stake':'&nbsp;'}</div></button>`).join('');
   $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${st.snap==='today'?'Today, '+esc(TODAY_LONG):'Yesterday (comparison)'}</span></div>
-   <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Four sections: the data check, what changed, the decisions to make, and the item list.</p>${health}${sinceHtml()}
+   <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list.</p>${health}${snapHtml}${sinceHtml()}
    <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision. Tap a box to filter the list below.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
-   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At risk is the sales value of the units we would be short (units short times price). The tabs switch between items that need attention, risks you accepted, and forecast accuracy.</p>
+   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, and forecast accuracy.</p>
    <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="${st.tab==='attn'}" data-tab="attn" data-g="tab-attn">Needs attention</button>
     <button class="tab" role="tab" aria-selected="${st.tab==='acc'}" data-tab="acc" data-g="tab-accepted">Accepted risks (${r.accepted})</button>
@@ -86,7 +125,7 @@ function sinceHtml(){
    </div>`;
 }
 function bindApp(){
-  $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';renderApp()});
+  $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';st.tier='attn';renderApp()});
   $$('[data-tier]').forEach(b=>b.onclick=()=>{st.tier=b.dataset.tier;renderApp()});
   $$('[data-tab]').forEach(b=>b.onclick=()=>{st.tab=b.dataset.tab;renderApp()});
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();openSku(a.dataset.open)});
@@ -122,7 +161,7 @@ function chipsHtml(){const r=st.res,attn=r.rows.filter(x=>x.headline).length;
 function renderList(){
   const rows=filtered(),c=st.settings.cols;$('#cnt').textContent=rows.length+' SKUs';
   const cap=(!st.more&&!st.q&&rows.length>8)?8:rows.length,shown=rows.slice(0,cap);
-  $('#listbody').innerHTML=rows.length?`<table class="list"><thead><tr><th>Status</th><th>SKU</th><th>What is going on</th>${c.dollars?'<th class="num">$ at risk</th>':''}${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
+  $('#listbody').innerHTML=rows.length?`<div class="lscroll"><table class="list"><thead><tr><th>Status</th><th>SKU</th><th>What is going on</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst</th><th>Stock-out</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
    :'<div class="empty">Nothing here with these filters.</div>';
   bindRows($('#listbody'));const sm=$('#showmore');if(sm)sm.onclick=()=>{st.more=true;renderList()};
 }
@@ -131,6 +170,7 @@ function rowHtml(r){const c=st.settings.cols;
   return `<tr class="r" tabindex="0" data-open="${r.id}"><td>${tierB(r.tier)}${r.reAlert?'<div style="margin-top:4px"><span class="re" style="margin:0">RE-ALERT</span></div>':''}</td>
    <td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id}${c.sub?' · '+esc(r.sub):''}${r.isNew?' · new item':''}${r.lumpy?' · lumpy demand':''}</div></td>
    <td>${r.headline?`<span class="tag">${esc(E.FLAG_LABEL[r.headlineType])}</span>`:''}${esc(hl)}${r.metrics.spike&&!r.headline?'<div class="conf">One-time spike noticed in the last 8 weeks, treated as a one-off.</div>':''}</td>
+   ${['onhand','onorder','wos','fcstwk','salesvs'].map(k=>{const v=pv(k,r);return `<td class="num ${pcls(k,v)}">${v===''?'—':fv(k,v)}</td>`}).join('')}<td class="${pcls('stockout',pv('stockout',r))}">${esc(pv('stockout',r))}</td><td class="num">${r.headline?fmt(r.gapUnits):'—'}</td>
    ${c.dollars?`<td class="num">${r.dollars>0?money(r.dollars):'—'}</td>`:''}${c.conf?`<td class="conf">${r.headline?r.confidence:''}</td>`:''}</tr>`}
 function bindRows(root){$$('[data-open]',root).forEach(e=>{e.onclick=()=>openSku(e.dataset.open);e.onkeydown=ev=>{if(ev.key==='Enter')openSku(e.dataset.open)}})}
 function accHtml(){
@@ -142,12 +182,14 @@ function accHtml(){
    <td class="num">${fmt(n.acceptedGap)} units</td><td class="num">${fmt(f.gapUnits)} units</td><td class="num">${n.realertGap!=null?(n.realertGap>1e8?'Never':fmt(n.realertGap)+' units'):fmt(n.acceptedGap*1.5)+' units'}</td></tr>`})).join('')}</tbody></table></div>
    <p class="foot">Notes never expire on their own. The only thing that brings a flag back is the data: if the gap grows past 1.5x what you accepted (adjustable per note), or you remove the note.</p>`}
 function accuracyHtml(){
-  const a=E.accuracy(snap());
-  return `<div class="card sec" data-g="accuracy"><h3>Forecast accuracy by subcategory (last 13 weeks)</h3>
-  <p class="mute">Checked at group level, not SKU by SKU, so one noisy item cannot trigger a false alarm.</p>
-  <table class="list"><thead><tr><th>Subcategory</th><th class="num">SKUs</th><th class="num">Miss (WMAPE)</th><th class="num">Bias</th><th>Signal</th></tr></thead><tbody>
-  ${Object.entries(a).map(([k,v])=>`<tr><td><b>${esc(k)}</b></td><td class="num">${v.n}</td><td class="num">${(v.wmape*100).toFixed(1)}%</td><td class="num">${v.bias>0?'+':''}${(v.bias*100).toFixed(1)}%</td>
-  <td>${v.possible?`<span class="tier t-med">◆ Possible bias: forecast runs ${v.direction === 'under' ? 'low' : 'high'}</span><div class="conf">Seen over 8 weeks across ${v.n} SKUs. Worth a look at the forecast method.</div>`:'<span class="ok-t">✔ No consistent bias</span>'}</td></tr>`).join('')}</tbody></table></div>`}
+  const a=E.accuracy(snap()),T=E.accuracyTotal(snap());
+  const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-med">◆ Watch</span>':'<span class="ok-t">✔ On target</span>';
+  return `<div class="card sec" data-g="accuracy"><h3>Forecast accuracy by line (last 13 weeks)</h3>
+  <p class="mute">Miss (WMAPE) adds up the gap between actual sales and forecast for every SKU and week, then divides by total sales. Bias is whether the forecast runs high (+) or low (-) overall. Common targets: miss under 25%, bias within 5% either way. The bias signal below is checked at line level, so one noisy item cannot trigger a false alarm.</p>
+  <div class="xl-scroll"><table class="list"><thead><tr><th>Line</th><th class="num">SKUs</th><th class="num">Forecast accuracy</th><th class="num">Miss (WMAPE)</th><th class="num">Bias</th><th>Against targets</th><th>Signal</th></tr></thead><tbody>
+  <tr><td><b>All lines</b></td><td class="num">${T.n}</td><td class="num">${pctN(1-T.wmape)}</td><td class="num">${pctN(T.wmape)}</td><td class="num">${pctSN(T.bias)}</td><td>${tgt(T.wmape,T.bias)}</td><td></td></tr>
+  ${Object.entries(a).sort((x,y)=>y[1].wmape-x[1].wmape).map(([k,v])=>`<tr><td><b>${esc(k)}</b></td><td class="num">${v.n}</td><td class="num">${pctN(1-v.wmape)}</td><td class="num">${pctN(v.wmape)}</td><td class="num">${pctSN(v.bias)}</td><td>${tgt(v.wmape,v.bias)}</td>
+  <td>${v.possible?`<span class="tier t-med">◆ Possible bias: forecast runs ${v.direction === 'under' ? 'low' : 'high'}</span><div class="conf">Seen over 8 weeks across ${v.n} SKUs. Worth a look at the forecast method.</div>`:'<span class="ok-t">✔ No consistent bias</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
 
 /* ---------- charts ---------- */
 function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p;return (f<1.5?1:f<3?2:f<7?5:10)*p}
@@ -333,9 +375,9 @@ function openSettings(){
    ${row('channelRatio','Shipping ahead of sales, ratio above','1.3 means 30% ahead',1,3,.05)}
    ${row('outpaceRatio','Sales above forecast, ratio above','1.2 means 20% above',1,3,.05)}
    ${row('outpaceWeeks','Sales above forecast, weeks in a row','',2,8)}
-   ${row('minDollars','Hide items under ($ at risk)','Manager view uses 25,000',0,1000000,1000)}
+   ${row('minDollars','Hide items under ($ at stake)','Manager view uses 25,000',0,1000000,1000)}
    <div class="set-row"><div>Lead time to trust<small>Typical uses the supplier's real history. Quoted uses the quote only.</small></div><select data-s="leadTimeBasis"><option value="p80" ${s.leadTimeBasis==='p80'?'selected':''}>Typical</option><option value="quoted" ${s.leadTimeBasis==='quoted'?'selected':''}>Quoted</option></select></div></div>
-  <div class="card sec"><h3>Columns</h3>${[['sub','Subcategory'],['conf','Confidence'],['dollars','$ at risk']].map(([k,l])=>`<label class="sw"><input type="checkbox" data-col="${k}" ${s.cols[k]?'checked':''}> ${l}</label>`).join('')}</div>
+  <div class="card sec"><h3>Columns</h3>${[['sub','Subcategory'],['conf','Confidence'],['dollars','$ at stake']].map(([k,l])=>`<label class="sw"><input type="checkbox" data-col="${k}" ${s.cols[k]?'checked':''}> ${l}</label>`).join('')}</div>
   <div class="card sec"><h3>Status names</h3>${TIERS.map(t=>`<div class="set-row"><div>${t}</div><input type="text" data-tn="${t}" value="${esc(s.tierNames[t]||'')}" placeholder="${t}"></div>`).join('')}</div>
   <div class="row"><button class="btn" id="st-export">Copy my settings</button><button class="btn" id="st-def">Back to defaults</button></div></div>`;
   $('#settings').classList.add('on');$('#scrim').classList.add('on');
@@ -416,7 +458,7 @@ function openEmail(){
 }
 /* ---------- csv ---------- */
 function downloadCsv(){
-  const cols=['SKU','Name','Subcategory','Supplier','Status','Decision','What is going on','$ at risk','Confidence','On hand [Planning system]','In transit [Planning system]','Open PO qty [Planning system]','Supply [Calculated]','Forecast next 12 wks [Planning system]','Need from history [Calculated]','Same weeks last year [Reporting tool]','Weeks of supply [Calculated]','Lead time quoted wks [Shared file]','Lead time typical wks [Calculated]','Note'];
+  const cols=['SKU','Name','Subcategory','Supplier','Status','Decision','What is going on','$ at stake','Confidence','On hand [Planning system]','In transit [Planning system]','Open PO qty [Planning system]','Supply [Calculated]','Forecast next 12 wks [Planning system]','Need from history [Calculated]','Same weeks last year [Reporting tool]','Weeks of supply [Calculated]','Lead time quoted wks [Shared file]','Lead time typical wks [Calculated]','Note'];
   const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const lines=[cols.join(',')];
   st.res.rows.forEach(r=>{const m=r.metrics,lt=m.lt,n=r.acceptedFlags[0]&&r.acceptedFlags[0].note;
@@ -456,7 +498,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();
