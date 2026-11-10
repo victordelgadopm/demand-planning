@@ -133,6 +133,17 @@ function renderHome(){
   </div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Shared folder</span><span class="arrow">→</span><span><b>2.</b> Copilot connection</span><span class="mute">Use drag and drop to start on day one.</span></div>
+  <h2 class="sec-h">Ways To Run It Each Morning</h2>
+  <p class="pg-sub" style="margin-top:0">Three possible paths, from simplest to most automatic. Each one has limits, listed honestly.</p>
+  <div class="paths">
+   <div class="card path"><span class="tagp">Start Here</span><h3>A. You Ask Each Morning</h3><p>Open the AI, point it at the files in the shared folder, and ask for the sheet. Takes a minute.</p>
+    <p class="lim"><b>Limits:</b> Someone has to do it every day. Wording can change the result a little, so save a standard request.</p></div>
+   <div class="card path"><span class="tagp">Same Every Day</span><h3>B. Scheduled, Same Sheet Every Day</h3><p>A scheduled flow in Microsoft's cloud copies a template, loads the files, applies the colors and flags, and saves the sheet in the folder. No prompt, and your computer can be off.</p>
+    <p class="lim"><b>Limits:</b> Needs IT to allow the flow and a one-time build and test. Each Microsoft piece is documented, but the full chain still needs a pilot. Changes mean updating the script.</p></div>
+   <div class="card path"><span class="tagp">Later</span><h3>C. A Scheduled AI Agent</h3><p>An AI agent runs on a schedule and uses judgment, such as writing the morning summary.</p>
+    <p class="lim"><b>Limits:</b> Runs use credits, use the builder's sign-in, and admins can block them. Output can vary day to day, and building a formatted Excel file this way is not confirmed.</p></div>
+  </div>
+  <div class="card rule"><b>Built Once, Then Repeated</b><span><b>1.</b> Write down the files and rules</span><span class="arrow">→</span><span><b>2.</b> AI builds it with real files</span><span class="arrow">→</span><span><b>3.</b> Test against known items</span><span class="arrow">→</span><span><b>4.</b> Save it and schedule it</span></div>
   <div class="who"><div class="card"><h3>You</h3><p>Say what you need and what you are not seeing. Decide what to do about each flagged item.</p></div>
    <div class="card"><h3>The AI</h3><p>Reads the files, checks them, builds the sheet, writes the morning summary, and keeps your preferences.</p></div>
    <div class="card"><h3>IT</h3><p>Approves one way to get the data in. That is the only thing they have to do.</p></div></div>
