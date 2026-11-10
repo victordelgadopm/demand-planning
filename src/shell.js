@@ -132,6 +132,7 @@ function renderHome(){
    <div class="card step"><div class="num">3</div><h2>Get Your Sheet</h2><p>A formatted Excel file every morning, with the items that need you at the top.</p>
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap" ><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
   </div>
+  <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <h2 class="sec-h">What Connects To What</h2>
   <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026.</p>
   <div class="card mx-wrap"><table class="mx"><thead><tr><th></th><th>ChatGPT</th><th>Copilot</th><th>Shared Folder</th></tr></thead><tbody>
@@ -144,8 +145,26 @@ function renderHome(){
     <td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td>
     <td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. IT adds a step.</span></td></tr>
   </tbody></table></div>
-  <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Shared folder</span><span class="arrow">→</span><span><b>2.</b> Copilot or ChatGPT connection, whichever IT approves</span><span class="mute">Use drag and drop to start on day one.</span></div>
+  <p style="margin-top:18px"><button class="btn pri" data-nav="options">See All Options And Limits</button></p>
+  </div>`;
+  const h=$('#v-home');
+  $$('[data-route]',h).forEach(b=>b.onclick=()=>{route=b.dataset.route;renderHome()});
+  $$('[data-nav]',h).forEach(b=>b.onclick=()=>go(b.dataset.nav));
+  $('#h-dl').onclick=downloadXlsx;
+}
+function renderOptions(){
+  $('#v-options').innerHTML=`<div class="page"><div class="pg-h"><h1>All Options And Limits</h1></div>
+  <p class="pg-sub">Every way to connect, what each can do for Anaplan and Tableau, and what limits it. Checked against each company's own pages in November 2026.</p>
+  <h2 class="sec-h" style="margin-top:8px">All Connection Options</h2>
+  <div class="card mx-wrap"><table class="mx"><thead><tr><th>Option</th><th>Anaplan</th><th>Tableau</th><th>Main Limit</th></tr></thead><tbody>
+   <tr><th>Shared Folder<small>Any approved AI tool</small></th><td class="part"><b>▲ Partly</b><span>Exports to S3, Azure Blob or BigQuery. IT moves them to the folder.</span></td><td class="part"><b>▲ Partly</b><span>Prep file output or REST API. IT moves them to the folder.</span></td><td>IT builds one step per system.</td></tr>
+   <tr><th>Copilot Connection</th><td class="yes"><b>✔ Yes</b><span>Named by Anaplan.</span></td><td class="part"><b>▲ Partly</b><span>Finds and answers about dashboards.</span></td><td>Full Tableau numbers not stated. Licensing for Anaplan not stated.</td></tr>
+   <tr><th>ChatGPT Connection</th><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or bridge.</span></td><td class="yes"><b>✔ Yes</b><span>Listed by Tableau.</span></td><td>Scheduled tasks cannot take file uploads.</td></tr>
+   <tr><th>Split: ChatGPT And Copilot<small>Both save to the folder, Copilot merges</small></th><td class="no"><b>✕ Not until built</b><span>Anaplan connector must be built first.</span></td><td class="yes"><b>✔ Yes</b><span>Through ChatGPT.</span></td><td>Two tools to approve. Saving files from ChatGPT to the folder is not confirmed.</td></tr>
+   <tr><th>Drag And Drop</th><td class="yes"><b>✔ Yes</b><span>You export the file by hand.</span></td><td class="yes"><b>✔ Yes</b><span>You export the file by hand.</span></td><td>Manual every day.</td></tr>
+   <tr><th>Keep Separate<small>One sheet per system</small></th><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td>No flags that need both systems.</td></tr>
+  </tbody></table></div>
   <h2 class="sec-h">Ways To Run It Each Morning</h2>
   <p class="pg-sub" style="margin-top:0">Three possible paths, from simplest to most automatic. Each one has limits, listed honestly.</p>
   <div class="paths">
@@ -194,10 +213,9 @@ function renderHome(){
    <p class="conf">Sources: <a href="https://help.anaplan.com/cloudworks-96f951fe-52fc-45a3-b6cb-16b7fe38e1aa" target="_blank" rel="noopener">Anaplan CloudWorks</a> · <a href="https://help.tableau.com/current/online/en-us/subscribe_user.htm" target="_blank" rel="noopener">Tableau subscriptions</a> · <a href="https://help.tableau.com/current/online/en-us/prep_conductor_schedule_flow_task.htm" target="_blank" rel="noopener">Tableau Prep flows</a> · <a href="https://learn.microsoft.com/en-us/connectors/excelonlinebusiness/" target="_blank" rel="noopener">Excel connector</a> · <a href="https://www.anaplan.com/platform/anaplan-ai-gateway/" target="_blank" rel="noopener">Anaplan AI Gateway</a> · <a href="https://learn.microsoft.com/en-us/microsoft-365/copilot/connectors/tableau-cloud-deployment" target="_blank" rel="noopener">Tableau connector for Copilot</a> · <a href="https://learn.microsoft.com/microsoft-copilot-studio/authoring-triggers-about" target="_blank" rel="noopener">Copilot Studio triggers</a></p></details>
   <details class="card it"><summary>Extras</summary><p class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="x-load">Replay Today's Data Check</button><button class="btn" id="x-flow">Data Flow Map</button><button class="btn" id="x-email">Daily Email Preview</button><button class="btn" id="x-set">Advanced Thresholds</button><button class="btn" id="x-csv">Download CSV</button><button class="btn" id="x-reset">Reset Demo</button></p></details>
   </div>`;
-  const h=$('#v-home');
-  $$('[data-route]',h).forEach(b=>b.onclick=()=>{route=b.dataset.route;renderHome()});
-  $$('[data-nav]',h).forEach(b=>b.onclick=()=>go(b.dataset.nav));
-  $('#h-dl').onclick=downloadXlsx;$('#x-load').onclick=()=>A.openLoad(true);$('#x-flow').onclick=()=>A.openFlow();$('#x-email').onclick=A.openEmail;
+  const o=$('#v-options');
+  $$('[data-nav]',o).forEach(b=>b.onclick=()=>go(b.dataset.nav));
+  $('#x-load').onclick=()=>A.openLoad(true);$('#x-flow').onclick=()=>A.openFlow();$('#x-email').onclick=A.openEmail;
   $('#x-set').onclick=A.openSettings;$('#x-csv').onclick=A.downloadCsv;$('#x-reset').onclick=()=>{cols=DEFAULT.slice();saveCols();msgs=[hello()];rowsMode='attn';A.reset();renderAll()};
 }
 /* ---------- customize ---------- */
@@ -242,7 +260,7 @@ function renderCustom(){
   $('#c-adv').onclick=A.openSettings;
 }
 /* ---------- routing ---------- */
-const VIEWS=['home','sheet','custom','visual'];
+const VIEWS=['home','sheet','custom','visual','options'];
 function go(v){
   if(!VIEWS.includes(v))v='home';A.closeAll();
   VIEWS.forEach(x=>$('#v-'+x).classList.toggle('on',x===v));
@@ -251,7 +269,7 @@ function go(v){
   if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);window.scrollTo(0,0);
   const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');
 }
-function renderAll(){renderHome();renderSheet();renderCustom();A.renderApp()}
+function renderAll(){renderHome();renderOptions();renderSheet();renderCustom();A.renderApp()}
 $$('.nav button').forEach(b=>b.onclick=()=>go(b.dataset.nav));
 addEventListener('hashchange',()=>go(location.hash.slice(1)));
 renderAll();go(location.hash.slice(1)||'home');

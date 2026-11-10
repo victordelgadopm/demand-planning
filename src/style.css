@@ -193,3 +193,4 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .mx td.part{background:var(--med-bg)}.mx td.part b{color:var(--med)}
 .mx td.no{background:var(--risk-bg)}.mx td.no b{color:var(--risk)}
 .mx tbody tr:last-child th,.mx tbody tr:last-child td{border-bottom:0}
+.mx tbody th small{display:block;font-weight:400;font-size:.8rem;color:var(--mute)}.mx tbody th{width:150px}
