@@ -132,6 +132,18 @@ function renderHome(){
    <div class="card step"><div class="num">3</div><h2>Get Your Sheet</h2><p>A formatted Excel file every morning, with the items that need you at the top.</p>
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap" ><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
   </div>
+  <h2 class="sec-h">What Connects To What</h2>
+  <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026.</p>
+  <div class="card mx-wrap"><table class="mx"><thead><tr><th></th><th>ChatGPT</th><th>Copilot</th><th>Shared Folder</th></tr></thead><tbody>
+   <tr><th>Anaplan</th>
+    <td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or an outside bridge built first.</span></td>
+    <td class="yes"><b>✔ Yes</b><span>Anaplan's AI Gateway names Microsoft Copilot. Licensing is not stated.</span></td>
+    <td class="part"><b>▲ Partly</b><span>Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. IT adds a step.</span></td></tr>
+   <tr><th>Tableau</th>
+    <td class="yes"><b>✔ Yes</b><span>Tableau lists ChatGPT as a supported client. Read-only, with a sign-in per person.</span></td>
+    <td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td>
+    <td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. IT adds a step.</span></td></tr>
+  </tbody></table></div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Shared folder</span><span class="arrow">→</span><span><b>2.</b> Copilot or ChatGPT connection, whichever IT approves</span><span class="mute">Use drag and drop to start on day one.</span></div>
   <h2 class="sec-h">Ways To Run It Each Morning</h2>
