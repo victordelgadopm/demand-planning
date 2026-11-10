@@ -113,16 +113,15 @@ function downloadXlsx(){
 }
 /* ---------- home ---------- */
 const ROUTES={
- manual:['Manual Export','The safest route, always available','You export the data from Anaplan and Tableau yourself and drop the files in the shared folder or the chat. No connection and no IT build are needed. You still need your company\'s OK to use the data with the AI tool. This is also how history gets in: export the past three years of weekly sales once, save them as the reference file, and every daily run compares against it.','Your own export access in each system, and your company\'s OK to use the data with the AI tool. Nothing for IT to build.'],
- folder:['Shared Folder','The reliable route','Both systems put their data into one shared folder each morning, and the AI reads the newest files, checks them and saves the finished sheet back there. It works with any approved AI tool. Neither Anaplan nor Tableau saves straight into SharePoint on its own, so IT builds one small step to move the files (details in the IT box below).','One shared folder, and one IT-built step to move each export into it.'],
- copilot:['Copilot Connection','Second choice, depends on what is available','Microsoft Copilot can reach both systems directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','IT approval, plus a quick test to see what the connection can actually read.'],
- chatgpt:['ChatGPT Connection','Second choice, depends on what is available','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','IT approval for the Tableau connector, plus a built connector or bridge for Anaplan. ChatGPT scheduled tasks cannot take file uploads, so a daily unattended run is not confirmed.']
+ manual:['Manual Export','You export the files yourself. No connection needed.','You export the data from Anaplan and Tableau yourself and drop the files in the shared folder or the chat. No connection and no IT build are needed. You still need your company\'s OK to use the data with the AI tool. This is also how history gets in: export the past three years of weekly sales once, save them as the reference file, and every daily run compares against it.','Your own export access in each system, and your company\'s OK to use the data with the AI tool. Nothing for IT to build.'],
+ folder:['Shared Folder','Both systems put files in one folder.','Both systems put their data into one shared folder each morning, and the AI reads the newest files, checks them and saves the finished sheet back there. It works with any approved AI tool. Neither Anaplan nor Tableau saves straight into SharePoint on its own, so IT builds one small step to move the files (details in the IT box below).','One shared folder, and one IT-built step to move each export into it.'],
+ copilot:['Copilot Connection','Direct connection, if your company allows it.','Microsoft Copilot can reach both systems directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','IT approval, plus a quick test to see what the connection can actually read.'],
+ chatgpt:['ChatGPT Connection','Direct connection, if your company allows it.','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','IT approval for the Tableau connector, plus a built connector or bridge for Anaplan. ChatGPT scheduled tasks cannot take file uploads, so a daily unattended run is not confirmed.']
 };
 let route='manual';
-const RTAG={manual:'Safest, always works',folder:'Reliable, needs IT',copilot:'Second choice',chatgpt:'Second choice'};
 function miniSheet(){
   const rows=sheetRows('attn').slice(0,3);
-  return `<div class="mini-sheet" aria-hidden="true">${rows.map(r=>`<div class="ms-r"><span class="ms-st ${({'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Too much':'t-much'})[r.tier]||'t-ok'}">${esc(val('status',r))}</span><span class="ms-n">${esc(val('product',r))}</span><span class="ms-d">${r.dollars?money(r.dollars):''}</span></div>`).join('')}</div>`;
+  return `<div class="mini-sheet" aria-hidden="true">${rows.map(r=>`<div class="ms-r"><span class="ms-st ${({'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Too much':'t-much'})[r.tier]||'t-ok'}">${esc(val('status',r))}</span><span class="ms-n">${esc(val('product',r))}</span><span class="ms-d">${esc(r.id)}</span></div>`).join('')}</div>`;
 }
 function renderHome(){
   const r=ROUTES[route];
@@ -130,8 +129,9 @@ function renderHome(){
   <div class="hero"><h1>Your Daily Planning Sheet, Built By AI From The Data You Already Have</h1>
   <p>Four steps. No code. You explain what you want to the AI in plain words, and an Excel sheet shows up each morning.</p></div>
   <div class="steps">
-   <div class="card step"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Choose how your files reach the AI. Details appear below.</p>
-    <div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}"><b>${ROUTES[k][0].replace(' Connection','')}</b><span>${RTAG[k]}</span></button>`).join('')}</div></div>
+   <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach the AI. What each one means is on the right.</p>
+    <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
+    <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="conf" style="margin-bottom:6px">${r[1]}</div><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div></div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Prompt Your AI Agent</h2></div><p>Most of the work happens here.</p>
     <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. The agent hears the voice of the customer (VOC) here.</li></ul>
     <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
@@ -141,7 +141,6 @@ function renderHome(){
    <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
     <div class="quotes"><p class="quote">“I don't see how many weeks of stock we have.”</p><p class="quote">“Add who owns each item.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">Try It Now</button></div>
   </div>
-  <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <h2 class="sec-h">What Connects To What</h2>
   <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026.</p>
   <div class="card mx-wrap"><table class="mx"><thead><tr><th></th><th>Manual Export</th><th>ChatGPT</th><th>Copilot</th><th>Shared Folder</th></tr></thead><tbody>
@@ -156,7 +155,7 @@ function renderHome(){
     <td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td>
     <td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. IT adds a step.</span></td></tr>
   </tbody></table></div>
-  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Start here, then automate:</span><span><b>1.</b> Manual export (always works)</span><span class="arrow">→</span><span><b>2.</b> Shared folder</span><span class="arrow">→</span><span><b>3.</b> Copilot or ChatGPT connection, whichever IT approves</span></div>
+  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Use whichever one works for you today. Manual export needs nothing from IT. A shared folder or a direct connection removes the daily manual step once your company approves it.</span></div>
   <p style="margin-top:18px"><button class="btn pri" data-nav="options">See Setup Options And Limits</button></p>
   </div>`;
   const h=$('#v-home');
@@ -169,7 +168,7 @@ function renderOptions(){
   <p class="pg-sub">This is the detail behind Step 1. It lists every way to connect, how to run it each morning, how to bring Anaplan and Tableau together, and why history matters. Checked against each company's own pages in November 2026.</p>
   <h2 class="sec-h" style="margin-top:8px">Ways To Connect</h2>
   <div class="card mx-wrap"><table class="mx"><thead><tr><th>Option</th><th>Anaplan</th><th>Tableau</th><th>Main Limit</th></tr></thead><tbody>
-   <tr><th>Manual Export<small>The safest route</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every day. Also how history is loaded.</td></tr>
+   <tr><th>Manual Export<small>No connection needed</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every day. Also how history is loaded.</td></tr>
    <tr><th>Shared Folder<small>Any approved AI tool</small></th><td class="part"><b>▲ Partly</b><span>Exports to S3, Azure Blob or BigQuery. IT moves them to the folder.</span></td><td class="part"><b>▲ Partly</b><span>Prep file output or REST API. IT moves them to the folder.</span></td><td>IT builds one step per system.</td></tr>
    <tr><th>Copilot Connection</th><td class="yes"><b>✔ Yes</b><span>Named by Anaplan.</span></td><td class="part"><b>▲ Partly</b><span>Finds and answers about dashboards.</span></td><td>Full Tableau numbers not stated. Licensing for Anaplan not stated.</td></tr>
    <tr><th>ChatGPT Connection</th><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or bridge.</span></td><td class="yes"><b>✔ Yes</b><span>Listed by Tableau.</span></td><td>Scheduled tasks cannot take file uploads.</td></tr>

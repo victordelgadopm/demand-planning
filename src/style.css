@@ -218,3 +218,15 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .morebar{padding:12px;text-align:center;border-top:1px solid var(--line)}
 #app .sec-h{margin:6px 0 10px}
 #app{padding-top:18px}
+/* round 3: step 1 is the big box, 2-4 sit in a row below */
+.steps{grid-template-columns:repeat(3,1fr)}
+.step.s1{grid-column:1/-1;padding:20px 24px}
+.s1-body{display:grid;grid-template-columns:240px 1fr;gap:18px;align-items:stretch}
+.s1 .routes{display:flex;flex-direction:column;gap:10px}
+.s1 .route{flex:1;justify-content:flex-start;font-size:1.05rem;font-weight:700;min-height:52px}
+.s1 .routebox{margin:0;padding:18px 20px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.s1 .routebox h3{font-size:1.25rem;margin:0 0 2px}.s1 .routebox p{font-size:1rem;line-height:1.55}
+@media(max-width:900px){.steps{grid-template-columns:1fr}.s1-body{grid-template-columns:1fr}.s1 .routes{display:grid;grid-template-columns:1fr 1fr}}
+.ms-r{grid-template-columns:76px 1fr auto}.ms-d{font-weight:500;color:var(--mute);font-size:.8rem}
+.shead .optl{white-space:nowrap;font-size:.68rem;padding:2px 8px}
+.ms-r{grid-template-columns:70px 1fr auto;gap:8px;padding:9px 10px}
