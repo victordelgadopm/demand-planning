@@ -6,7 +6,7 @@ with sync_playwright() as p:
     b=p.chromium.launch();pg=b.new_page(viewport={'width':1366,'height':850},accept_downloads=True)
     errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
     pg.goto('file:///home/claude/mattel-demo/dist/index.html')
-    ok('home leads with 3 steps',pg.locator('.step').count()==3 and 'Connect' in pg.locator('.step h2').first.inner_text())
+    ok('home shows 4 steps',pg.locator('.step').count()==4 and 'Connect' in pg.locator('.step h2').first.inner_text())
     pg.click('[data-route=chatgpt]');ok('route panel changes','ChatGPT' in pg.locator('#routebox h3').inner_text())
     pg.click('nav [data-nav=sheet]');ok('sheet shows 17 attention rows',pg.locator('.xt tbody tr').count()==17)
     pg.click('[data-rows=all]');ok('all rows 123',pg.locator('.xt tbody tr').count()==123)

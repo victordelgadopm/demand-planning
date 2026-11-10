@@ -123,15 +123,18 @@ function renderHome(){
   const r=ROUTES[route];
   $('#v-home').innerHTML=`<div class="page">
   <div class="hero"><h1>Your Daily Planning Sheet, Built By AI From The Data You Already Have</h1>
-  <p>Three steps. No code. You talk to the AI in plain words, and an Excel sheet shows up each morning.</p></div>
+  <p>Four steps. No code. You explain what you want to the AI in plain words, and an Excel sheet shows up each morning.</p></div>
   <div class="steps">
    <div class="card step"><div class="num">1</div><h2>Connect Your Data</h2><p>Choose how your files reach the AI.</p>
     <div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0]}</button>`).join('')}</div>
     <p class="ex">Pick one to read how it works below.</p></div>
-   <div class="card step"><div class="num">2</div><h2>Tell It What You Are Not Seeing</h2><p>Talk to the AI like a coworker. It adjusts the sheet and remembers.</p>
-    <p class="ex">“I don't see how many weeks of stock we have.”</p><button class="btn pri go" data-nav="custom">Try It Now</button></div>
+   <div class="card step"><div class="num">2</div><h2>Prompt Your AI Agent</h2><p>This is where most of the work happens. Tell the agent what you want the sheet to be.</p>
+    <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you hope to get out</li></ul>
+    <p class="ex">The agent hears the voice of the customer (VOC) here.</p><button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
    <div class="card step"><div class="num">3</div><h2>Get Your Sheet</h2><p>A formatted Excel file every morning, with the items that need you at the top.</p>
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap" ><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
+   <div class="card step"><div class="num">4</div><h2>Customize <span class="optl">Optional, Anytime</span></h2><p>Tell the agent what you are not seeing or want to change. Once the sheet exists, it can always be adjusted.</p>
+    <p class="ex">“I don't see how many weeks of stock we have.”</p><button class="btn go" data-nav="custom">Try It Now</button></div>
   </div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <h2 class="sec-h">What Connects To What</h2>
@@ -242,7 +245,7 @@ function reply(text){
 }
 function renderCustom(){
   $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize</h1></div>
-  <p class="pg-sub">You change the sheet by talking to the AI, not by editing settings. Say what you are not seeing, and it adds the column and remembers for next time.</p>
+  <p class="pg-sub">You shape the sheet by talking to the AI, not by editing settings. Start with a full prompt about what you want, then adjust anytime by saying what you are not seeing. It remembers for next time.</p>
   <div class="chat-wrap"><div class="card chat"><div class="chat-h"><span>Chat With The AI</span><span class="conf">Demo only: simulated replies</span></div>
    <div class="msgs" id="msgs" aria-live="polite">${msgs.map(m=>`<div class="msg ${m.w}">${m.w==='you'?esc(m.t):m.t}</div>`).join('')}</div>
    <div class="sug">${SUG.map((s,i)=>`<button class="chip" data-sug="${i}">${esc(s)}</button>`).join('')}</div>
@@ -251,7 +254,8 @@ function renderCustom(){
    <ol>${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
    <p style="margin:10px 0 0"><b>Rows:</b> ${rowsMode==='all'?'All items':'Items that need attention'}</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Sheet</button><button class="btn" id="c-reset">Reset Columns</button></div></div>
-   <div class="card recipe" style="margin-top:14px"><h3>How This Works In Real Life</h3><ol><li>You describe what you are not seeing, in your own words.</li><li>The AI finds the field in your data, or asks you where it lives.</li><li>It updates the recipe and rebuilds the sheet.</li><li>Tomorrow's scheduled run uses the saved recipe.</li></ol>
+   <div class="card recipe" style="margin-top:14px"><h3>Example Prompts To Start With</h3><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the daily sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div>
+   <div class="card recipe" style="margin-top:14px"><h3>How This Works In Real Life</h3><ol><li>You describe what you want, or what you are not seeing, in your own words.</li><li>The AI finds the field in your data, or asks you where it lives.</li><li>It updates the recipe and rebuilds the sheet.</li><li>Tomorrow's scheduled run uses the saved recipe.</li></ol>
    <p style="margin:10px 0 0"><button class="btn sm" id="c-adv">Advanced Thresholds</button></p></div></div></div></div>`;
   const v=$('#v-custom'),box=$('#msgs');box.scrollTop=box.scrollHeight;
   const send=t=>{if(!t.trim())return;msgs.push({w:'you',t});msgs.push({w:'ai',t:reply(t)});renderCustom();renderSheet()};
