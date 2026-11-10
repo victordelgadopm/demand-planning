@@ -69,13 +69,21 @@ function renderApp(){
 }
 function sinceHtml(){
   if(!st.diff)return '';const d=st.diff,nm=id=>esc(rowOf(id).name),lk=id=>`<a data-open="${id}">${nm(id)}</a>`;
-  const li=[];
-  d.toAtRisk.forEach(i=>li.push(`<li>▲ <b>Newly at risk:</b> ${lk(i)}</li>`));
-  d.reAlerted.forEach(i=>li.push(`<li><span class="re">RE-ALERT</span> ${lk(i)} gap grew past what was accepted</li>`));
-  d.newFlags.forEach(i=>li.push(`<li>◆ <b>New flag:</b> ${lk(i)}</li>`));
-  d.worsened.forEach(i=>li.push(`<li>↗ <b>Got worse:</b> ${lk(i)}</li>`));
-  d.recovered.forEach(i=>li.push(`<li>✔ <b>Fixed:</b> ${lk(i)} (an order was placed)</li>`));
-  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Items that moved into or out of trouble overnight. Click a name to open it.</p><div class="card since" data-g="since">${li.length?`<ul>${li.join('')}</ul>`:'<div class="mute">Nothing changed.</div>'}</div>`;
+  const moved=new Set([...d.toAtRisk,...d.newFlags,...d.worsened,...d.reAlerted,...d.recovered]);
+  const prevTier={};st.prev.rows.forEach(r=>{prevTier[r.id]=r.tier});
+  const still=st.res.rows.filter(r=>(r.tier==='At risk'||r.tier==='Medium')&&prevTier[r.id]===r.tier&&!moved.has(r.id)).sort((x,y)=>y.dollars-x.dollars).map(r=>r.id);
+  const newRisk=[...d.toAtRisk.map(i=>[i,'now at risk']),...d.newFlags.filter(i=>!d.toAtRisk.includes(i)).map(i=>[i,'new flag'])];
+  const worse=[...d.reAlerted.map(i=>[i,'<span class="re" style="margin:0">RE-ALERT</span> gap grew past what was accepted']),...d.worsened.filter(i=>!d.reAlerted.includes(i)).map(i=>[i,'gap got bigger'])];
+  const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
+    return `<div class="sc ${cls}"><div class="sc-h"><span>${title}</span><b>${items.length}</b></div><div class="sc-sub">${sub}</div>
+    ${items.length?`<ul>${shown.map(fmt).join('')}</ul>${more>0?`<div class="sc-more">and ${more} more in the list below</div>`:''}`:'<div class="sc-none">None today</div>'}</div>`};
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p>
+   <div class="since4" data-g="since">
+    ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
+    ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
+    ${col('c-fixed','Fixed','An order was placed or the gap closed',d.recovered,i=>`<li>${lk(i)}</li>`)}
+    ${col('c-still','Still At Risk','Same as yesterday, no change',still,i=>`<li>${lk(i)}</li>`,4)}
+   </div>`;
 }
 function bindApp(){
   $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';renderApp()});

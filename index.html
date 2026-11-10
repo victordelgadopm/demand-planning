@@ -244,6 +244,22 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .step .quote{color:var(--ink)}
 .conf,.mute,.simnote{color:var(--mute)}
 .optl{color:var(--brand)}
+/* since yesterday, four groups */
+.since4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+@media(max-width:1000px){.since4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.since4{grid-template-columns:1fr}}
+.sc{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:var(--r);padding:12px 14px;box-shadow:var(--shadow)}
+.sc-h{display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:1.05rem}
+.sc-h b{min-width:28px;text-align:center;border-radius:99px;padding:1px 9px;font-size:.95rem}
+.sc-sub{color:var(--mute);font-size:.85rem;margin:2px 0 8px}
+.sc ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.sc li{font-size:.94rem;line-height:1.3}.sc li .w{display:block;color:var(--mute);font-size:.82rem;margin-top:1px}
+.sc a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);cursor:pointer}.sc a:hover{color:var(--brand)}
+.sc-none{color:var(--mute);font-size:.9rem}.sc-more{color:var(--mute);font-size:.82rem;margin-top:8px}
+.c-new{border-top-color:var(--risk)}.c-new .sc-h b{background:var(--risk-bg);color:var(--risk)}
+.c-worse{border-top-color:var(--med)}.c-worse .sc-h b{background:var(--med-bg);color:var(--med)}
+.c-fixed{border-top-color:var(--ok)}.c-fixed .sc-h b{background:var(--ok-bg);color:var(--ok)}
+.c-still{border-top-color:var(--watch)}.c-still .sc-h b{background:var(--watch-bg);color:var(--watch)}
 </style></head>
 <body>
 <header class="top"><div class="top-in">
@@ -637,13 +653,21 @@ function renderApp(){
 }
 function sinceHtml(){
   if(!st.diff)return '';const d=st.diff,nm=id=>esc(rowOf(id).name),lk=id=>`<a data-open="${id}">${nm(id)}</a>`;
-  const li=[];
-  d.toAtRisk.forEach(i=>li.push(`<li>▲ <b>Newly at risk:</b> ${lk(i)}</li>`));
-  d.reAlerted.forEach(i=>li.push(`<li><span class="re">RE-ALERT</span> ${lk(i)} gap grew past what was accepted</li>`));
-  d.newFlags.forEach(i=>li.push(`<li>◆ <b>New flag:</b> ${lk(i)}</li>`));
-  d.worsened.forEach(i=>li.push(`<li>↗ <b>Got worse:</b> ${lk(i)}</li>`));
-  d.recovered.forEach(i=>li.push(`<li>✔ <b>Fixed:</b> ${lk(i)} (an order was placed)</li>`));
-  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Items that moved into or out of trouble overnight. Click a name to open it.</p><div class="card since" data-g="since">${li.length?`<ul>${li.join('')}</ul>`:'<div class="mute">Nothing changed.</div>'}</div>`;
+  const moved=new Set([...d.toAtRisk,...d.newFlags,...d.worsened,...d.reAlerted,...d.recovered]);
+  const prevTier={};st.prev.rows.forEach(r=>{prevTier[r.id]=r.tier});
+  const still=st.res.rows.filter(r=>(r.tier==='At risk'||r.tier==='Medium')&&prevTier[r.id]===r.tier&&!moved.has(r.id)).sort((x,y)=>y.dollars-x.dollars).map(r=>r.id);
+  const newRisk=[...d.toAtRisk.map(i=>[i,'now at risk']),...d.newFlags.filter(i=>!d.toAtRisk.includes(i)).map(i=>[i,'new flag'])];
+  const worse=[...d.reAlerted.map(i=>[i,'<span class="re" style="margin:0">RE-ALERT</span> gap grew past what was accepted']),...d.worsened.filter(i=>!d.reAlerted.includes(i)).map(i=>[i,'gap got bigger'])];
+  const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
+    return `<div class="sc ${cls}"><div class="sc-h"><span>${title}</span><b>${items.length}</b></div><div class="sc-sub">${sub}</div>
+    ${items.length?`<ul>${shown.map(fmt).join('')}</ul>${more>0?`<div class="sc-more">and ${more} more in the list below</div>`:''}`:'<div class="sc-none">None today</div>'}</div>`};
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p>
+   <div class="since4" data-g="since">
+    ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
+    ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
+    ${col('c-fixed','Fixed','An order was placed or the gap closed',d.recovered,i=>`<li>${lk(i)}</li>`)}
+    ${col('c-still','Still At Risk','Same as yesterday, no change',still,i=>`<li>${lk(i)}</li>`,4)}
+   </div>`;
 }
 function bindApp(){
   $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';renderApp()});
