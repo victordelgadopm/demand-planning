@@ -144,6 +144,22 @@ function renderHome(){
     <p class="lim"><b>Limits:</b> Runs use credits, use the builder's sign-in, and admins can block them. Output can vary day to day, and building a formatted Excel file this way is not confirmed.</p></div>
   </div>
   <div class="card rule"><b>Built Once, Then Repeated</b><span><b>1.</b> Write down the files and rules</span><span class="arrow">→</span><span><b>2.</b> AI builds it with real files</span><span class="arrow">→</span><span><b>3.</b> Test against known items</span><span class="arrow">→</span><span><b>4.</b> Save it and schedule it</span></div>
+  <h2 class="sec-h">Ways To Get Anaplan And Tableau Into One Sheet</h2>
+  <p class="pg-sub" style="margin-top:0">Merged or separate, there are several paths. Which one is open depends on what IT approves.</p>
+  <div class="paths four">
+   <div class="card path"><span class="tagp">One Tool</span><h3>1. Copilot Reaches Both</h3><p>Copilot connects to Anaplan and to Tableau and builds one merged sheet.</p>
+    <p class="lim"><b>Limits:</b> Anaplan names Copilot as a client. Microsoft's Tableau connector finds and answers questions about dashboards, and Microsoft does not say it includes the full numbers. Needs a test.</p></div>
+   <div class="card path"><span class="tagp">Two Tools</span><h3>2. Split Pulls, Then Merge</h3><p>ChatGPT pulls Tableau, which it supports. Anaplan needs a custom connector or an outside bridge before ChatGPT can pull it. Both results go to the shared folder, and Copilot merges them into the sheet.</p>
+    <p class="lim"><b>Limits:</b> Two tools to approve. Building the Anaplan connector is real work. Saving files from ChatGPT into the folder is not confirmed.</p></div>
+   <div class="card path"><span class="tagp">Any Tool</span><h3>3. Shared Folder Only</h3><p>Each system exports on a schedule into the folder, and one AI merges the files.</p>
+    <p class="lim"><b>Limits:</b> IT builds the step that moves each export into the folder. Tableau subscriptions are email images or PDFs, so data comes through Prep or the API.</p></div>
+   <div class="card path"><span class="tagp">No Merge</span><h3>4. Keep Them Separate</h3><p>One sheet from Anaplan and one from Tableau, reviewed side by side.</p>
+    <p class="lim"><b>Limits:</b> No cross-system flags, such as sales above forecast with low stock. A planner joins them by hand.</p></div>
+  </div>
+  <div class="card hist"><h3>Why History Is Needed For Accurate Reports</h3>
+   <p>Several flags only work with past sales by week. Without history, the sheet can show today but cannot judge it.</p>
+   <ul><li><b>Short vs last year:</b> compares supply to what the same weeks needed last year.</li><li><b>Promo repeat:</b> measures how much last year's promo lifted sales.</li><li><b>New item forecast:</b> compares to how similar past launches sold.</li><li><b>Stock-outs:</b> removes weeks last year when sales were capped by empty shelves.</li></ul>
+   <p class="conf">The demo uses three years of weekly history. The real exports should include the same, kept in the shared folder so every run can read it.</p></div>
   <div class="who"><div class="card"><h3>You</h3><p>Say what you need and what you are not seeing. Decide what to do about each flagged item.</p></div>
    <div class="card"><h3>The AI</h3><p>Reads the files, checks them, builds the sheet, writes the morning summary, and keeps your preferences.</p></div>
    <div class="card"><h3>IT</h3><p>Approves one way to get the data in. That is the only thing they have to do.</p></div></div>
