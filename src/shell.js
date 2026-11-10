@@ -86,7 +86,7 @@ function renderSheet(){
     <button class="btn dl" id="sh-dl">Download Excel</button></div>
    ${inner}
    <div class="xl-tabs" role="tablist">${[['today','Today'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']].map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Today is what needs you. Since Yesterday is what changed. Notes is the decisions you logged. Recipe is how the sheet is built.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   $$('[data-open]',v).forEach(e=>{e.onclick=()=>A.openSku(e.dataset.open);e.onkeydown=ev=>{if(ev.key==='Enter')A.openSku(e.dataset.open)}});
@@ -195,6 +195,7 @@ function renderOptions(){
    <p>Several flags only work with past sales by week. Without history, the sheet can show today but cannot judge it.</p>
    <ul><li><b>Short vs last year:</b> compares supply to what the same weeks needed last year.</li><li><b>Promo repeat:</b> measures how much last year's promo lifted sales.</li><li><b>New item forecast:</b> compares to how similar past launches sold.</li><li><b>Stock-outs:</b> removes weeks last year when sales were capped by empty shelves.</li></ul>
    <p class="conf">The demo uses three years of weekly history. With no connection, export it by hand once, save it as the reference file in the shared folder, and refresh it when needed. Every daily run reads it.</p></div>
+  <h2 class="sec-h">Who Does What</h2><p class="pg-sub" style="margin-top:0">Three roles, each with a clear job.</p>
   <div class="who"><div class="card"><h3>You</h3><p>Say what you need and what you are not seeing. Decide what to do about each flagged item.</p></div>
    <div class="card"><h3>The AI</h3><p>Reads the files, checks them, builds the sheet, writes the morning summary, and keeps your preferences.</p></div>
    <div class="card"><h3>IT, If Something Is Blocked</h3><p>We do not know yet what is blocked. Try it yourself first. If your access is blocked, IT sets it up or opens it up.</p></div></div>

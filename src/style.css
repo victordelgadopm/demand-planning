@@ -233,3 +233,6 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .routebox .same{margin-top:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--brand) 10%,var(--card));font-size:.95rem}
 .mx thead tr.grp th{text-align:center;font-size:.8rem;color:var(--brand);border-bottom:1px solid var(--line);padding:8px 10px;background:color-mix(in srgb,var(--brand) 6%,var(--card))}
 .mx thead tr.grp th+th+th{border-left:1px solid var(--line)}
+.sec-sub{color:var(--mute);margin:-4px 0 10px}
+#app .sec-h{margin:22px 0 4px;font-size:1.3rem}
+#app .pg-h+.pg-sub+.sec-h{margin-top:6px}

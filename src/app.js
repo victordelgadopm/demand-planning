@@ -47,16 +47,18 @@ const src=k=>`<span class="src s-${k}">${SRC[k]}</span>`;
 function renderApp(){
   const r=st.res,rows=r.rows,attn=rows.filter(x=>x.headline).length;
   const q=D.loadReport.filter(x=>x.status==='quarantined').length, nf=D.loadReport.filter(x=>x.status==='new_field').length;
-  const health=`<div class="card health" data-g="health"><span class="ok-t">✔ ${D.sources.length} sources combined and checked</span>
+  const health=`<h2 class="sec-h">Data Check</h2><p class="sec-sub">Did today's files load correctly? This runs before anything is judged.</p>
+   <div class="card health" data-g="health"><span class="ok-t">✔ ${D.sources.length} sources combined and checked</span>
    ${st.snap==='today'&&q?`<span class="warn-t">▲ ${q} file held back (units look wrong)</span>`:''}
    <a href="#" id="l-load" style="color:var(--brand)">See today's data check</a></div>`;
   const dsum=Object.entries(r.dec).map(([k,v])=>`<button class="dtile" aria-pressed="${st.dec===k}" data-dec="${k}">
      <div class="t">${DEC[k][0]}</div><div class="n">${v.n}</div><div class="d">${DEC[k][1]}</div>
      <div class="h">${v.d>0?money(v.d)+' at stake':'&nbsp;'}</div></button>`).join('');
   $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${st.snap==='today'?'Today, '+esc(TODAY_LONG):'Yesterday (comparison)'}</span></div>
-   <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Start with the four boxes: each one is a kind of decision a planner makes. Tap a box to filter the list below it.</p>${health}${sinceHtml()}
-   <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2>
+   <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Four sections: the data check, what changed, the decisions to make, and the item list.</p>${health}${sinceHtml()}
+   <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision. Tap a box to filter the list below.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
+   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At risk is the sales value of the units we would be short (units short times price). The tabs switch between items that need attention, risks you accepted, and forecast accuracy.</p>
    <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="${st.tab==='attn'}" data-tab="attn" data-g="tab-attn">Needs attention</button>
     <button class="tab" role="tab" aria-selected="${st.tab==='acc'}" data-tab="acc" data-g="tab-accepted">Accepted risks (${r.accepted})</button>
@@ -73,7 +75,7 @@ function sinceHtml(){
   d.newFlags.forEach(i=>li.push(`<li>◆ <b>New flag:</b> ${lk(i)}</li>`));
   d.worsened.forEach(i=>li.push(`<li>↗ <b>Got worse:</b> ${lk(i)}</li>`));
   d.recovered.forEach(i=>li.push(`<li>✔ <b>Fixed:</b> ${lk(i)} (an order was placed)</li>`));
-  return `<div class="card since" data-g="since"><h2>Since yesterday</h2>${li.length?`<ul>${li.join('')}</ul>`:'<div class="mute">Nothing changed.</div>'}</div>`;
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Items that moved into or out of trouble overnight. Click a name to open it.</p><div class="card since" data-g="since">${li.length?`<ul>${li.join('')}</ul>`:'<div class="mute">Nothing changed.</div>'}</div>`;
 }
 function bindApp(){
   $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';renderApp()});
