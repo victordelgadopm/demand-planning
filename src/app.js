@@ -46,11 +46,10 @@ const src=k=>`<span class="src s-${k}">${SRC[k]}</span>`;
 function renderApp(){
   const r=st.res,rows=r.rows,attn=rows.filter(x=>x.headline).length;
   const q=D.loadReport.filter(x=>x.status==='quarantined').length, nf=D.loadReport.filter(x=>x.status==='new_field').length;
-  const health=`<div class="card health" data-g="health"><b>Data health</b>
-   <span class="ok-t">● ${D.sources.length} sources combined</span>
-   <span>Refreshed ${esc(snap().meta.asOf)}, 6:05 AM</span>
-   ${st.snap==='today'?`<span class="warn-t">▲ ${q} file held back (units look wrong)</span><span>◉ ${nf} new field kept, not used yet</span><span class="ok-t">✔ 1 renamed column auto-mapped</span>`:`<span class="mute">Yesterday's files</span>`}
-   <a href="#" id="l-load" style="color:var(--brand)">See what happened in today's load</a></div>`;
+  const health=`<div class="card health" data-g="health"><span class="ok-t">✔ ${D.sources.length} sources combined and checked</span>
+   <span class="mute">Refreshed ${esc(snap().meta.asOf)}, 6:05 AM</span>
+   ${st.snap==='today'&&q?`<span class="warn-t">▲ ${q} file held back (units look wrong)</span>`:''}
+   <a href="#" id="l-load" style="color:var(--brand)">See today's data check</a></div>`;
   const dsum=Object.entries(r.dec).map(([k,v])=>`<button class="dtile" aria-pressed="${st.dec===k}" data-dec="${k}">
      <div class="t">${DEC[k][0]}</div><div class="n">${v.n}</div><div class="d">${DEC[k][1]}</div>
      <div class="h">${v.d>0?money(v.d)+' at stake':'&nbsp;'}</div></button>`).join('');
@@ -442,12 +441,9 @@ function tour(i){
 }
 function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key==='ArrowLeft'&&gi>0)tour(gi-1);else if(e.key==='Escape'){e.stopPropagation();tour(-1)}}
 /* ---------- boot ---------- */
-$('#b-tour').onclick=()=>{st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';recompute();renderApp();tour(0)};
-$('#b-load').onclick=()=>openLoad(true);$('#b-flow').onclick=()=>openFlow();$('#b-email').onclick=openEmail;$('#b-csv').onclick=downloadCsv;$('#b-set').onclick=openSettings;
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
-const rb=document.createElement('button');rb.className='btn';rb.id='b-reset';rb.textContent='Reset demo';rb.onclick=()=>window.__app.reset();$('.top-in').appendChild(rb);
+window.__app={esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();

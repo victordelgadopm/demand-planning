@@ -6,7 +6,7 @@ def ok(n,c,x=''):
 with sync_playwright() as p:
     b=p.chromium.launch();ctx=b.new_context(viewport={'width':1440,'height':900},accept_downloads=True);pg=ctx.new_page()
     pg.on('console',lambda m:errs.append(m.text) if m.type=='error' else None);pg.on('pageerror',lambda e:errs.append(str(e)))
-    pg.goto('file:///home/claude/demand-planning/index.html');pg.wait_for_selector('.dtile')
+    pg.goto('file:///home/claude/mattel-demo/dist/index.html');pg.click('nav [data-nav=visual]');pg.wait_for_selector('.dtile')
     # decision filter
     pg.click('[data-dec=too_much]');ok('decision filter narrows list',pg.locator('tr.r').count()==3,pg.locator('tr.r').count());pg.click('[data-dec=too_much]')
     # tier chip
@@ -21,7 +21,7 @@ with sync_playwright() as p:
     ok('note saved shows note-box',pg.locator('.note-box').count()==1)
     pg.click('#d-close');ok('accepted tab count 2',' (2)' in pg.locator('[data-tab=acc]').inner_text(),pg.locator('[data-tab=acc]').inner_text())
     # persistence
-    pg.reload();pg.wait_for_selector('.dtile');ok('note persists after reload',' (2)' in pg.locator('[data-tab=acc]').inner_text())
+    pg.reload();pg.click('nav [data-nav=visual]');pg.wait_for_selector('.dtile');ok('note persists after reload',' (2)' in pg.locator('[data-tab=acc]').inner_text())
     pg.click('[data-tab=acc]');pg.wait_for_timeout(200);pg.screenshot(path=SP+'/acc.png')
     pg.locator('tr.r',has_text='Holiday Ball Gown').click();pg.wait_for_timeout(400)
     pg.click('[data-rm]');pg.click('[id^=rc-]');pg.wait_for_timeout(300)
@@ -35,23 +35,23 @@ with sync_playwright() as p:
     pg.evaluate("document.getElementById('drawer').scrollTop=900");pg.wait_for_timeout(200);pg.screenshot(path=SP+'/wi.png')
     pg.click('#d-close')
     # settings
-    pg.click('#b-set');pg.wait_for_timeout(400);pg.screenshot(path=SP+'/set.png')
+    pg.evaluate('window.__app.openSettings()');pg.wait_for_timeout(400);pg.screenshot(path=SP+'/set.png')
     pg.click('[data-prof=Manager]');pg.wait_for_timeout(200);pg.click('#st-close')
     n1=pg.locator('#cnt').inner_text();ok('manager profile hides small items',int(n1.split()[0])<17,n1)
-    pg.click('#b-reset');pg.wait_for_timeout(200);ok('reset restores 17',pg.locator('#cnt').inner_text().startswith('17'))
+    pg.evaluate('window.__app.reset()');pg.wait_for_timeout(200);ok('reset restores 17',pg.locator('#cnt').inner_text().startswith('17'))
     # flow
-    pg.click('#b-flow');pg.wait_for_timeout(500);pg.click('[data-src=bi]');pg.wait_for_timeout(200);pg.screenshot(path=SP+'/flow.png')
+    pg.evaluate('window.__app.openFlow()');pg.wait_for_timeout(500);pg.click('[data-src=bi]');pg.wait_for_timeout(200);pg.screenshot(path=SP+'/flow.png')
     ok('flow panel shows file',pg.locator('#f-panel').inner_text().find('shipments_dc3')>=0)
     pg.click('#f-pause');ok('pause toggles',pg.locator('#f-pause').inner_text()=='Play animation')
     pg.click('#m-close')
     # email + csv
-    pg.click('#b-email');pg.wait_for_timeout(200);ok('email has subject',pg.locator('.email').inner_text().startswith('Subject:'));pg.screenshot(path=SP+'/em.png');pg.click('#m-close')
-    with pg.expect_download() as dl: pg.click('#b-csv')
+    pg.evaluate('window.__app.openEmail()');pg.wait_for_timeout(200);ok('email has subject',pg.locator('.email').inner_text().startswith('Subject:'));pg.screenshot(path=SP+'/em.png');pg.click('#m-close')
+    with pg.expect_download() as dl: pg.evaluate('window.__app.downloadCsv()')
     path=dl.value.path();txt=open(path).read();ok('csv rows 124',len(txt.strip().split('\n'))==124,len(txt.strip().split('\n')))
     # replay load
-    pg.click('#b-load');pg.wait_for_selector('#lg-go',timeout=8000);pg.screenshot(path=SP+'/load.png');pg.click('#lg-go');ok('since panel after load',pg.locator('[data-g=since]').count()==1)
+    pg.evaluate('window.__app.openLoad(true)');pg.wait_for_selector('#lg-go',timeout=8000);pg.screenshot(path=SP+'/load.png');pg.click('#lg-go');ok('since panel after load',pg.locator('[data-g=since]').count()==1)
     # tour
-    pg.click('#b-tour')
+    pg.evaluate('window.__app.tour(0)')
     for i in range(11):
         pg.wait_for_selector('.g-call',timeout=3000);pg.wait_for_timeout(700)
         if i in (0,5,6,9): pg.screenshot(path=SP+f'/tour{i}.png')
