@@ -83,7 +83,7 @@ function renderSheet(){
    <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
     ${tab==='today'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
     <button class="btn sm" id="sh-custom">Add or remove columns</button>
-    <button class="btn dl" id="sh-dl">Download Excel</button></div>
+    <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${inner}
    <div class="xl-tabs" role="tablist">${[['today','Today'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']].map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
    <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Today is what needs you. Since Yesterday is what changed. Notes is the decisions you logged. Recipe is how the sheet is built.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
@@ -190,7 +190,7 @@ function renderHome(){
     <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
    <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning, with the items that need you at the top.</p>
     ${miniSheet()}
-    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
+    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Sheet</button></div></div>
    <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
     <div class="quotes"><p class="quote">“I don't see how many weeks of stock we have.”</p><p class="quote">“Add who owns each item.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">Try It Now</button></div>
   </div>
