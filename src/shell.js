@@ -115,6 +115,7 @@ function downloadXlsx(){
 const ROUTES={
  folder:['Shared Folder','The reliable route','Both systems put their data into one shared folder each morning, and the AI reads the newest files, checks them and saves the finished sheet back there. It works with any approved AI tool. Neither Anaplan nor Tableau saves straight into SharePoint on its own, so IT builds one small step to move the files (details in the IT box below).','One shared folder, and one IT-built step to move each export into it.'],
  copilot:['Copilot Connection','Second choice, depends on what is available','Microsoft Copilot can reach both systems directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','IT approval, plus a quick test to see what the connection can actually read.'],
+ chatgpt:['ChatGPT Connection','Second choice, depends on what is available','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','IT approval for the Tableau connector, plus a built connector or bridge for Anaplan. ChatGPT scheduled tasks cannot take file uploads, so a daily unattended run is not confirmed.'],
  manual:['Drag And Drop','Good for week one','You drop the files into the chat each morning. No IT work at all, so it is the fastest way to prove the idea.','Nothing. You can start today.']};
 let route='folder';
 function renderHome(){
@@ -132,7 +133,7 @@ function renderHome(){
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap" ><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
   </div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
-  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Shared folder</span><span class="arrow">→</span><span><b>2.</b> Copilot connection</span><span class="mute">Use drag and drop to start on day one.</span></div>
+  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Try them in this order:</span><span><b>1.</b> Shared folder</span><span class="arrow">→</span><span><b>2.</b> Copilot or ChatGPT connection, whichever IT approves</span><span class="mute">Use drag and drop to start on day one.</span></div>
   <h2 class="sec-h">Ways To Run It Each Morning</h2>
   <p class="pg-sub" style="margin-top:0">Three possible paths, from simplest to most automatic. Each one has limits, listed honestly.</p>
   <div class="paths">
@@ -168,6 +169,10 @@ function renderHome(){
     <li><b>Anaplan:</b> Its scheduled integrations (CloudWorks) export to Amazon S3, Azure Blob or Google BigQuery. SharePoint and OneDrive are not listed, so a step is needed to move the file.</li>
     <li><b>Tableau:</b> Scheduled subscriptions are email only, as a PNG image or PDF, not a data file. Other options are Tableau Prep flows that output files, or the REST API, which returns summary-level view data as CSV to people with export permission.</li>
     <li><b>Excel:</b> The Power Automate Excel connector cannot create a workbook or format one directly. It can add rows to a copy of a template and run Office Scripts.</li></ul>
+   <p><b>ChatGPT route</b></p><ul>
+    <li><b>Tableau:</b> Tableau's own documentation lists ChatGPT as a supported client of its connector. Sign-in is per person, and the connector is read-only.</li>
+    <li><b>Anaplan:</b> Anaplan's AI Gateway does not name ChatGPT. It needs a custom connector or an outside bridge.</li>
+    <li><b>Limits:</b> ChatGPT connectors need a hosted server and a sign-in per person. Scheduled tasks allow 10 active tasks and no file uploads, so unattended daily runs are not confirmed.</li></ul>
    <p><b>Copilot route</b></p><ul>
     <li><b>Anaplan:</b> The AI Gateway names Microsoft Copilot as a client. Its page is inconsistent on read-only versus write-back, and does not state licensing.</li>
     <li><b>Tableau:</b> Microsoft's Tableau Cloud connector indexes published sheets and details such as name, project, workbook and tags. It needs Tableau Cloud (not Server), a Microsoft 365 AI admin and a Tableau site admin. Microsoft's pages do not say whether the numbers behind a dashboard are included.</li>
