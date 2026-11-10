@@ -804,7 +804,7 @@ function renderTab(){
   const subs=['',...D.subs];
   tb.innerHTML=`<div class="bar" data-g="filters">${chipsHtml()}</div>
    <div class="bar"><input type="search" id="q" placeholder="Search SKU or name" value="${esc(st.q)}" aria-label="Search">
-   <select id="sub" aria-label="Subcategory">${subs.map(s=>`<option value="${esc(s)}" ${st.sub===s?'selected':''}>${s||'All subcategories'}</option>`).join('')}</select>
+   <select id="sub" aria-label="Line">${subs.map(s=>`<option value="${esc(s)}" ${st.sub===s?'selected':''}>${s||'All lines'}</option>`).join('')}</select>
    <span class="mute" id="cnt"></span>${st.dec?`<button class="btn sm" id="cleardec">Clear "${DEC[st.dec][0]}"</button>`:''}</div>
    <div class="card" data-g="list"><div id="listbody"></div></div>`;
   $$('[data-tier]',tb).forEach(b=>b.onclick=()=>{st.tier=b.dataset.tier;renderApp()});
@@ -840,7 +840,7 @@ function accHtml(){
 function accuracyHtml(){
   const a=E.accuracy(snap()),T=E.accuracyTotal(snap());
   const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-med">◆ Watch</span>':'<span class="ok-t">✔ On target</span>';
-  return `<div class="card sec" data-g="accuracy"><h3>Forecast accuracy by line (last 13 weeks)</h3>
+  return `<div class="card sec" data-g="accuracy"><h3>Forecast Accuracy By Line (Last 13 Weeks)</h3>
   <p class="mute">Miss (WMAPE) adds up the gap between actual sales and forecast for every SKU and week, then divides by total sales. Bias is whether the forecast runs high (+) or low (-) overall. Common targets: miss under 25%, bias within 5% either way. The bias signal below is checked at line level, so one noisy item cannot trigger a false alarm.</p>
   <div class="xl-scroll"><table class="list"><thead><tr><th>Line</th><th class="num">SKUs</th><th class="num">Forecast accuracy</th><th class="num">Miss (WMAPE)</th><th class="num">Bias</th><th>Against targets</th><th>Signal</th></tr></thead><tbody>
   <tr><td><b>All lines</b></td><td class="num">${T.n}</td><td class="num">${pctN(1-T.wmape)}</td><td class="num">${pctN(T.wmape)}</td><td class="num">${pctSN(T.bias)}</td><td>${tgt(T.wmape,T.bias)}</td><td></td></tr>
@@ -1033,7 +1033,7 @@ function openSettings(){
    ${row('outpaceWeeks','Sales above forecast, weeks in a row','',2,8)}
    ${row('minDollars','Hide items under ($ at stake)','Manager view uses 25,000',0,1000000,1000)}
    <div class="set-row"><div>Lead time to trust<small>Typical uses the supplier's real history. Quoted uses the quote only.</small></div><select data-s="leadTimeBasis"><option value="p80" ${s.leadTimeBasis==='p80'?'selected':''}>Typical</option><option value="quoted" ${s.leadTimeBasis==='quoted'?'selected':''}>Quoted</option></select></div></div>
-  <div class="card sec"><h3>Columns</h3>${[['sub','Subcategory'],['conf','Confidence'],['dollars','$ at stake']].map(([k,l])=>`<label class="sw"><input type="checkbox" data-col="${k}" ${s.cols[k]?'checked':''}> ${l}</label>`).join('')}</div>
+  <div class="card sec"><h3>Columns</h3>${[['sub','Line'],['conf','Confidence'],['dollars','$ at stake']].map(([k,l])=>`<label class="sw"><input type="checkbox" data-col="${k}" ${s.cols[k]?'checked':''}> ${l}</label>`).join('')}</div>
   <div class="card sec"><h3>Status names</h3>${TIERS.map(t=>`<div class="set-row"><div>${t}</div><input type="text" data-tn="${t}" value="${esc(s.tierNames[t]||'')}" placeholder="${t}"></div>`).join('')}</div>
   <div class="row"><button class="btn" id="st-export">Copy my settings</button><button class="btn" id="st-def">Back to defaults</button></div></div>`;
   $('#settings').classList.add('on');$('#scrim').classList.add('on');
@@ -1114,7 +1114,7 @@ function openEmail(){
 }
 /* ---------- csv ---------- */
 function downloadCsv(){
-  const cols=['SKU','Name','Subcategory','Supplier','Status','Decision','What is going on','$ at stake','Confidence','On hand [Planning system]','In transit [Planning system]','Open PO qty [Planning system]','Supply [Calculated]','Forecast next 12 wks [Planning system]','Need from history [Calculated]','Same weeks last year [Reporting tool]','Weeks of supply [Calculated]','Lead time quoted wks [Shared file]','Lead time typical wks [Calculated]','Note'];
+  const cols=['SKU','Name','Line','Supplier','Status','Decision','What is going on','$ at stake','Confidence','On hand [Planning system]','In transit [Planning system]','Open PO qty [Planning system]','Supply [Calculated]','Forecast next 12 wks [Planning system]','Need from history [Calculated]','Same weeks last year [Reporting tool]','Weeks of supply [Calculated]','Lead time quoted wks [Shared file]','Lead time typical wks [Calculated]','Note'];
   const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const lines=[cols.join(',')];
   st.res.rows.forEach(r=>{const m=r.metrics,lt=m.lt,n=r.acceptedFlags[0]&&r.acceptedFlags[0].note;
@@ -1347,7 +1347,7 @@ function dashHtml(){
     if(C.num)return `<td class="money ${A.pcls(k,v)}">${esc(A.fv(k,v))}</td>`;
     return `<td class="${k==='going'?'wide':(k==='sku'||k==='conf'||k==='nextarr'?'c':'')} ${A.pcls(k,v)}">${esc(String(v))}</td>`}).join('')}</tr>`).join('');
   return `<div class="dash"><h3>Daily Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
-   <p class="dnote">Pick a decision and a status in the two yellow cells. The four boxes count the items for the status you picked, and the list below rebuilds itself. This is the same dashboard that opens first in the downloaded sheet.</p>
+   <p class="dnote">Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells. The four boxes count the items for the status you picked, and the list rebuilds itself. This is the same dashboard that opens first in the downloaded sheet.</p>
    <div class="dpick"><label>Decision <select id="dd">${[ALLD,...DECL].map(o=>`<option ${o===dashDec?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
    <label>Status <select id="ds">${STAT().map(o=>`<option ${o===dashStat?'selected':''}>${esc(o)}</option>`).join('')}</select></label></div>
    <div class="dboxes">${boxes}</div>
@@ -1442,14 +1442,14 @@ function renderSheet(){
   else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map(t=>({t:String(t)}))})),{empty:'No notes yet.'});count=it.length+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
-   <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. Download it to open in Excel with the same colors and formatting. The download opens on an interactive Dashboard: pick a decision or a status from the yellow dropdowns and the count boxes and the list update.</p>
+   <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. The download opens in Excel with the same colors and formatting, on an interactive Dashboard where the yellow dropdowns change the boxes and the list.</p>
    <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
     ${tab==='today'||tab==='plan'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
     <button class="btn sm" id="sh-custom">Add or remove columns</button>
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Dashboard is the interactive view that opens first. Today is the list of what needs you, with the columns you chose. All Items has every item and every column. 12-Week Plan is the week-by-week stock projection. Forecast Accuracy shows how well the forecast has done by line. Since Yesterday is what changed. Notes is the decisions you logged. Recipe is how the sheet is built, with every column defined.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Dashboard opens first. Today lists what needs you, with the columns you chose. All Items has every item and every column. 12-Week Plan projects stock week by week. Forecast Accuracy shows how the forecast has done by line. Since Yesterday is what changed. Notes holds the decisions you logged. Recipe explains how the sheet is built and defines every column.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
@@ -1528,7 +1528,7 @@ function downloadXlsx(){
   const fill=(r,c0,c1,sty)=>{for(let c=c0;c<=c1;c++)if(!R(r)[c])put(r,c,{v:'',s:sty})};
   const span=(r,c0,c1,o)=>{put(r,c0,o);fill(r,c0+1,c1,o.s);if(c1>c0)dash.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
   span(1,0,nd-1,{v:'Daily Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
-  span(2,0,nd-1,{v:'Pick a decision and a status in the two yellow cells. The four boxes count the items for the status you picked, and the list below rebuilds itself. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first.',s:'note'});R(2).h=34;
+  span(2,0,nd-1,{v:'Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells. The four boxes count the items for the status you picked, and the list rebuilds itself. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first.',s:'note'});R(2).h=34;
   put(4,0,{v:'Decision',s:'label'});span(4,1,2,{v:D0,s:'pick'});
   span(4,3,4,{v:'Status',s:'label'});span(4,5,7,{v:S0,s:'pick'});R(4).h=24;
   dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[ALLD,...DECL].join(',')+'"'},{ref:'F4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STATL.join(',')+'"'});
@@ -1601,9 +1601,9 @@ function renderHome(){
     <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
     <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="conf" style="margin-bottom:6px">${r[1]}</div><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div></div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Prompt Your AI Agent</h2></div><p>Most of the work happens here.</p>
-    <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. The agent hears the voice of the customer (VOC) here.</li></ul>
+    <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. This is also where the voice of the customer (VOC) comes in.</li></ul>
     <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
-   <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning, with the items that need you at the top.</p>
+   <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning. It opens on a dashboard of what needs you, with stock counts, weeks of supply and stock-out dates.</p>
     ${miniSheet()}
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Sheet</button></div></div>
    <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
@@ -1611,9 +1611,9 @@ function renderHome(){
   </div>
   <h2 class="sec-h">What Connects To What</h2>
   <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026. Shown for Anaplan and Tableau, the two sources in this example. Any other source works the same way: if it can export a file, it can go in the shared folder.</p>
-  <div class="card mx-wrap"><table class="mx"><thead><tr class="grp"><th></th><th colspan="2">Files Land In The Shared Folder</th><th colspan="2">Direct Connection To The AI</th></tr><tr><th></th><th>Manual Export</th><th>Automated Export</th><th>ChatGPT</th><th>Copilot</th></tr></thead><tbody>
-   <tr><th>Anaplan</th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="part"><b>▲ Partly</b><span>Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step is needed to move the file.</span></td><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or an outside bridge built first.</span></td><td class="yes"><b>✔ Yes</b><span>Anaplan's AI Gateway names Microsoft Copilot. Licensing is not stated.</span></td></tr>
-   <tr><th>Tableau</th><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. A step is needed to move the file.</span></td><td class="yes"><b>✔ Yes</b><span>Tableau lists ChatGPT as a supported client. Read-only, with a sign-in per person.</span></td><td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td></tr>
+  <div class="card mx-wrap"><table class="mx"><thead><tr class="grp"><th></th><th colspan="2">Files Land In The Shared Folder</th><th colspan="2">Direct Connection To The AI</th></tr><tr><th></th><th>Manual Export</th><th>Automated Export</th><th>Copilot</th><th>ChatGPT</th></tr></thead><tbody>
+   <tr><th>Anaplan</th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="part"><b>▲ Partly</b><span>Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step is needed to move the file.</span></td><td class="yes"><b>✔ Yes</b><span>Anaplan's AI Gateway names Microsoft Copilot. Licensing is not stated.</span></td><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or an outside bridge built first.</span></td></tr>
+   <tr><th>Tableau</th><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. A step is needed to move the file.</span></td><td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td><td class="yes"><b>✔ Yes</b><span>Tableau lists ChatGPT as a supported client. Read-only, with a sign-in per person.</span></td></tr>
   </tbody></table></div>
   <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Use whichever one works for you today. Manual export needs no setup. Automated export or a direct connection removes the daily manual step. Try setting it up yourself first, and ask IT only if something is blocked.</span></div>
   <p style="margin-top:18px"><button class="btn pri" data-nav="options">See Setup Options And Limits</button></p>
@@ -1630,8 +1630,8 @@ function renderOptions(){
   <div class="card mx-wrap"><table class="mx"><thead><tr><th>Option</th><th>Anaplan</th><th>Tableau</th><th>Main Limit</th></tr></thead><tbody>
    <tr><th>Manual Export<small>You put the files in the shared folder</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every day. Also how history is loaded.</td></tr>
    <tr><th>Automated Export<small>Sources put the files in the shared folder</small></th><td class="part"><b>▲ Partly</b><span>Exports to S3, Azure Blob or BigQuery. A step moves them to the folder.</span></td><td class="part"><b>▲ Partly</b><span>Prep file output or REST API. A step moves them to the folder.</span></td><td>One step per source to move the file. You or IT sets it up.</td></tr>
-   <tr><th>ChatGPT<small>Direct, no folder needed</small></th><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or bridge.</span></td><td class="yes"><b>✔ Yes</b><span>Listed by Tableau.</span></td><td>Scheduled tasks cannot take file uploads.</td></tr>
    <tr><th>Copilot<small>Direct, no folder needed</small></th><td class="yes"><b>✔ Yes</b><span>Named by Anaplan.</span></td><td class="part"><b>▲ Partly</b><span>Finds and answers about dashboards.</span></td><td>Full Tableau numbers not stated. Licensing for Anaplan not stated.</td></tr>
+   <tr><th>ChatGPT<small>Direct, no folder needed</small></th><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or bridge.</span></td><td class="yes"><b>✔ Yes</b><span>Listed by Tableau.</span></td><td>Scheduled tasks cannot take file uploads.</td></tr>
    <tr><th>Split: ChatGPT And Copilot<small>Both save to the folder, Copilot merges</small></th><td class="no"><b>✕ Not until built</b><span>Anaplan connector must be built first.</span></td><td class="yes"><b>✔ Yes</b><span>Through ChatGPT.</span></td><td>Two tools to approve. Saving files from ChatGPT to the folder is not confirmed.</td></tr>
    <tr><th>Keep Separate<small>One sheet per system</small></th><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td>No flags that need both systems.</td></tr>
   </tbody></table></div>

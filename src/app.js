@@ -148,7 +148,7 @@ function renderTab(){
   const subs=['',...D.subs];
   tb.innerHTML=`<div class="bar" data-g="filters">${chipsHtml()}</div>
    <div class="bar"><input type="search" id="q" placeholder="Search SKU or name" value="${esc(st.q)}" aria-label="Search">
-   <select id="sub" aria-label="Subcategory">${subs.map(s=>`<option value="${esc(s)}" ${st.sub===s?'selected':''}>${s||'All subcategories'}</option>`).join('')}</select>
+   <select id="sub" aria-label="Line">${subs.map(s=>`<option value="${esc(s)}" ${st.sub===s?'selected':''}>${s||'All lines'}</option>`).join('')}</select>
    <span class="mute" id="cnt"></span>${st.dec?`<button class="btn sm" id="cleardec">Clear "${DEC[st.dec][0]}"</button>`:''}</div>
    <div class="card" data-g="list"><div id="listbody"></div></div>`;
   $$('[data-tier]',tb).forEach(b=>b.onclick=()=>{st.tier=b.dataset.tier;renderApp()});
@@ -184,7 +184,7 @@ function accHtml(){
 function accuracyHtml(){
   const a=E.accuracy(snap()),T=E.accuracyTotal(snap());
   const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-med">◆ Watch</span>':'<span class="ok-t">✔ On target</span>';
-  return `<div class="card sec" data-g="accuracy"><h3>Forecast accuracy by line (last 13 weeks)</h3>
+  return `<div class="card sec" data-g="accuracy"><h3>Forecast Accuracy By Line (Last 13 Weeks)</h3>
   <p class="mute">Miss (WMAPE) adds up the gap between actual sales and forecast for every SKU and week, then divides by total sales. Bias is whether the forecast runs high (+) or low (-) overall. Common targets: miss under 25%, bias within 5% either way. The bias signal below is checked at line level, so one noisy item cannot trigger a false alarm.</p>
   <div class="xl-scroll"><table class="list"><thead><tr><th>Line</th><th class="num">SKUs</th><th class="num">Forecast accuracy</th><th class="num">Miss (WMAPE)</th><th class="num">Bias</th><th>Against targets</th><th>Signal</th></tr></thead><tbody>
   <tr><td><b>All lines</b></td><td class="num">${T.n}</td><td class="num">${pctN(1-T.wmape)}</td><td class="num">${pctN(T.wmape)}</td><td class="num">${pctSN(T.bias)}</td><td>${tgt(T.wmape,T.bias)}</td><td></td></tr>
@@ -377,7 +377,7 @@ function openSettings(){
    ${row('outpaceWeeks','Sales above forecast, weeks in a row','',2,8)}
    ${row('minDollars','Hide items under ($ at stake)','Manager view uses 25,000',0,1000000,1000)}
    <div class="set-row"><div>Lead time to trust<small>Typical uses the supplier's real history. Quoted uses the quote only.</small></div><select data-s="leadTimeBasis"><option value="p80" ${s.leadTimeBasis==='p80'?'selected':''}>Typical</option><option value="quoted" ${s.leadTimeBasis==='quoted'?'selected':''}>Quoted</option></select></div></div>
-  <div class="card sec"><h3>Columns</h3>${[['sub','Subcategory'],['conf','Confidence'],['dollars','$ at stake']].map(([k,l])=>`<label class="sw"><input type="checkbox" data-col="${k}" ${s.cols[k]?'checked':''}> ${l}</label>`).join('')}</div>
+  <div class="card sec"><h3>Columns</h3>${[['sub','Line'],['conf','Confidence'],['dollars','$ at stake']].map(([k,l])=>`<label class="sw"><input type="checkbox" data-col="${k}" ${s.cols[k]?'checked':''}> ${l}</label>`).join('')}</div>
   <div class="card sec"><h3>Status names</h3>${TIERS.map(t=>`<div class="set-row"><div>${t}</div><input type="text" data-tn="${t}" value="${esc(s.tierNames[t]||'')}" placeholder="${t}"></div>`).join('')}</div>
   <div class="row"><button class="btn" id="st-export">Copy my settings</button><button class="btn" id="st-def">Back to defaults</button></div></div>`;
   $('#settings').classList.add('on');$('#scrim').classList.add('on');
@@ -458,7 +458,7 @@ function openEmail(){
 }
 /* ---------- csv ---------- */
 function downloadCsv(){
-  const cols=['SKU','Name','Subcategory','Supplier','Status','Decision','What is going on','$ at stake','Confidence','On hand [Planning system]','In transit [Planning system]','Open PO qty [Planning system]','Supply [Calculated]','Forecast next 12 wks [Planning system]','Need from history [Calculated]','Same weeks last year [Reporting tool]','Weeks of supply [Calculated]','Lead time quoted wks [Shared file]','Lead time typical wks [Calculated]','Note'];
+  const cols=['SKU','Name','Line','Supplier','Status','Decision','What is going on','$ at stake','Confidence','On hand [Planning system]','In transit [Planning system]','Open PO qty [Planning system]','Supply [Calculated]','Forecast next 12 wks [Planning system]','Need from history [Calculated]','Same weeks last year [Reporting tool]','Weeks of supply [Calculated]','Lead time quoted wks [Shared file]','Lead time typical wks [Calculated]','Note'];
   const q=v=>{v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const lines=[cols.join(',')];
   st.res.rows.forEach(r=>{const m=r.metrics,lt=m.lt,n=r.acceptedFlags[0]&&r.acceptedFlags[0].note;
