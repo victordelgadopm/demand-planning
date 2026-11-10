@@ -33,17 +33,23 @@ const COLS={
  acc:{h:'Forecast Accuracy (13 Wks)',w:13,num:'pct',src:'calculated: one minus the forecast miss over the last 13 weeks'},
  bias:{h:'Forecast Bias (13 Wks)',w:13,num:'pctS',src:'calculated: whether the forecast ran high (+) or low (-) over the last 13 weeks'},
  ship:{h:'Shipped ÷ Sold (8 Wks)',w:12,num:'x2',src:'from the Reporting tool: shipments to retailers divided by retailer sales over 8 weeks'},
+ peak:{h:'Peak Months',w:14,src:'calculated from the last two years of sales: months that sell at least 1.5x an average month'},
+ peakwk:{h:'Peak Weeks (Next 12)',w:20,src:'calculated: the weeks in the next 12 that sold at least 1.5x a normal week last year'},
+ peakcover:{h:'Peak Cover',w:11,src:'calculated: whether projected stock stays above 2 weeks of peak demand through the peak weeks (OK, Thin or Short)'},
+ promo:{h:'Promo Status',w:18,src:'from the Shared file (the promo calendar) and last year\'s tagged promo weeks'},
+ nextpromo:{h:'Next Promo',w:22,src:'from the Shared file: the next promo week on the calendar and whether it is confirmed'},
+ lift:{h:'Promo Lift (Last Year)',w:12,num:'pctS',src:'calculated: last year\'s promo weeks compared with the normal weeks around them'},
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
  note:{h:'Note',w:48,wide:1,src:'from the notes you save on each item'}};
 const DEFAULT=['status','sku','product','sub','onhand','onorder','wos','fcstwk','salesvs','stockout','gap','dollars','going','conf'];
-const FULLK=['status','sku','product','sub','abc','supplier','owner','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note'];
-const DASHK=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','gap','dollars','going','conf'];
-const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On'};
+const FULLK=['status','sku','product','sub','abc','supplier','owner','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note'];
+const DASHK=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','conf'];
+const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
 const saveCols=()=>{try{localStorage.setItem(CK,JSON.stringify(cols))}catch(e){}};
 let rowsMode='attn',tab='dash';
-const PLK=new Set(['onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc']);
+const PLK=new Set(['onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lift']);
 function val(k,r){
   if(PLK.has(k))return A.pv(k,r);
   const m=r.metrics,sk=A.skuOf(r.id),n=r.acceptedFlags&&r.acceptedFlags[0]&&r.acceptedFlags[0].note;
@@ -110,12 +116,17 @@ const DEFS=[
  ['ABC Class','A is the items that make the first 80% of 12-week forecast sales value, B the next 15%, C the last 5%.'],
  ['Forecast Accuracy / Bias','Accuracy is 1 minus the miss (WMAPE) over the last 13 weeks. Miss is the sum of |actual - forecast| divided by total actual. Bias is (forecast - actual) divided by actual, so negative means the forecast runs low.'],
  ['Shipped ÷ Sold (8 Wks)','Shipments to retailers divided by retailer sales over 8 weeks. Above 1.3x suggests retailers are building stock.'],
- ['12-Week Plan','Projected On Hand each week is last week plus receipts minus forecast demand. Red means below zero. Lowest Point is the lowest projected week.']];
+ ['Peak Months / Peak Weeks','Peak months are the calendar months that sold at least 1.5x an average month, over the last two years. Peak weeks are the weeks in the next 12 that sold at least 1.5x a normal week last year.'],
+ ['Peak Cover','OK means projected stock stays above 2 weeks of peak demand through the peak weeks. Thin means it dips below that. Short means stock goes below zero. "No peak" means no peak week falls in the next 12.'],
+ ['Promo Status','None, Last year only, Not confirmed (this year\'s promo is on the calendar but not confirmed), Confirmed covered or short (supply against the base forecast plus last year\'s lift), or New this year.'],
+ ['Promo Lift (Last Year)','Last year\'s promo weeks compared with the normal weeks around them.'],
+ ['12-Week Plan','Projected On Hand each week is last week plus receipts minus forecast demand. Red means below zero. Lowest Point is the lowest projected week. The Peak / Promo Weeks row marks PEAK weeks, PROMO weeks (PROMO? if not confirmed) and BOTH.']];
 function recipeItems(){
   return [['Rows Shown','Items that need attention, ranked by status then dollars. Switch to all items any time.'],
    ['Columns',cols.map(k=>COLS[k].h).join(', ')],
    ['Data Sources',D.sources.map(s=>s.name).join(', ')],
    ['Checks Run',Object.keys(E.FLAG_LABEL).filter(k=>st.settings.flags[k]).map(k=>E.FLAG_LABEL[k]).join(', ')],
+   ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal Calendar tab lists what is calculated, what comes from a file and what is not available.'],
    ['Notes','Notes never expire. An accepted item comes back only if its gap grows past 1.5 times what was accepted.'],
    ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
    ['How To Change It','Tell the AI in chat what you are not seeing. It updates this recipe.'],
@@ -123,7 +134,9 @@ function recipeItems(){
 }
 /* ---------- plan + accuracy data ---------- */
 function planBlocks(rows){
-  return rows.map(r=>{const sk=A.skuOf(r.id),pj=E.project(sk,A.snap(),{demand:sk.fcstH,slip:0}).rows;return {r,onHand:sk.inv.onHand,dem:pj.map(x=>x.demand),rec:pj.map(x=>x.arrival),inv:pj.map(x=>x.inv)}});
+  return rows.map(r=>{const sk=A.skuOf(r.id),pj=E.project(sk,A.snap(),{demand:sk.fcstH,slip:0}).rows;const pw=new Set(r.metrics.peak?r.metrics.peak.weeks:[]),ty={};((sk.promo&&sk.promo.ty)||[]).forEach(x=>{ty[x.h]=x.confirmed});
+    const mark=pj.map((x,h)=>{const pk=pw.has(h),pr=h in ty;return pk&&pr?'BOTH':pk?'PEAK':pr?(ty[h]?'PROMO':'PROMO?'):''});
+    return {r,onHand:sk.inv.onHand,dem:pj.map(x=>x.demand),rec:pj.map(x=>x.arrival),inv:pj.map(x=>x.inv),mark}});
 }
 const weekLabels=()=>Array.from({length:E.H},(_,h)=>E.fmtDate(E.weekStart(A.snap(),h)));
 const tgtText=(w,b)=>w>0.35||Math.abs(b)>0.10?'Off target':w>0.25||Math.abs(b)>0.05?'Watch':'On target';
@@ -154,14 +167,23 @@ function planGrid(rows){
     const id=(first)=>first?[{t:A.tn(r.tier),cls:'st '+TCLASS[r.tier]},{t:r.id},{t:r.name}]:[{t:''},{t:''},{t:''}];
     body.push({id:r.id,c:[...id(1),{t:'Forecast Demand'},{t:''},...b.dem.map(v=>({t:nf(v),cls:'money'})),{t:nf(b.dem.reduce((a,v)=>a+v,0)),cls:'money'},{t:''}]});
     body.push({id:r.id,c:[...id(0),{t:'Receipts (Transit + PO)'},{t:''},...b.rec.map(v=>({t:v?nf(v):'',cls:'money'})),{t:nf(b.rec.reduce((a,v)=>a+v,0)),cls:'money'},{t:''}]});
-    body.push({id:r.id,c:[...id(0),{t:'Projected On Hand',cls:'bold'},{t:nf(b.onHand),cls:'money'},...b.inv.map(v=>({t:nf(v),cls:'money'+(v<0?' bad':'')})),{t:''},{t:nf(low),cls:'money'+(low<0?' bad':'')}]})});
+    body.push({id:r.id,c:[...id(0),{t:'Projected On Hand',cls:'bold'},{t:nf(b.onHand),cls:'money'},...b.inv.map(v=>({t:nf(v),cls:'money'+(v<0?' bad':'')})),{t:''},{t:nf(low),cls:'money'+(low<0?' bad':'')}]});
+    body.push({id:r.id,c:[...id(0),{t:'Peak / Promo Weeks'},{t:''},...b.mark.map(v=>({t:v,cls:v?'warn':''})),{t:''},{t:''}]})});
   return {html:gridHtml(heads,body,{empty:'Nothing needs attention.'}),n:rows.length};
+}
+const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peakcover','going'];
+const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short. Shaded months are each line's peaks.`;
+function seasonGrid(){
+  const d=A.seasonData(),heads=[{t:'Line'},...A.MONS.map(m=>({t:m,cls:'money'}))];
+  const body=d.lines.map(l=>{const a=l==='All Lines'?d.sz.all:d.sz.lines[l];return {c:[{t:l,cls:'bold'},...a.map(x=>({t:A.pctN(x,0),cls:'money'+(x>=A.PEAKSH?' warn':'')}))]}});
+  const srcs=gridHtml(['Topic','Where It Comes From','How'].map(t=>({t})),A.SEASON_SRC.map(x=>({c:[{t:x[0],cls:'bold'},{t:x[1],cls:'st'},{t:x[2],cls:'wide'}]})));
+  return `<div class="note-box">${esc(seasonSummary(d))}</div>`+gridHtml(heads,body)+`<h3 class="sub-h">Where This Comes From</h3>`+srcs;
 }
 function accGrid(){
   const rows=accRows(),heads=['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal'].map((t,i)=>({t,cls:i>=1&&i<=4?'money':''}));
   return {html:gridHtml(heads,rows.map(x=>({c:[{t:x.line,cls:'bold'},{t:String(x.n),cls:'money'},{t:A.pctN(1-x.w),cls:'money'},{t:A.pctN(x.w),cls:'money'},{t:A.pctSN(x.b),cls:'money'},{t:tgtText(x.w,x.b),cls:({'On target':'','Watch':'warn','Off target':'bad'})[tgtText(x.w,x.b)]},{t:x.sig,cls:'wide'}]}))),n:rows.length-1};
 }
-const TABS=[['dash','Dashboard'],['today','Today'],['all','All Items'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
+const TABS=[['dash','Dashboard'],['today','Today'],['all','All Items'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
 function renderSheet(){
   const v=$('#v-sheet'),total=st.res.total;
   let inner,count='';
@@ -170,6 +192,8 @@ function renderSheet(){
   else if(tab==='all'){const g=colGrid(FULLK,sheetRows('all'));inner=g.html;count=`${g.n} items, every column`}
   else if(tab==='plan'){const g=planGrid(sheetRows(rowsMode));inner=g.html;count=`${g.n} items, ${E.H} weeks`}
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
+  else if(tab==='season'){inner=seasonGrid();count='12 months, by line'}
+  else if(tab==='promos'){const d=A.seasonData(),g=colGrid(PPK,d.list);inner=g.html;count=`${g.n} items with a promo or a thin peak`}
   else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail'].map(t=>({t})),it.map(r=>({id:r[2],c:r.map(t=>({t}))})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
   else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map(t=>({t:String(t)}))})),{empty:'No notes yet.'});count=it.length+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
@@ -203,6 +227,9 @@ function downloadXlsx(){
     if(sl)out.push({ref:`${sl}${first}:${sl}${last}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${sl}${first}),ABS(${sl}${first})>=0.15)`}]});
     [ol,ob].forEach(c=>{if(c)out.push({ref:`${c}${first}:${c}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(${c}${first}<>"",${c}${first}<>"None",${c}${first}<>"n/a")`}]})});
     if(hl)out.push({ref:`${hl}${first}:${hl}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(ISNUMBER(${hl}${first}),${hl}${first}<0)`}]});
+    const pcv=L('peakcover'),prm=L('promo');
+    if(pcv)out.push({ref:`${pcv}${first}:${pcv}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Short"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Thin"'}]});
+    if(prm)out.push({ref:`${prm}${first}:${prm}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Confirmed, short"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Not confirmed"'}]});
     return out};
   const mk=(rows,name,keys)=>{
     const data=rows.map(r=>keys.map(k=>cellOf(k,r)));
@@ -240,19 +267,36 @@ function downloadXlsx(){
   const PB=planBlocks(allRows),wl=weekLabels(),W=E.H;
   const plan={name:'12-Week Plan',widths:[13,11,32,24,12,...Array(W).fill(9),12,12],freeze:1,freezeCols:4,rows:[hdr(['Status','SKU','Product','Measure','On Hand Now',...wl,'12-Wk Total','Lowest Point'])],cf:[]};
   const wc0=5,wcN=4+W,tc=5+W,lc=6+W;
-  PB.forEach((b,i)=>{const r=b.r,r1=2+i*3,r2=r1+1,r3=r1+2,id=[{v:A.tn(r.tier),s:TS[r.tier]},{v:r.id,s:'txt'},{v:r.name,s:'txt'}];
+  PB.forEach((b,i)=>{const r=b.r,r1=2+i*4,r2=r1+1,r3=r1+2,id=[{v:A.tn(r.tier),s:TS[r.tier]},{v:r.id,s:'txt'},{v:r.name,s:'txt'}];
     const rd=Math.round,v3=x=>Math.round(x*1000)/1000;
     plan.rows.push([...id,{v:'Forecast Demand',s:'txt'},{v:'',s:'txt'},...b.dem.map(x=>({v:v3(x),s:'int'})),{f:`SUM(${C(wc0)}${r1}:${C(wcN)}${r1})`,v:b.dem.reduce((a,x)=>a+v3(x),0),s:'int'},{v:'',s:'txt'}]);
     plan.rows.push([...id,{v:'Receipts (Transit + PO)',s:'txt'},{v:'',s:'txt'},...b.rec.map(x=>({v:x||0,s:'int'})),{f:`SUM(${C(wc0)}${r2}:${C(wcN)}${r2})`,v:b.rec.reduce((a,x)=>a+x,0),s:'int'},{v:'',s:'txt'}]);
     let prev=b.onHand;const proj=b.dem.map((d,h)=>{prev=prev+(b.rec[h]||0)-v3(d);return prev});
     plan.rows.push([...id,{v:'Projected On Hand',s:'bold'},{v:b.onHand,s:'int'},...proj.map((x,h)=>({f:`${C(wc0+h-1)}${r3}+${C(wc0+h)}${r2}-${C(wc0+h)}${r1}`,v:x,s:'int'})),{v:'',s:'txt'},
       {f:`MIN(${C(wc0)}${r3}:${C(wcN)}${r3})`,v:Math.min(...proj),s:'int'}]);
+    plan.rows.push([...id,{v:'Peak / Promo Weeks',s:'txt'},{v:'',s:'txt'},...b.mark.map(x=>({v:x,s:'ctr'})),{v:'',s:'txt'},{v:'',s:'txt'}]);
   });
   const pl=plan.rows.length;plan.filter=pl;
   // first projected week starts from On Hand Now (column E)
   plan.cf.push({ref:`${C(wc0)}2:${C(lc)}${pl}`,rules:[{type:'expression',dxf:0,formula:`AND($D2="Projected On Hand",ISNUMBER(${C(wc0)}2),${C(wc0)}2<0)`}]});
+  plan.cf.push({ref:`${C(wc0)}2:${C(wcN)}${pl}`,rules:[{type:'expression',dxf:1,formula:`AND($D2="Peak / Promo Weeks",${C(wc0)}2<>"")`}]});
+  /* ---- Seasonal Calendar and Promos And Peaks ---- */
+  const SD=A.seasonData(),SR=SD.lines.length,sc0=5;
+  const season={name:'Seasonal Calendar',widths:[22,...Array(12).fill(9),4],freeze:0,rows:[],merges:[],cf:[]};
+  const sput=(r,c,o)=>{while(season.rows.length<r)season.rows.push([]);season.rows[r-1][c]=o};
+  const sspan=(r,c0,c1,o)=>{sput(r,c0,o);for(let c=c0+1;c<=c1;c++)sput(r,c,{v:'',s:o.s});if(c1>c0)season.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
+  sspan(1,0,12,{v:'Seasonal Calendar (Sample Data)',s:'title'});
+  sspan(2,0,12,{f:`COUNTIF(${rng('promo')},"<>None")&" of "&COUNTA(${rng('sku')})&" items have a promo this year or last year. "&(COUNTIF(${rng('peakcover')},"Thin")+COUNTIF(${rng('peakcover')},"Short"))&" items would run thin or short into a peak in the next 12 weeks. Shaded months are each line's peaks (1.5x an average month or more)."`,
+    v:`${SD.n.promo} of ${SD.n.items} items have a promo this year or last year. ${SD.n.thin} items would run thin or short into a peak in the next 12 weeks. Shaded months are each line's peaks (1.5x an average month or more).`,s:'note'});
+  season.rows[1].h=34;
+  sput(4,0,{v:'Line (Share Of A Year\'s Sales)',s:'head'});A.MONS.forEach((m,j)=>sput(4,1+j,{v:m,s:'head'}));season.rows[3].h=30;
+  SD.lines.forEach((l,i)=>{const a=l==='All Lines'?SD.sz.all:SD.sz.lines[l];sput(5+i,0,{v:l,s:'bold'});a.forEach((x,j)=>sput(5+i,1+j,{v:x,s:'pct'}))});
+  season.cf.push({ref:`B5:M${4+SR}`,rules:[{type:'cellIs',op:'greaterThanOrEqual',dxf:1,formula:String(A.PEAKSH)}]});
+  const wr=6+SR;sspan(wr,0,12,{v:'Where This Comes From',s:'sect'});
+  A.SEASON_SRC.forEach((x,i)=>{const r=wr+1+i;sspan(r,0,0,{v:x[0],s:'bold'});sspan(r,1,2,{v:x[1],s:'ctr'});sspan(r,3,12,{v:x[2],s:'note'});season.rows[r-1].h=48});
+  const promoSheet=mk(SD.list,'Promos And Peaks',PPK);promoSheet.freezeCols=3;
   /* ---- Dashboard ---- */
-  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,gap:10,dollars:12,going:56,conf:10};
+  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:56,conf:10};
   const nd=DASHK.length,HC=nd; // helper column index on the dashboard
   const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:[...DASHK.map(k=>DW[k]),6],hide:[HC],rows:[],merges:[],cf:[],dv:[]};
   const R=n=>{while(dash.rows.length<n)dash.rows.push([]);return dash.rows[n-1]};
@@ -264,7 +308,7 @@ function downloadXlsx(){
   put(4,0,{v:'Decision',s:'label'});span(4,1,2,{v:D0,s:'pick'});
   span(4,3,4,{v:'Status',s:'label'});span(4,5,7,{v:S0,s:'pick'});R(4).h=24;
   dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[ALLD,...DECL].join(',')+'"'},{ref:'F4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STATL.join(',')+'"'});
-  const BOX=[[0,2],[3,7],[8,11],[12,13]];
+  const BOX=[[0,2],[3,7],[8,11],[12,nd-1]];
   BOX.forEach(([c0,c1],i)=>{const lab=DECL[i],it=allRows.filter(r=>dName(r)===lab&&statOK(r)),dol=sumD(it);
     span(6,c0,c1,{v:lab,s:'boxT'});
     span(7,c0,c1,{f:`COUNTIFS(${rDec},${C(c0)}6,${rSM},1)`,v:it.length,s:'boxN'});
@@ -281,7 +325,7 @@ function downloadXlsx(){
    [[3,5],'On Order',{f:`SUM(${rng('transit')})+SUM(${rng('openpo')})`,v:K.transit+K.openPO,s:'boxN'},{f:`TEXT(SUM(${rng('transit')}),"#,##0")&" transit + "&TEXT(SUM(${rng('openpo')}),"#,##0")&" PO"`,v:E.fmtNum(K.transit)+' transit + '+E.fmtNum(K.openPO)+' PO'}],
    [[6,8],'Weeks Of Supply',{f:`(SUM(${rng('onhand')})+SUM(${rng('transit')}))/SUM(${rng('fcstwk')})`,v:K.wos,s:'boxN1'},{f:`COUNTIFS(${rng('wos')},"<4",${rng('onhand')},">=0",${rng('fcstwk')},">0")&" items under 4 weeks, "&COUNTIF(${rng('wos')},">${ovr}")&" over ${ovr}"`,v:K.lowCover+' items under 4 weeks, '+K.highCover+' over '+ovr}],
    [[9,11],'Forecast Accuracy',{f:"'Forecast Accuracy'!C2",v:1-AC.wmape,s:'boxPct'},{f:`"Miss (WMAPE) "&TEXT('Forecast Accuracy'!D2,"0.0%")&", last 13 weeks"`,v:'Miss (WMAPE) '+(AC.wmape*100).toFixed(1)+'%, last 13 weeks'}],
-   [[12,13],'Forecast Bias',{f:"'Forecast Accuracy'!E2",v:AC.bias,s:'boxPctS'},{f:`IF('Forecast Accuracy'!E2<0,"Forecast runs low (sales beat it)","Forecast runs high")`,v:AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high'}]];
+   [[12,nd-1],'Forecast Bias',{f:"'Forecast Accuracy'!E2",v:AC.bias,s:'boxPctS'},{f:`IF('Forecast Accuracy'!E2<0,"Forecast runs low (sales beat it)","Forecast runs high")`,v:AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high'}]];
   TILE.forEach(([[c0,c1],t,val_,sub])=>{span(11,c0,c1,{v:t,s:'boxT'});span(12,c0,c1,val_);span(13,c0,c1,Object.assign({s:'boxS'},sub))});
   R(11).h=22;R(12).h=40;R(13).h=20;
   /* totals line + list header */
@@ -289,7 +333,7 @@ function downloadXlsx(){
   span(15,0,2,{v:'Items matching your choices:',s:'label'});put(15,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
   span(15,4,6,{v:'Total $ at stake:',s:'label'});put(15,7,{f:`SUM(${C(DASHK.indexOf('dollars'))}${first}:${C(DASHK.indexOf('dollars'))}${last})`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(15,8,10,{v:'No decision needed:',s:'label'});put(15,11,{f:'IF($B$4="All decisions",D15-A7-D7-I7-M7,0)',v:matched0.filter(r=>!r.decision).length,s:'int'});R(15).h=24;
   DASHK.forEach((k,c)=>put(16,c,{v:dh(k),s:'head'}));R(16).h=34;
-  const STY={status:'ctr',sku:'ctr',product:'txt',onhand:'int',onorder:'int',wos:'dec1',fcstwk:'int',salesvs:'pctS',stockout:'ctr',nextarr:'ctr',gap:'int',dollars:'money0',going:'txt',conf:'ctr'};
+  const STY={status:'ctr',sku:'ctr',product:'txt',onhand:'int',onorder:'int',wos:'dec1',fcstwk:'int',salesvs:'pctS',stockout:'ctr',nextarr:'ctr',peakcover:'ctr',nextpromo:'ctr',gap:'int',dollars:'money0',going:'txt',conf:'ctr'};
   const matched=allRows.filter(dashMatch);
   for(let i=0;i<N;i++){const row=first+i,src=matched[i],hc=`$${C(HC)}${row}`;
     put(row,HC,{f:`IFERROR(MATCH(${i+1},${rShow},0),"")`,v:src?i+1+0:'',s:'txt'});
@@ -302,7 +346,7 @@ function downloadXlsx(){
   dash.cf.push({ref:`A${first}:A${last}`,rules:TN.map((t,i)=>({type:'cellIs',op:'equal',dxf:i,formula:`"${A.tn(t)}"`}))});
   dash.cf.push(...cfList(DASHK,first,last));
   dash.freeze=4;
-  const sheets=[dash,mk(sheetRows(rowsMode),'Today',cols),dataSheet,plan,accSheet,
+  const sheets=[dash,mk(sheetRows(rowsMode),'Today',cols),dataSheet,plan,accSheet,season,promoSheet,
    {name:'Since Yesterday',widths:[16,32,11,70],rows:[hdr(['Change','Product','SKU','Detail']),...since.map(r=>r.map(t=>({v:t,s:'txt'})))],freeze:1},
    {name:'Notes',widths:[11,30,18,20,60,10,10,14],rows:[hdr(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===7?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
    {name:'Recipe',widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the All Items sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
@@ -425,8 +469,8 @@ function renderOptions(){
 /* ---------- customize ---------- */
 const hello=()=>({w:'ai',t:'Hi. Tell me what you are not seeing in your daily sheet, and I will change it. In this demo, tap one of the examples below or type your own.'});
 let msgs=[hello()];
-const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add who owns each item.','Add the ABC class.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
-const PAT=[['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['owner',/owner|who owns|responsible|assigned/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
+const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add who owns each item.','Add the ABC class.','Add the peak months and promo status.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
+const PAT=[['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['owner',/owner|who owns|responsible|assigned/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();

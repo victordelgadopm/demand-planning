@@ -20,10 +20,11 @@ const RULES={
  overstock:['Too much stock','Many weeks of supply on hand and sell-through is slowing.'],
  channel_fill:['Shipping ahead of sales','Shipments to retailers are well above what shoppers bought over 8 weeks, so retailers may be building stock.'],
  newitem_gap:['New item forecast','The forecast for a new item is far from what similar past launches sold in their first 12 weeks.'],
+ peak_cover:['Thin cover into peak','The busiest weeks in the next 12 (weeks selling at least 1.5x a normal week last year) would leave less than 2 weeks of peak demand in stock at their lowest point, using the quoted delivery dates.'],
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int'};
+const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS'};
 const r3=x=>Math.round(x*10000)/10000;
 const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
 function pv(k,r){const m=r.metrics,nw=r.isNew;
@@ -39,7 +40,13 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'dollars':return r.dollars>0?Math.round(r.dollars):0;case 'price':return r.price;
    case 'acc':return m.acc13==null?'':r3(m.acc13);case 'bias':return m.bias13==null?'':r3(m.bias13);
    case 'ship':return m.shipRatio==null?'':Math.round(m.shipRatio*100)/100;
-   case 'abc':return r.abc;}
+   case 'abc':return r.abc;
+   case 'peak':return nw?'n/a':(m.peakMonths||'None');
+   case 'peakwk':return nw?'n/a':!m.peak?'None in window':(m.peak.start===m.peak.end?m.peak.start:m.peak.start+' to '+m.peak.end);
+   case 'peakcover':return m.peakStatus==='—'?'No peak':m.peakStatus;
+   case 'promo':return m.promo.status;
+   case 'nextpromo':return m.promo.next?m.promo.next+(m.promo.confirmed?'':' (not confirmed)'):'None';
+   case 'lift':return m.promo.lift==null||!isFinite(m.promo.lift)?'':r3(m.promo.lift);}
   return '';}
 function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!=='number')return String(v);
   switch(t){case 'int':return fmt(v);case 'dec1':return v.toFixed(1);case 'pct':return Math.round(v*100)+'%';case 'pctS':return (v>0?'+':'')+Math.round(v*100)+'%';
@@ -49,7 +56,10 @@ function pcls(k,v){if(v===''||v==null)return '';
   if(k==='wos'&&typeof v==='number')return v<4?'bad':v>st.settings.overstockWOS?'ovr':'';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
-  if(k==='onhand'&&v<0)return 'bad';return ''}
+  if(k==='onhand'&&v<0)return 'bad';
+  if(k==='peakcover')return v==='Short'?'bad':v==='Thin'?'warn':'';
+  if(k==='promo')return v==='Confirmed, short'?'bad':v==='Not confirmed'?'warn':'';
+  return ''}
 const pctN=(v,d=1)=>(v*100).toFixed(d)+'%',pctSN=(v,d=1)=>(v>0?'+':'')+(v*100).toFixed(d)+'%';
 
 function snapTiles(){const r=st.res,K=r.kpi,AC=E.accuracyTotal(snap()),attn=r.rows.filter(x=>x.headline).length;
@@ -97,11 +107,12 @@ function renderApp(){
    <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list.</p>${health}${snapHtml}${sinceHtml()}
    <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision. Tap a box to filter the list below.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
-   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, and forecast accuracy.</p>
+   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, forecast accuracy, and seasonality and promos.</p>
    <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="${st.tab==='attn'}" data-tab="attn" data-g="tab-attn">Needs attention</button>
     <button class="tab" role="tab" aria-selected="${st.tab==='acc'}" data-tab="acc" data-g="tab-accepted">Accepted risks (${r.accepted})</button>
-    <button class="tab" role="tab" aria-selected="${st.tab==='acc2'}" data-tab="acc2" data-g="tab-accuracy">Forecast accuracy</button></div>
+    <button class="tab" role="tab" aria-selected="${st.tab==='acc2'}" data-tab="acc2" data-g="tab-accuracy">Forecast accuracy</button>
+    <button class="tab" role="tab" aria-selected="${st.tab==='season'}" data-tab="season" data-g="tab-season">Seasonality and promos</button></div>
    <div id="tabbody"></div>
    <p class="foot">Sample data, not Mattel data. Every brand, supplier and number here is invented. Built from fields a planning team already has: POS, shipments, on-hand, in-transit, open POs, forecast, promo calendar, supplier lead times and 3 years of history.</p>`;
   bindApp();renderTab();
@@ -145,6 +156,7 @@ function renderTab(){
   const tb=$('#tabbody');
   if(st.tab==='acc')return tb.innerHTML=accHtml(),bindRows(tb);
   if(st.tab==='acc2')return tb.innerHTML=accuracyHtml();
+  if(st.tab==='season')return tb.innerHTML=seasonHtml(),bindRows(tb);
   const subs=['',...D.subs];
   tb.innerHTML=`<div class="bar" data-g="filters">${chipsHtml()}</div>
    <div class="bar"><input type="search" id="q" placeholder="Search SKU or name" value="${esc(st.q)}" aria-label="Search">
@@ -181,6 +193,35 @@ function accHtml(){
    <td><span class="tag">${esc(n.reason)}</span>${esc(n.text)}<div class="conf">${esc(n.who)}, ${esc(n.date)}. Kept until you remove it.</div></td>
    <td class="num">${fmt(n.acceptedGap)} units</td><td class="num">${fmt(f.gapUnits)} units</td><td class="num">${n.realertGap!=null?(n.realertGap>1e8?'Never':fmt(n.realertGap)+' units'):fmt(n.acceptedGap*1.5)+' units'}</td></tr>`})).join('')}</tbody></table></div>
    <p class="foot">Notes never expire on their own. The only thing that brings a flag back is the data: if the gap grows past 1.5x what you accepted (adjustable per note), or you remove the note.</p>`}
+/* ---------- seasonality and promos: shared by the Visual View, the sheet preview and the download ---------- */
+const MONS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],PEAKSH=1.5/12;
+const PRANK={'Confirmed, short':0,'Not confirmed':1,'Confirmed, covered':3,'New this year':4,'Last year only':5};
+function seasonData(){
+  const sz=E.seasonality(snap()),rows=st.res.rows,pr=rows.filter(r=>r.metrics.promo.status!=='None'),pk=rows.filter(r=>r.metrics.peak);
+  const list=rows.filter(r=>r.metrics.promo.status!=='None'||r.metrics.peakStatus==='Short'||r.metrics.peakStatus==='Thin')
+    .sort((a,b)=>{const ra=a.metrics.peakStatus==='Short'?0:a.metrics.peakStatus==='Thin'?2:9,rb=b.metrics.peakStatus==='Short'?0:b.metrics.peakStatus==='Thin'?2:9;
+      return Math.min(PRANK[a.metrics.promo.status]??9,ra)-Math.min(PRANK[b.metrics.promo.status]??9,rb)||b.dollars-a.dollars||(a.id<b.id?-1:1)});
+  return {sz,lines:['All Lines',...Object.keys(sz.lines).sort()],list,
+    n:{items:rows.length,promo:pr.length,ty:rows.filter(r=>r.metrics.promo.next).length,unconf:rows.filter(r=>r.metrics.promo.status==='Not confirmed').length,peak:pk.length,thin:rows.filter(r=>r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short').length}};
+}
+const SEASON_SRC=[
+ ['Peak months','Calculated','Counted from the last two years of weekly sales in the Reporting tool, by calendar month. A month is a peak when it sells at least 1.5x an average month.'],
+ ['This year\'s promos','From a file','Read from the promo calendar in the Shared file, with a confirmed or not confirmed mark. If a promo is missing from the file, it will not show here, so "None" means none on file, not none planned.'],
+ ['Last year\'s promo lift','Calculated','Measured by comparing last year\'s promo weeks with the normal weeks around them. It only shows when last year\'s promo weeks are tagged in the history.'],
+ ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
+function seasonHtml(){
+  const d=seasonData(),n=d.n;
+  const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}</tr></thead><tbody>${d.lines.map(l=>{const a=l==='All Lines'?d.sz.all:d.sz.lines[l];
+    return `<tr><td><b>${esc(l)}</b></td>${a.map(x=>`<td class="num ${x>=PEAKSH?'warn':''}">${pctN(x,0)}</td>`).join('')}</tr>`}).join('')}</tbody></table></div>`;
+  const lst=`<div class="lscroll"><table class="list"><thead><tr><th>Item</th><th>Promo status</th><th>Next promo</th><th class="num">Last year lift</th><th>Peak weeks (next 12)</th><th>Peak cover</th></tr></thead><tbody>${d.list.map(r=>{
+    const g=k=>pv(k,r),c=k=>pcls(k,g(k));
+    return `<tr class="r" tabindex="0" data-open="${r.id}"><td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}</div></td><td class="${c('promo')}">${esc(g('promo'))}</td><td>${esc(g('nextpromo'))}</td><td class="num">${g('lift')===''?'—':fv('lift',g('lift'))}</td><td>${esc(g('peakwk'))}</td><td class="${c('peakcover')}">${esc(g('peakcover'))}</td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
+  <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short. The shaded months in the table are each line's peaks.</p>
+  <h4 class="sub-h">Where Each Month Falls (Share Of A Year's Sales)</h4>${heat}
+  <h4 class="sub-h">Items With A Promo Or A Thin Peak</h4><p class="mute">Click a row for the numbers behind it.</p>${lst}
+  <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
+}
 function accuracyHtml(){
   const a=E.accuracy(snap()),T=E.accuracyTotal(snap());
   const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-med">◆ Watch</span>':'<span class="ok-t">✔ On target</span>';
@@ -299,6 +340,7 @@ function drawerHtml(){
   $('#drawer').innerHTML=`<div class="dr-h"><div style="flex:1">${tierB(res.tier)}${res.reAlert?'<span class="re">RE-ALERT</span>':''}<div class="hl" style="margin:6px 0 0">${esc(res.name)}</div>
    <div class="mute">${res.id} · ${esc(res.sub)} · ${esc(sku.supplier)} · $${sku.price.toFixed(2)} each</div></div><button class="btn" id="d-close">Close</button></div>
    <div class="dr-b">${why}
+   ${sku.isNew?'':seasonCard(sku,res)}
    ${sku.isNew?analogHtml(sku,res):`<div class="card sec" data-g="drill-chart"><h3>Sales: this year, forecast, and prior years</h3>${demandChart(sku,res)}</div>`}
    ${inv?`<div class="card sec" data-g="whatif"><h3>Stock projection and what-if</h3><div id="wi-chart">${inv.html}</div><div id="wi-v">${inv.v}</div>
      ${(sku.isNew||!res.metrics.lt||sku.inv.onHand<0)?'':`<div style="margin-top:12px">
@@ -313,6 +355,12 @@ function drawerHtml(){
    ${notesHtml(sku,res)}</div>`;
   bindDrawer(sku,res,inv);updateOut();
 }
+function seasonCard(sku,res){const m=res.metrics,pc=m.peakCover;
+  const rows=[['Peak months (last 2 years)',pv('peak',res),'calc'],['Peak weeks in the next 12',pv('peakwk',res),'calc'],
+   ['Lowest stock in those weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Peak cover',pv('peakcover',res),'calc'],
+   ['Next promo',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Promo status',pv('promo',res),'calc'],
+   ['Promo lift last year',m.promo.lift==null?'—':fv('lift',r3(m.promo.lift)),'calc']];
+  return `<div class="card sec" data-g="season-sku"><h3>Season And Promos</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`}
 function updateOut(){const w=st.wi,set=(i,t)=>{const e=$('#'+i);if(e)e.textContent=t};
   set('o-slip',w.slip+' wk');set('o-lift',(w.lift>0?'+':'')+w.lift+'%');set('o-qty',fmt(w.qty));set('o-h','wk +'+w.h)}
 function bindDrawer(sku,res,inv){
@@ -498,7 +546,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();

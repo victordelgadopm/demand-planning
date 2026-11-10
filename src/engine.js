@@ -8,14 +8,14 @@
     historyGapPct: 10, promoCushionPct: 3, overstockWOS: 16, channelRatio: 1.3,
     outpaceRatio: 1.2, outpaceWeeks: 3, leadTimeBasis: 'p80', minDollars: 0,
     flags: { missed_order: true, late_po: true, history_gap: true, promo_repeat: true, pos_outpacing: true,
-             overstock: true, channel_fill: true, newitem_gap: true, check_data: true }
+             overstock: true, channel_fill: true, newitem_gap: true, check_data: true, peak_cover: true }
   };
   const TIER_ORDER = { 'At risk': 0, 'Medium': 1, 'Watch': 2, 'Overstocked': 3, 'No risk': 4 };
   const DECISION_OF = { missed_order: 'order_more', late_po: 'order_more', history_gap: 'order_more', promo_repeat: 'order_more',
-    pos_outpacing: 'order_more', overstock: 'too_much', channel_fill: 'too_much', newitem_gap: 'forecast_off', check_data: 'check_data' };
+    pos_outpacing: 'order_more', overstock: 'too_much', channel_fill: 'too_much', newitem_gap: 'forecast_off', check_data: 'check_data', peak_cover: 'order_more' };
   const FLAG_LABEL = { missed_order: 'Missed order', late_po: 'Lead time risk', history_gap: 'Short vs last year', promo_repeat: 'Promo repeat',
     pos_outpacing: 'Sales above forecast', overstock: 'Too much stock', channel_fill: 'Shipping ahead of sales',
-    newitem_gap: 'New item forecast', check_data: 'Check the data' };
+    newitem_gap: 'New item forecast', check_data: 'Check the data', peak_cover: 'Thin cover into peak' };
 
   const sum = (a, f = 0, t = a.length) => { let s = 0; for (let i = f; i < t; i++) s += a[i] || 0; return s; };
   const mean = a => (a.length ? sum(a) / a.length : 0);
@@ -103,6 +103,25 @@
     return out;
   }
 
+  // share of a year's sales that falls in each calendar month, averaged over the last two full years (weeks are assigned to a month by their midpoint)
+  function monthUnits(sku, snap) {
+    const w1 = parseDay(snap.meta.weekOneStart), out = new Array(12).fill(0);
+    [[sku.pos.y2025, -364], [sku.pos.y2024, -728]].forEach(([y, off]) => { if (!y || sum(y) <= 0) return; y.forEach((v, i) => { out[addDays(w1, off + 7 * i + 3).getUTCMonth()] += v; }); });
+    return out;
+  }
+  function peakMonthsOf(units) {
+    const t = sum(units); if (t <= 0) return null; const sh = units.map(x => x / t), pm = sh.map((x, i) => x >= 1.5 / 12 ? i : -1).filter(i => i >= 0);
+    if (!pm.length) return null;
+    const contiguous = pm.every((m, i) => i === 0 || m === pm[i - 1] + 1);
+    return { months: pm, share: sum(pm.map(i => sh[i])), text: contiguous && pm.length > 1 ? MON[pm[0]] + ' to ' + MON[pm[pm.length - 1]] : pm.map(i => MON[i]).join(', ') };
+  }
+  function seasonality(snap) {
+    const lines = {}, all = new Array(12).fill(0);
+    snap.skus.forEach(s => { if (s.isNew) return; const u = monthUnits(s, snap); u.forEach((x, i) => { all[i] += x; }); const l = lines[s.sub] = lines[s.sub] || new Array(12).fill(0); u.forEach((x, i) => { l[i] += x; }); });
+    const norm = a => { const t = sum(a); return a.map(x => t > 0 ? x / t : 0); };
+    const out = { all: norm(all), lines: {} }; Object.keys(lines).forEach(k => { out.lines[k] = norm(lines[k]); }); return out;
+  }
+
   function evalSku(sku, snap, S, notes) {
     const flags = []; const price = sku.price; const F = sku.fcstH; const needPlan = sum(F);
     const inv = sku.inv; const transitQty = sum((inv.transit || []).map(t => t.qty)); const poQty = sum((inv.pos || []).map(p => p.qty));
@@ -132,6 +151,36 @@
           if (lt) { const d = addDays(weekStart(snap, pj.first), -Math.round(lt.use * 7)); metrics.orderBy = d <= parseDay(snap.meta.today) ? 'Now' : fmtDate(d); }
         }
       } }
+
+    // seasonality and promos (shown in every view; one flag, thin cover into peak, depends on them)
+    metrics.peak = null; metrics.peakCover = null; metrics.peakStatus = sku.isNew || inv.onHand < 0 ? 'n/a' : '—';
+    metrics.peakMonths = null; metrics.peakShare = null;
+    if (!sku.isNew) {
+      const pmo = peakMonthsOf(monthUnits(sku, snap)); if (pmo) { metrics.peakMonths = pmo.text; metrics.peakShare = pmo.share; }
+      const srt = sku.pos.y2025.slice().sort((a, b) => a - b), md = srt[Math.floor(srt.length / 2)] || 1;
+      const pk = []; for (let h = 0; h < H; h++) { const w = 46 + h; const v = (w <= 52 ? sku.pos.y2025[w - 1] : sku.pos.y2026[w - 53]) / md; if (v >= 1.5) pk.push(h); }
+      if (pk.length && !metrics.peakMonths) { const u = monthUnits(sku, snap); metrics.peakMonths = MON[u.indexOf(Math.max(...u))] + ' (mild)'; }
+      if (pk.length) {
+        metrics.peak = { startH: pk[0], endH: pk[pk.length - 1], n: pk.length, weeks: pk, start: fmtDate(weekStart(snap, pk[0])), end: fmtDate(weekStart(snap, pk[pk.length - 1])) };
+        if (inv.onHand >= 0) {
+          const pj = project(sku, snap, { demand: F, slip: 0 }).rows, avg = mean(pk.map(h => F[h])), safety = 2 * avg;
+          const atStart = pk[0] > 0 ? pj[pk[0] - 1].inv : inv.onHand, minInv = Math.min(...pk.map(h => pj[h].inv)), neg = pj.findIndex(r => r.inv < 0);
+          metrics.peakCover = { weeks: avg > 0 ? atStart / avg : null, atStart, minInv, safety, avg };
+          metrics.peakStatus = neg >= 0 && neg <= pk[pk.length - 1] ? 'Short' : minInv < safety ? 'Thin' : 'OK';
+        }
+      }
+    }
+    { const lyP = sku.promo.ly || [], tyP = sku.promo.ty || [], tyC = tyP.filter(x => x.confirmed);
+      const pr = { status: 'None', next: null, name: null, lift: null, confirmed: null };
+      if (tyP.length) { const f = tyP.slice().sort((a, b) => a.h - b.h)[0]; pr.next = fmtDate(weekStart(snap, f.h)); pr.name = f.name; pr.confirmed = !!f.confirmed; }
+      else if (lyP.length) pr.name = lyP[0].name;
+      if (lyP.length && !sku.isNew) pr.lift = measureLift(sku);
+      if (!tyP.length && !lyP.length) pr.status = 'None';
+      else if (!tyP.length) pr.status = 'Last year only';
+      else if (!tyC.length) pr.status = 'Not confirmed';
+      else if (!lyP.length || sku.isNew) pr.status = 'New this year';
+      else pr.status = supply >= (1 - S.promoCushionPct / 100) * (needPlan + meanF * pr.lift * tyC.length) ? 'Confirmed, covered' : 'Confirmed, short';
+      metrics.promo = pr; }
 
     // data checks
     const issues = (sku.dataIssues || []).slice();
@@ -211,6 +260,11 @@
         else if (r > 1.33) add({ type: 'newitem_gap', tier: 'Watch', dollars: (needPlan - an.mean) * price, gapUnits: needPlan - an.mean, confidence: 'Medium',
           text: 'Forecast is ' + Math.round((r - 1) * 100) + '% above similar past launches (' + fmtNum(needPlan) + ' vs ' + fmtNum(an.mean) + ' units)' });
       }
+    }
+    if (S.flags.peak_cover && canProject && !sku.isNew && metrics.peakStatus === 'Thin') {
+      const pc = metrics.peakCover, gap = pc.safety - pc.minInv;
+      add({ type: 'peak_cover', tier: 'Watch', dollars: gap * price, gapUnits: gap, confidence: 'High',
+        text: 'Thin cover into the peak (' + metrics.peak.start + ' to ' + metrics.peak.end + '). Lowest stock in those weeks is ' + fmtNum(pc.minInv) + ' units, under 2 weeks of peak demand (' + fmtNum(pc.safety) + ')' });
     }
     flags.forEach(f => { f.decision = f.decision || DECISION_OF[f.type]; f.label = FLAG_LABEL[f.type]; });
     if (sku.lumpy) flags.forEach(f => { f.confidence = 'Low'; });
@@ -316,12 +370,15 @@
     } else if (f.type === 'newitem_gap') {
       o.push({ t: 'Review the analogs and the forecast together', note: 'Swap an analog if one does not fit' });
       o.push({ t: 'Adjust the forecast toward the analog range', note: 'Range: ' + fmtNum((analogsFor(sku, snap) || {}).min || 0) + ' to ' + fmtNum((analogsFor(sku, snap) || {}).max || 0) + ' units' });
+    } else if (f.type === 'peak_cover') {
+      o.push({ t: 'Add or pull in about ' + fmtNum(Math.ceil(f.gapUnits / 10) * 10) + ' units before the peak', note: 'Brings the lowest peak week back to 2 weeks of cover' });
+      o.push({ t: 'Check the peak and promo weeks with Sales', note: 'The peak weeks come from the last two years of sales' });
     } else if (f.type === 'check_data') {
       o.push({ t: 'Ask the data owner to fix or confirm the field', note: 'Flags that depend on it are paused until then' });
     }
     return o;
   }
 
-  return { H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, analogsFor, activeNotes, leadWeeks, options,
+  return { H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthUnits, analogsFor, activeNotes, leadWeeks, options,
     weekStart, weekNum, fmtDate, fmtNum, fmtMoney, parseDay, addDays, sum, mean, sd };
 });

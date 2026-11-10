@@ -34,13 +34,13 @@ with sync_playwright() as p:
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Today']
-    ok('xlsx 8 sheets',wb.sheetnames==['Dashboard','Today','All Items','12-Week Plan','Forecast Accuracy','Since Yesterday','Notes','Recipe'])
+    ok('xlsx 10 sheets',wb.sheetnames==['Dashboard','Today','All Items','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Promos And Peaks','Since Yesterday','Notes','Recipe'])
     ok('xlsx includes added column','Lead Time (Weeks)' in [c.value for c in ws[1]])
     ok('xlsx frozen+filter',ws.freeze_panes=='A2' and ws.auto_filter.ref is not None)
     ok('xlsx status colored',ws['A2'].fill.fgColor.rgb=='FFF8D7DA')
     hd=[c.value for c in wb['All Items'][1]]
     ok('all items has planner columns',all(h in hd for h in ['On Hand (Units)','In Transit (Units)','Open PO (Units)','Weeks Of Supply','Forecast Per Week (Units)','Stock-Out Week','Order By','ABC Class','Forecast Accuracy (13 Wks)']))
-    ok('plan sheet 3 rows per item',wb['12-Week Plan'].max_row==1+123*3)
+    ok('plan sheet 4 rows per item',wb['12-Week Plan'].max_row==1+123*4)
     ok('xlsx all items 123',wb['All Items'].max_row==124)
     pg.set_viewport_size({'width':390,'height':800});
     for v in ['home','sheet','custom','visual']:
