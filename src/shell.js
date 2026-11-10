@@ -125,16 +125,15 @@ function renderHome(){
   <div class="hero"><h1>Your Daily Planning Sheet, Built By AI From The Data You Already Have</h1>
   <p>Four steps. No code. You explain what you want to the AI in plain words, and an Excel sheet shows up each morning.</p></div>
   <div class="steps">
-   <div class="card step"><div class="num">1</div><h2>Connect Your Data</h2><p>Choose how your files reach the AI.</p>
-    <div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0]}</button>`).join('')}</div>
-    <p class="ex">Pick one to read how it works below.</p></div>
-   <div class="card step"><div class="num">2</div><h2>Prompt Your AI Agent</h2><p>This is where most of the work happens. Tell the agent what you want the sheet to be.</p>
-    <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you hope to get out</li></ul>
-    <p class="ex">The agent hears the voice of the customer (VOC) here.</p><button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
-   <div class="card step"><div class="num">3</div><h2>Get Your Sheet</h2><p>A formatted Excel file every morning, with the items that need you at the top.</p>
-    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap" ><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
-   <div class="card step"><div class="num">4</div><h2>Customize <span class="optl">Optional, Anytime</span></h2><p>Tell the agent what you are not seeing or want to change. Once the sheet exists, it can always be adjusted.</p>
-    <p class="ex">“I don't see how many weeks of stock we have.”</p><button class="btn go" data-nav="custom">Try It Now</button></div>
+   <div class="card step"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Choose how your files reach the AI. Details appear below.</p>
+    <div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div></div>
+   <div class="card step"><div class="shead"><div class="num">2</div><h2>Prompt Your AI Agent</h2></div><p>Most of the work happens here.</p>
+    <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. The agent hears the voice of the customer (VOC) here.</li></ul>
+    <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
+   <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning, with the items that need you at the top.</p>
+    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Excel</button></div></div>
+   <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
+    <p class="quote">“I don't see how many weeks of stock we have.”</p><button class="btn go" data-nav="custom">Try It Now</button></div>
   </div>
   <div class="card routebox" id="routebox"><h3>${r[0]} <span class="conf">${r[1]}</span></h3><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div>
   <h2 class="sec-h">What Connects To What</h2>
