@@ -9,7 +9,7 @@ const TS={'At risk':'t_risk','Watch':'t_watch','Overstocked':'t_much','No risk':
 const TCLASS={'At risk':'t-risk','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
 const R3=x=>Math.round(x*1000)/1000;
 const COLS={
- filest:{h:'File Status',w:13,src:'calculated by the morning run: New Today when the item is in today\'s files but was not in yesterday\'s'},
+ filest:{h:'File Status',w:13,src:'calculated by the scheduled run: New Today when the item is in the latest files but was not in the previous run\'s'},
  peaklift:{h:'Peak Lift (x)',w:10,num:'x2',src:'calculated: forecast per week in the peak weeks divided by a normal week (the middle week of the next 12)'},
  stocklp:{h:'Stock Last Peak',w:20,src:'calculated from last year\'s weekly stock: In stock, or how many weeks of last year\'s peak the item was out of stock (so last year\'s sales understate demand)'},
  suggest:{h:'AI Recommended Qty (Stock Gap)',w:13,num:'int',src:'calculated by the AI: the units to add when the check says order more (stock runs out, or the order is late or missing), rounded up to 10'},
@@ -74,8 +74,8 @@ const MASTER='Master List (Work Here)',INK=['ovr','ovrwhy','plan','needby','note
 const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','aifcst','aifdiff','sales4','salesvs','ly','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','wos','lt','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','suggest','addqty','addwhy','ordovr','plan','cmpai','cmptxt','needby','note','notedate'];
 const DH={onhand:'On Hand',transit:'In Transit',openpo:'Open PO',orderby:'Order By',onorder:'On Order',wos:'Wks Of Supply',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival Date',nextarrq:'Next Arrival Qty',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
-let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
-const saveCols=()=>{try{localStorage.setItem(CK,JSON.stringify(cols))}catch(e){}};
+let cols=DEFAULT.slice();
+const saveCols=()=>{};
 let rowsMode='attn',tab='dash';
 const PLK=new Set(['nextarrq','arr2','arr2q','aifdiff','filest','suggest','addqty','addwhy','aifcst','aifdiff','cmpai','cmptxt','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift']);
 function val(k,r){
@@ -114,7 +114,7 @@ function dashHtml(){
     if(k==='status')return `<td class="st ${TCLASS[r.tier]||'t-ok'}">${esc(v)}</td>`;
     if(C.num)return `<td class="money ${A.pcls(k,v)}">${esc(A.fv(k,v))}</td>`;
     return `<td class="${k==='going'?'wide':(k==='sku'||k==='conf'||k==='nextarr'||k==='arr2'?'c':'')} ${A.pcls(k,v)}">${esc(String(v))}</td>`}).join('')}</tr>`).join('');
-  return `<div class="dash"><h3>Daily Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
+  return `<div class="dash"><h3>Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
    <p class="dnote">Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. To act on what you see, go to the Master List (Work Here) and filter to the same choices. This is the same dashboard that opens first in the downloaded sheet.</p>
    ${colorKey()}
    <div class="dpick"><label>Decision <select id="dd">${[ALLD,...DECL].map(o=>`<option ${o===dashDec?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
@@ -160,10 +160,10 @@ function recipeItems(){
    ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal And Promo Lifts tab shows each item\'s peak and promo, and its Where This Comes From section lists what is calculated, what comes from a file and what is not available. The Sales History tab shows the weekly sales behind the peaks, and the Master List suggests how many units to add for a peak or promo, with the reason.'],
    ...A.SEASON_SRC.map(x=>['Source: '+x[0],x[1]+'. '+x[2]]),
    ['Notes','Notes never expire. Type one note per item in the Master List. In the app, a comment keeps the alert on and an accepted risk stops it, coming back only if its gap grows past 1.5 times what was accepted.'],
-   ['Carrying Work Forward','Each run starts from yesterday\'s file and the two fresh source files. Calculated columns are replaced from the new files. The light yellow columns are copied across by SKU, so notes, peak overrides, order quantities to place and needed-by dates carry forward. An order quantity to place is flagged for review once its Needed By date passes, and an override is flagged for review after two weeks, so old fixes do not drive orders forever.'],
-   ['New And Missing Items','A SKU in today\'s files that was not in yesterday\'s is marked New Today in the File Status column on the Master List, with the light yellow columns empty. A SKU that was in yesterday\'s file but is missing from today\'s goes to the New And Missing Items tab with the work you had typed, so you know to check the shared files for what happened.'],
+   ['Carrying Work Forward','Each run starts from the previous file and the two fresh source files. Calculated columns are replaced from the new files. The light yellow columns are copied across by SKU, so notes, peak overrides, order quantities to place and needed-by dates carry forward. An order quantity to place is flagged for review once its Needed By date passes, and an override is flagged for review after two weeks, so old fixes do not drive orders forever.'],
+   ['New And Missing Items','A SKU in the latest files that was not in the previous run\'s is marked New Today in the File Status column on the Master List, with the light yellow columns empty. A SKU that was in the previous file but is missing from today\'s goes to the New And Missing Items tab with the work you had typed, so you know to check the shared files for what happened.'],
    ['Peak Override And Orders','Read the peak columns left to right on the Master List: Peak Weeks is when, Peak Lift is how big (the forecast in the peak weeks divided by a normal week), with your Override and its Reason beside it and Peak Lift Used after them, Peak Bump is the extra units that means, and Units Short Of Peak Cover is what is still missing after stock and orders on the way. If you know last year was out of stock, type your own lift on the Master List. AI Recommended Qty (Stock Gap) covers stock-out gaps. AI Recommended Add (Peak + Promo) says how many more units to order so stock stays above 2 weeks of peak demand, counting the confirmed promo, and AI Recommendation Why gives the reason in words. AI Recommended Qty (Total) adds them together and recalculates with any override you typed. Order Qty To Place and Needed By are yours to type and copy into the planning system.'],
-   ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
+   ['Schedule','On your schedule: daily, weekly or on request (sample: 6:05 AM)'],
    ['How To Change It','Ask your AI agent. Columns, colors and rules are changed in conversation with the agent, which updates this saved recipe so every future run uses it. They are not edited on this site or in the downloaded file.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
 }
@@ -218,18 +218,18 @@ function accGrid(){
 }
 const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['items','Seasonal And Promo Lifts'],['hist','Sales History'],['notes','Notes'],['dropped','New And Missing Items'],['recipe','Recipe']];
 function roleHtml(){
-  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Items marked New Today in the File Status column are new in today\'s files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak and promo columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means. Next come the promo columns: this year\'s promo weeks, last year\'s promo weeks, the units it sold and the lift it gave, whether it lands inside the peak, and Promo Extra Units. Peak Bump plus Promo Extra Units is shown in units, never averaged. Then Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right the teal AI columns sit together: AI Recommended Qty (Stock Gap), AI Recommended Add (Peak + Promo) with AI Recommendation Why, and AI Recommended Qty (Total), recalculated when you type an override. Then come Order Qty To Place, which is what you decide, Variance Vs AI Qty and Your Qty Vs AI (Near AI Qty, Below AI Qty or Above AI Qty). Type an override and the bump, promo and order quantities update.</div>${colorKey()}`;
+  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Items marked New Today in the File Status column are new in the latest files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak and promo columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means. Next come the promo columns: this year\'s promo weeks, last year\'s promo weeks, the units it sold and the lift it gave, whether it lands inside the peak, and Promo Extra Units. Peak Bump plus Promo Extra Units is shown in units, never averaged. Then Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right the teal AI columns sit together: AI Recommended Qty (Stock Gap), AI Recommended Add (Peak + Promo) with AI Recommendation Why, and AI Recommended Qty (Total), recalculated when you type an override. Then come Order Qty To Place, which is what you decide, Variance Vs AI Qty and Your Qty Vs AI (Near AI Qty, Below AI Qty or Above AI Qty). Type an override and the bump, promo and order quantities update.</div>${colorKey()}`;
   if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div><div class="carry-box"><b>Today\'s files:</b> ${esc(carryText())}</div>`;
-  if(tab==='dropped')return `<div class="role"><b>View only.</b> Every change in which items are in the files. New means the item is in today\'s files but was not in yesterday\'s (it is also marked New Today on the Master List). Missing Today means it was in yesterday\'s file but is not in today\'s: the run lists it here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
+  if(tab==='dropped')return `<div class="role"><b>View only.</b> Every change in which items are in the files. New means the item is in the latest files but was not in the previous run\'s (it is also marked New Today on the Master List). Missing Today means it was in the previous file but is not in today\'s: the run lists it here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
   if(tab==='recipe')return '';
   return `<div class="role"><b>View only.</b> This tab reads from the Master List, so make changes there. It is locked so typing here does not get lost (in Excel: Review, then Unprotect Sheet, no password).</div>`;
 }
-const newCheck='New in today\'s files, so nothing is typed yet. Check its forecast and launch plan, then type any note or order quantity on the Master List.';
+const newCheck='New in the latest files, so nothing is typed yet. Check its forecast and launch plan, then type any note or order quantity on the Master List.';
 function changeList(){const out=[];A.NEWIDS.forEach(id=>{const r=A.rowOf(id);if(r)out.push({chg:'New',id,name:r.name,sub:r.sub,onHand:r.metrics.onHand,po:r.metrics.transit+r.metrics.openPO,note:'',plan:'',by:'',check:newCheck})});
   A.droppedList().forEach(x=>out.push({chg:'Missing Today',id:x.id,name:x.name,sub:x.sub,onHand:x.onHand,po:x.po,note:x.note,plan:x.plan,by:x.by,check:dropCheck(x)}));return out}
-const dropCheck=x=>'Not in today\'s files. Check the shared files for a discontinue, a rename or a missing row.'+(x.po>0?' It still has '+E.fmtNum(x.po)+' units on order, so confirm with the supplier.':'')+(x.plan?' You had an order to place for '+E.fmtNum(x.plan)+' units, so confirm that order was placed.':'');
+const dropCheck=x=>'Not in the latest files. Check the shared files for a discontinue, a rename or a missing row.'+(x.po>0?' It still has '+E.fmtNum(x.po)+' units on order, so confirm with the supplier.':'')+(x.plan?' You had an order to place for '+E.fmtNum(x.plan)+' units, so confirm that order was placed.':'');
 function carryCounts(){const rows=sheetRows('all');return {nw:A.NEWIDS.length,carried:rows.filter(r=>val('note',r)!==''||val('ovr',r)!==''||val('plan',r)!=='').length,dropped:A.droppedList().length}}
-function carryText(){const c=carryCounts();return c.nw+' new items in today\'s files (marked New Today on the Master List, nothing typed yet). '+c.carried+' items carry typed work from yesterday\'s file. '+c.dropped+' items from yesterday are missing from today\'s files (see New And Missing Items).'}
+function carryText(){const c=carryCounts();return c.nw+' new items in the latest files (marked New Today on the Master List, nothing typed yet). '+c.carried+' items carry typed work from the previous file. '+c.dropped+' items from the previous run are missing from today\'s files (see New And Missing Items).'}
 function renderSheet(){
   const v=$('#v-sheet'),total=st.res.total;
   let inner,count='';
@@ -242,19 +242,19 @@ function renderSheet(){
   else if(tab==='hist'){const d=A.histData(itemLine),h=[{t:'Status'},{t:'SKU'},{t:'Product'},{t:'Line'},{t:'Row'},{t:'Normal Week (Units)',cls:'money'},...A.HIST_MON.map(t=>({t,cls:'money'})),...Array.from({length:52},(_,i)=>({t:'Wk '+(i+1),cls:'money'+(i>=45?' nxt':'')}))];
     const body=d.map(x=>({id:x.id,c:[{t:A.tn(x.r.tier),cls:'st '+TCLASS[x.r.tier]},{t:x.id},{t:x.r.name,cls:'nw'},{t:x.r.sub,cls:'nw'},{t:x.label,cls:'bold nw'},{t:x.norm>0?E.fmtNum(x.norm):'',cls:'money'},...x.mo.map(v=>({t:v==null?'':E.fmtNum(v),cls:'money'})),...x.wk.map((v,i)=>({t:v==null?'':E.fmtNum(v),cls:'money'+(v!=null&&x.norm>0&&v>=1.5*x.norm?' warn':'')}))]}));
     inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${A.seasonData().lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Units sold by week for 2024, 2025 and 2026, with the 2026 forecast, so you can see where inside a peak the units land: the first week, the last weeks, or the whole month. Each SKU has four rows. Orange weeks sold at least 1.5x that row\'s Normal Week (its middle week, left blank for items that sold in fewer than half the weeks, so nothing is highlighted for them). Monthly totals are on the left, weeks 1 to 52 on the right, and Wk 46 to Wk 52 are the weeks starting now. The forecast row shows the forecast for 2026; only Wk 46 to Wk 52 of the next 12 weeks fall in 2026. This reads the same sales history the peak weeks are calculated from, from the Reporting tool.</div>`+gridHtml(h,body,{empty:'No items.'});count=`${new Set(d.map(x=>x.id)).size} items`+(itemLine==='All Lines'?'':', '+itemLine)}
-  else if(tab==='dropped'){const cl=changeList();inner=gridHtml(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Yesterday','Qty To Place','Needed By','What To Check'].map((t,i)=>({t,cls:i==4||i==5||i==7?'money':''})),cl.map(x=>({id:x.chg==='New'?x.id:null,cls:x.chg==='New'?'newrow':'',c:[{t:x.chg==='New'?'New Today':'Missing Today',cls:'st '+(x.chg==='New'?'t-new':'t-drop')},{t:x.id},{t:x.name},{t:x.sub},{t:E.fmtNum(x.onHand),cls:'money'},{t:E.fmtNum(x.po),cls:'money'},{t:x.note,cls:'wide'},{t:x.plan===''?'':E.fmtNum(x.plan),cls:'money'},{t:x.by},{t:x.check,cls:'wide'}]})),{empty:'Nothing new or missing today.'});count=A.NEWIDS.length+' new, '+A.droppedList().length+' missing'}
+  else if(tab==='dropped'){const cl=changeList();inner=gridHtml(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Previous Run','Qty To Place','Needed By','What To Check'].map((t,i)=>({t,cls:i==4||i==5||i==7?'money':''})),cl.map(x=>({id:x.chg==='New'?x.id:null,cls:x.chg==='New'?'newrow':'',c:[{t:x.chg==='New'?'New Today':'Missing Today',cls:'st '+(x.chg==='New'?'t-new':'t-drop')},{t:x.id},{t:x.name},{t:x.sub},{t:E.fmtNum(x.onHand),cls:'money'},{t:E.fmtNum(x.po),cls:'money'},{t:x.note,cls:'wide'},{t:x.plan===''?'':E.fmtNum(x.plan),cls:'money'},{t:x.by},{t:x.check,cls:'wide'}]})),{empty:'Nothing new or missing today.'});count=A.NEWIDS.length+' new, '+A.droppedList().length+' missing'}
   else if(tab==='notes'){const g=colGrid(NK,sheetRows('all').filter(r=>A.noteFor(r.id)),'No notes yet.');inner=g.html;count=g.n+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
-  v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
-   <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. The download opens in Excel with the same colors and formatting, on an interactive Dashboard where the yellow dropdowns change the boxes and the list.</p>
+  v.innerHTML=`<div class="page"><div class="pg-h"><h1>Custom Spreadsheet</h1></div>
+   <ul class="mini pg-sub"><li><b>This is what lands in your Excel file</b> on every run.</li><li><b>Click any row</b> to see the numbers behind it.</li><li><b>The download</b> keeps the same colors and formatting, with yellow dropdowns that change the boxes and the list.</li></ul>
    <div class="demo-note slim"><b>Columns are changed through your AI agent, not on this page.</b> The Dashboard columns are saved in the agent\'s recipe, so to add, remove or reorder them, tell your AI agent what you want and it updates the recipe for every future run. <a href="#" id="sh-how">See an example conversation</a></div>
-   <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
+   <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
     ${tab==='plan'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
     <button class="btn sm" id="sh-custom">How To Change Columns</button>
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${roleHtml()}${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" class="${k==='all'?'work':k==='dash'?'front':''}" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <p class="sec-sub" style="margin:10px 0 0"><b>How the tabs fit together:</b> You work in one place, the light yellow Master List (Work Here) tab. Filter it and type there: notes, a peak lift override if you know better, and the order quantity to place. Items marked New Today are new, and items missing from today\'s files are listed on New And Missing Items. Every other tab only reads from it, so they update when it does, and they are locked so nothing typed in them gets lost. The Dashboard is where you look things over first: it is the same list, easier to see.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <ul class="mini sec-sub" style="margin:10px 0 0"><li><b>Work in one place:</b> the light yellow Master List (Work Here) tab. Filter it and type notes, a peak lift override or the order quantity to place.</li><li><b>Everything else reads from it,</b> so it updates when the Master List does. Those tabs are locked so nothing typed there gets lost.</li><li><b>New And Missing Items</b> lists what is new or missing from the latest files.</li><li><b>The Dashboard</b> is the same list, easier to scan. Look there first.</li></ul><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   const il=$('#il',v);if(il)il.onchange=()=>{itemLine=il.value;renderSheet()};
   $$('[data-line]',v).forEach(e=>{const go2=()=>{itemLine=e.dataset.line;tab='items';renderSheet()};e.onclick=go2;e.onkeydown=ev=>{if(ev.key==='Enter')go2()}});
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
@@ -380,7 +380,7 @@ function downloadXlsx(){
   const put=(r,c,o)=>{R(r)[c]=o};
   const fill=(r,c0,c1,sty)=>{for(let c=c0;c<=c1;c++)if(!R(r)[c])put(r,c,{v:'',s:sty})};
   const span=(r,c0,c1,o)=>{put(r,c0,o);fill(r,c0+1,c1,o.s);if(c1>c0)dash.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
-  span(1,0,nd-1,{v:'Daily Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
+  span(1,0,nd-1,{v:'Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
   span(2,0,nd-1,{v:'VIEW ONLY. Look things over here, then do the work on the light yellow Master List (Work Here) tab and filter it to the same Decision and Status. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first. Color key: teal is the AI\'s recommendation, light yellow is where you type, red is a problem or needs action, orange is Watch (the planner should check it), blue is Overstocked or too many weeks of supply, green is No risk.',s:'note'});R(2).h=48;
   put(4,0,{v:'Decision',s:'label'});span(4,1,2,{v:D0,s:'pick'});
   span(4,3,4,{v:'Status',s:'label'});span(4,5,7,{v:S0,s:'pick'});R(4).h=24;
@@ -437,73 +437,91 @@ function downloadXlsx(){
   dash.cf.push(...cfList(DK,first,last));
   dash.freeze=4;
   const CL=changeList(),DR=Math.max(CL.length,1)+1;
-  const dropSheet={name:'New And Missing Items',fit:true,widths:[12,11,34,17,12,13,46,12,11,58],freeze:1,filter:CL.length+1,rows:[hdr(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Yesterday','Qty To Place','Needed By','What To Check']),
+  const dropSheet={name:'New And Missing Items',fit:true,widths:[12,11,34,17,12,13,46,12,11,58],freeze:1,filter:CL.length+1,rows:[hdr(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Previous Run','Qty To Place','Needed By','What To Check']),
     ...(CL.length?CL.map(x=>[{v:x.chg==='New'?'New Today':'Missing Today',s:'ctr'},{v:x.id,s:'ctr'},{v:x.name,s:'txt'},{v:x.sub,s:'txt'},{v:x.onHand,s:'int'},{v:x.po,s:'int'},{v:x.note,s:'txt'},x.plan===''?{v:'',s:'txt'}:{v:x.plan,s:'int'},{v:x.by,s:'ctr'},{v:x.check,s:'txt'}]):[[{v:'Nothing new or missing today.',s:'txt'}]])],cf:[{ref:`A2:A${DR}`,rules:[{type:'cellIs',op:'equal',dxf:3,formula:'"New Today"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Missing Today"'}]}]};
-  span(3,0,nd-1,{f:`COUNTIF(${rng('filest')},"New Today")&" new items in today's files (marked New Today on the Master List, nothing typed yet). "&SUMPRODUCT(--(((${rng('note')}<>"")+(${rng('ovr')}<>"")+(${rng('plan')}<>""))>0))&" items carry typed work from yesterday's file. "&COUNTIF('New And Missing Items'!$A$2:$A$${DR},"Missing Today")&" items from yesterday are missing from today\'s files (see New And Missing Items)."`,v:carryText(),s:'note'});R(3).h=22;
+  span(3,0,nd-1,{f:`COUNTIF(${rng('filest')},"New Today")&" new items in the latest files (marked New Today on the Master List, nothing typed yet). "&SUMPRODUCT(--(((${rng('note')}<>"")+(${rng('ovr')}<>"")+(${rng('plan')}<>""))>0))&" items carry typed work from the previous file. "&COUNTIF('New And Missing Items'!$A$2:$A$${DR},"Missing Today")&" items from the previous run are missing from today\'s files (see New And Missing Items)."`,v:carryText(),s:'note'});R(3).h=22;
   const notesSheet=mkL(allRows.filter(r=>A.noteFor(r.id)),'Notes',NK);
   const sheets=[dash,dataSheet,plan,accSheet,itemSheet,histSheet,
    notesSheet,dropSheet,
    {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the light yellow Master List (Work Here) tab. It is the only tab you type in: filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal And Promo Lifts, Notes and New And Missing Items tabs (the Sales History tab shows each item\'s status, product and line from it). Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
    [{v:'One File Per Planner',s:'bold'},{v:'Each planner has their own file, built from their own demand line, so nobody shares edits and there is no need to track who wrote a note. To set one up for someone else, give them the same recipe and point it at the files for their line.',s:'txt'}],
-   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each morning the run builds a new file. In the real setup the run opens yesterday\'s file first and copies the light yellow columns across by SKU, so typed work carries forward.',s:'txt'}],
-   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal And Promo Lifts, Notes and New And Missing Items lists update as soon as you change the Master List. Sales History keeps its weekly numbers from the Reporting tool, so they only change with the morning run. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
+   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each run the run builds a new file. In the real setup the run opens the previous file first and copies the light yellow columns across by SKU, so typed work carries forward.',s:'txt'}],
+   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal And Promo Lifts, Notes and New And Missing Items lists update as soon as you change the Master List. Sales History keeps its weekly numbers from the Reporting tool, so they only change with the scheduled run. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the scheduled run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
    [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
   sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal And Promo Lifts','Sales History','New And Missing Items'].includes(sh.name))});
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
-  a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
+  a.href=URL.createObjectURL(blob);a.download='Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
   return sheets;
 }
 /* ---------- home ---------- */
 const ROUTES={
- manual:['Manual Export','You export the files yourself. No connection needed.','You export the data from your source systems yourself (Anaplan and Tableau in this example, or any other source) and put the files in the shared folder. This is also how history gets in: export the past three years of weekly sales once, save them as the reference file, and every daily run compares against it.','Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.'],
+ manual:['Manual Export','You export the files yourself. No connection needed.','You export the files from your sources (Anaplan and Tableau here) and put them in the shared folder. History works the same way: export three years of weekly sales once and save it as the reference file.','Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.'],
  folder:['Automated Export','Your sources export on a schedule.','Each source exports on a schedule instead of by hand and saves the file into the shared folder. The AI reads the newest files, checks them and saves the finished sheet back there. It works with any approved AI tool and any source that can export a file. Anaplan and Tableau do not save straight into SharePoint on their own, so one small step is needed to move each export into the folder.','A scheduled export in each source, and a way to save it to the shared folder. Set it up yourself if you have the access. If it is blocked on your side, ask IT to set it up.'],
  copilot:['Copilot Connection','Direct connection, if your company allows it.','Microsoft Copilot can reach some sources directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','Copilot access to each source, and a quick test to see what it can actually read. Turn it on yourself if you can. If it is blocked, ask IT.'],
- chatgpt:['ChatGPT Connection','Direct connection, if your company allows it.','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','A connector for each source: Tableau\'s already exists, Anaplan needs a custom connector or an outside bridge. ChatGPT scheduled tasks cannot take file uploads, so a daily unattended run is not confirmed. Set it up yourself if allowed. If it is blocked, ask IT.'],
+ chatgpt:['ChatGPT Connection','Direct connection, if your company allows it.','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','A connector for each source: Tableau\'s already exists, Anaplan needs a custom connector or an outside bridge. ChatGPT scheduled tasks cannot take file uploads, so a scheduled unattended run is not confirmed. Set it up yourself if allowed. If it is blocked, ask IT.'],
 };
 let route='manual';
 function miniSheet(){
   const rows=sheetRows('attn').slice(0,3);
   return `<div class="mini-sheet" aria-hidden="true">${rows.map(r=>`<div class="ms-r"><span class="ms-st ${({'At risk':'t-risk','Watch':'t-watch','Overstocked':'t-much'})[r.tier]||'t-ok'}">${esc(val('status',r))}</span><span class="ms-n">${esc(val('product',r))}</span><span class="ms-d">${esc(r.id)}</span></div>`).join('')}</div>`;
 }
+const FLOWS={
+ manual:[['Anaplan + Tableau','Your sources'],['You export','Files by hand'],['Shared folder','Files land here'],['AI agent','Checks and combines'],['Planning sheet','Saved to the folder']],
+ folder:[['Anaplan + Tableau','Your sources'],['Scheduled export','Runs on its own'],['Shared folder','One step moves each file'],['AI agent','Checks and combines'],['Planning sheet','Saved to the folder']],
+ copilot:[['Anaplan + Tableau','Your sources'],['Copilot connection','Direct, no folder'],['AI agent (Copilot)','Checks and combines'],['Planning sheet','Saved to the folder']],
+ chatgpt:[['Anaplan + Tableau','Your sources'],['ChatGPT connector','Tableau ready, Anaplan built'],['AI agent (ChatGPT)','Checks and combines'],['Planning sheet','Saved to the folder']]};
+function flowSvg(stages,label){
+  const n=stages.length,W=1000,gap=34,bw=(W-gap*(n-1))/n,H=118,y=22,bh=74;
+  const cx=i=>i*(bw+gap),mid=y+bh/2;
+  let sv=`<svg class="flowmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}: ${esc(stages.map(x=>x[0]).join(', then '))}">`;
+  sv+=`<path id="fl${label.length}" d="M${bw} ${mid} L${W-bw} ${mid}" fill="none" stroke="none"/>`;
+  for(let i=0;i<n-1;i++){const x1=cx(i)+bw,x2=cx(i+1);sv+=`<path d="M${x1} ${mid} L${x2} ${mid}" stroke="var(--brand)" stroke-width="3" opacity=".45"/><path d="M${x2-9} ${mid-6} L${x2} ${mid} L${x2-9} ${mid+6}" fill="none" stroke="var(--brand)" stroke-width="3" opacity=".7"/>`;
+    for(let k=0;k<2;k++)sv+=`<circle class="flow-dot" r="5.5" fill="var(--brand)" opacity="0"><animateMotion dur="2.4s" begin="${(k*1.2+i*.3).toFixed(2)}s" repeatCount="indefinite" path="M${x1} ${mid} L${x2-10} ${mid}"/><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.1;.9;1" dur="2.4s" begin="${(k*1.2+i*.3).toFixed(2)}s" repeatCount="indefinite"/></circle>`}
+  stages.forEach((st_,i)=>{const last=i===n-1,x=cx(i);
+    sv+=`<g><rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="12" fill="var(--card)" stroke="${last?'#00838F':'var(--brand)'}" stroke-width="${last?3:2}"/>
+     <text x="${x+bw/2}" y="${y+33}" text-anchor="middle" font-size="${n>4?15:17}" font-weight="700" fill="currentColor">${esc(st_[0])}</text>
+     <text x="${x+bw/2}" y="${y+56}" text-anchor="middle" font-size="${n>4?12.5:14}" fill="currentColor" opacity=".78">${esc(st_[1])}</text></g>`});
+  return sv+'</svg>'}
 function renderHome(){
   const r=ROUTES[route];
   $('#v-home').innerHTML=`<div class="page">
-  <div class="hero"><h1>Your Daily Planning Sheet, Built By AI From The Data You Already Have</h1>
-  <p>Four steps. No code. You explain what you want to the AI in plain words, and an Excel sheet shows up each morning.</p></div>
+  <div class="hero"><h1>Your Custom Planning Spreadsheet, Built By AI From The Data You Already Have</h1>
+  <p>Five steps. No code. You explain what you want to your AI agent in plain words, and your custom spreadsheet is built on your schedule: daily, weekly, or whenever you ask.</p></div>
   <div class="steps">
-   <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach the AI. What each one means is on the right.</p>
+   <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach your AI agent. The map below follows your choice.</p>
     <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
-    <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="conf" style="margin-bottom:6px">${r[1]}</div><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div></div></div>
-   <div class="card step"><div class="shead"><div class="num">2</div><h2>Prompt Your AI Agent</h2></div><p>Most of the work happens here.</p>
-    <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. This is also where the voice of the customer (VOC) comes in.</li></ul>
-    <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
-   <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning. It opens on a dashboard of what needs you, with stock counts, weeks of supply, stock-out dates, promo and peak cover, and notes. A light yellow Master List tab is where you type: notes, a peak lift override, and the order quantity to place. New and missing items get their own tab, and yesterday\'s typed work carries over by SKU.</p>
-    ${miniSheet()}
-    <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Sheet</button></div></div>
-   <div class="card step"><div class="shead"><div class="num">4</div><h2>Adjust Anytime</h2><span class="optl">Optional</span></div><p>Columns, colors and rules are changed by telling your AI agent in conversation, not by editing the sheet. It updates the saved recipe and the next run uses it. The AI Chat Example page shows what that conversation looks like.</p>
-    <div class="quotes"><p class="quote">“I don't see the supplier lead time.”</p><p class="quote">“Add the ABC class.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">See An Example Chat</button></div>
+    <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="conf" style="margin-bottom:6px">${r[1]}</div><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div></div>
+    <div class="flowwrap"><div class="flowcap">Data flow: ${esc(r[0])}</div>${flowSvg(FLOWS[route],'Data flow for '+r[0])}</div></div>
+   <div class="card step"><div class="shead"><div class="num">2</div><h2>Customize With Your AI Agent</h2></div><p>Prepare your custom spreadsheet. Describe it, show examples of sheets you like, and explain how to combine your data.</p>
+    <button class="btn pri go" data-nav="custom">See Customize</button></div>
+   <div class="card step"><div class="shead"><div class="num">3</div><h2>Access Your Custom Spreadsheet</h2></div>
+    <ul class="mini"><li><b>3A:</b> From the shared folder.</li><li><b>3B:</b> From your custom email.</li></ul>
+    <button class="btn pri go" data-nav="sheet">See The Spreadsheet</button></div>
+   <div class="card step"><div class="shead"><div class="num">4</div><h2>Create A Custom Email Delivery</h2></div><span class="pill">Recommended Option</span><p>Your agent checks the finished spreadsheet and emails you a written summary in your own format.</p>
+    <button class="btn go" data-nav="email">See The Email</button></div>
+   <div class="card step"><div class="shead"><div class="num">5</div><h2>Re-Customize Anytime</h2></div><span class="pill">Optional</span><p>Change columns, colors or rules whenever you need. Use the same flow, and the next run picks it up.</p>
+    <button class="btn go" data-nav="custom" data-hash="recustom">See How</button></div>
   </div>
   <h2 class="sec-h">What Connects To What</h2>
-  <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026. Shown for Anaplan and Tableau, the two sources in this example. Any other source works the same way: if it can export a file, it can go in the shared folder.</p>
+  <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026. Shown for Anaplan and Tableau, the two sources in this example. Any other source that can export a file can go in the shared folder.</p>
   <div class="card mx-wrap"><table class="mx"><thead><tr class="grp"><th></th><th colspan="2">Files Land In The Shared Folder</th><th colspan="2">Direct Connection To The AI</th></tr><tr><th></th><th>Manual Export</th><th>Automated Export</th><th>Copilot</th><th>ChatGPT</th></tr></thead><tbody>
    <tr><th>Anaplan</th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="part"><b>▲ Partly</b><span>Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step is needed to move the file.</span></td><td class="yes"><b>✔ Yes</b><span>Anaplan's AI Gateway names Microsoft Copilot. Licensing is not stated.</span></td><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or an outside bridge built first.</span></td></tr>
    <tr><th>Tableau</th><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. A step is needed to move the file.</span></td><td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td><td class="yes"><b>✔ Yes</b><span>Tableau lists ChatGPT as a supported client. Read-only, with a sign-in per person.</span></td></tr>
   </tbody></table></div>
-  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Use whichever one works for you today. Manual export needs no setup. Automated export or a direct connection removes the daily manual step. Try setting it up yourself first, and ask IT only if something is blocked.</span></div>
+  <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Use whichever one works for you today. Manual export needs no setup. Automated export or a direct connection removes the manual step. Try setting it up yourself first, and ask IT only if something is blocked.</span></div>
   <p style="margin-top:18px"><button class="btn pri" data-nav="options">See Setup Options And Limits</button></p>
   </div>`;
   const h=$('#v-home');
   $$('[data-route]',h).forEach(b=>b.onclick=()=>{route=b.dataset.route;renderHome()});
-  $$('[data-nav]',h).forEach(b=>b.onclick=()=>go(b.dataset.nav));
-  $('#h-dl').onclick=downloadXlsx;
+  $$('[data-nav]',h).forEach(b=>b.onclick=()=>{go(b.dataset.nav);if(b.dataset.hash)setTimeout(()=>{const e=document.getElementById(b.dataset.hash);if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},60)});
 }
 function renderOptions(){
   $('#v-options').innerHTML=`<div class="page"><div class="pg-h"><h1>Setup Options</h1></div>
-  <p class="pg-sub">This is the detail behind Step 1. It lists every way to connect, how to run it each morning, how to bring Anaplan and Tableau together, and why history matters. Checked against each company's own pages in November 2026.</p>
+  <p class="pg-sub">This is the detail behind Step 1. It lists every way to connect, how to run it on your schedule, how to bring Anaplan and Tableau together, and why history matters. Checked against each company's own pages in November 2026.</p>
   <h2 class="sec-h" style="margin-top:8px">Ways To Connect</h2>
   <div class="card mx-wrap"><table class="mx"><thead><tr><th>Option</th><th>Anaplan</th><th>Tableau</th><th>Main Limit</th></tr></thead><tbody>
-   <tr><th>Manual Export<small>You put the files in the shared folder</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every day. Also how history is loaded.</td></tr>
+   <tr><th>Manual Export<small>You put the files in the shared folder</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every run. Also how history is loaded.</td></tr>
    <tr><th>Automated Export<small>Sources put the files in the shared folder</small></th><td class="part"><b>▲ Partly</b><span>Exports to S3, Azure Blob or BigQuery. A step moves them to the folder.</span></td><td class="part"><b>▲ Partly</b><span>Prep file output or REST API. A step moves them to the folder.</span></td><td>One step per source to move the file. You or IT sets it up.</td></tr>
    <tr><th>Copilot<small>Direct, no folder needed</small></th><td class="yes"><b>✔ Yes</b><span>Named by Anaplan.</span></td><td class="part"><b>▲ Partly</b><span>Finds and answers about dashboards.</span></td><td>Full Tableau numbers not stated. Licensing for Anaplan not stated.</td></tr>
    <tr><th>ChatGPT<small>Direct, no folder needed</small></th><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or bridge.</span></td><td class="yes"><b>✔ Yes</b><span>Listed by Tableau.</span></td><td>Scheduled tasks cannot take file uploads.</td></tr>
@@ -511,15 +529,15 @@ function renderOptions(){
    <tr><th>Keep Separate<small>One sheet per system</small></th><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td>No flags that need both systems.</td></tr>
   </tbody></table></div>
   <p class="conf" style="margin:8px 0 0">Manual export and automated export are two ways to fill the same shared folder. ChatGPT and Copilot connect to the systems directly and skip the folder.</p>
-  <h2 class="sec-h">Ways To Run It Each Morning</h2>
+  <h2 class="sec-h">Ways To Run It On Your Schedule</h2>
   <p class="pg-sub" style="margin-top:0">Three possible paths, from simplest to most automatic. Each one has limits, listed honestly.</p>
   <div class="paths">
-   <div class="card path"><span class="tagp">Simplest</span><h3>A. You Ask Each Morning</h3><p>Open the AI, point it at the files in the shared folder, and ask for the sheet. Takes a minute.</p>
-    <p class="lim"><b>Limits:</b> Someone has to do it every day. Wording can change the result a little, so save a standard request.</p></div>
-   <div class="card path"><span class="tagp">Same Every Day</span><h3>B. Scheduled, Same Sheet Every Day</h3><p>A scheduled flow in Microsoft's cloud copies a template, loads the files, applies the colors and flags, and saves the sheet in the folder. No prompt, and your computer can be off.</p>
+   <div class="card path"><span class="tagp">Simplest</span><h3>A. You Ask Each Run</h3><p>Open the AI, point it at the files in the shared folder, and ask for the sheet. Takes a minute.</p>
+    <p class="lim"><b>Limits:</b> Someone has to do it every run. Wording can change the result a little, so save a standard request.</p></div>
+   <div class="card path"><span class="tagp">Same Every Run</span><h3>B. Scheduled, Same Sheet Every Run</h3><p>A scheduled flow in Microsoft's cloud copies a template, loads the files, applies the colors and flags, and saves the sheet in the folder. No prompt, and your computer can be off.</p>
     <p class="lim"><b>Limits:</b> Needs permission to run the flow, plus a one-time build and test. Ask IT if it is blocked. Each Microsoft piece is documented, but the full chain still needs a pilot. Changes mean updating the script.</p></div>
-   <div class="card path"><span class="tagp">Most Flexible</span><h3>C. A Scheduled AI Agent</h3><p>An AI agent runs on a schedule and uses judgment, such as writing the morning summary.</p>
-    <p class="lim"><b>Limits:</b> Runs use credits, use the builder's sign-in, and admins can block them. Output can vary day to day, and building a formatted Excel file this way is not confirmed.</p></div>
+   <div class="card path"><span class="tagp">Most Flexible</span><h3>C. A Scheduled AI Agent</h3><p>An AI agent runs on a schedule and uses judgment, such as writing a written summary.</p>
+    <p class="lim"><b>Limits:</b> Runs use credits, use the builder's sign-in, and admins can block them. Output can vary from run to run, and building a formatted Excel file this way is not confirmed.</p></div>
   </div>
   <div class="card rule"><b>Built Once, Then Repeated</b><span><b>1.</b> Write down the files and rules</span><span class="arrow">→</span><span><b>2.</b> AI builds it with real files</span><span class="arrow">→</span><span><b>3.</b> Test against known items</span><span class="arrow">→</span><span><b>4.</b> Save it and schedule it</span></div>
   <h2 class="sec-h">Ways To Get Two Sources Into One Sheet</h2>
@@ -537,12 +555,12 @@ function renderOptions(){
   <div class="card hist"><h3>Why History Is Needed For Accurate Reports</h3>
    <p>Several flags only work with past sales by week. Without history, the sheet can show today but cannot judge it.</p>
    <ul><li><b>Short vs last year:</b> compares supply to what the same weeks needed last year.</li><li><b>Promo repeat:</b> measures how much last year's promo lifted sales.</li><li><b>New item forecast:</b> compares to how similar past launches sold.</li><li><b>Stock-outs:</b> removes weeks last year when sales were capped by empty shelves.</li></ul>
-   <p class="conf">The demo uses three years of weekly history. With no connection, export it by hand once, save it as the reference file in the shared folder, and refresh it when needed. Every daily run reads it.</p></div>
+   <p class="conf">The demo uses three years of weekly history. With no connection, export it by hand once, save it as the reference file in the shared folder, and refresh it when needed. Every scheduled run reads it.</p></div>
   <h2 class="sec-h">Who Does What</h2><p class="pg-sub" style="margin-top:0">Three roles, each with a clear job.</p>
   <div class="who"><div class="card"><h3>You</h3><p>Say what you need and what you are not seeing. Decide what to do about each flagged item.</p></div>
-   <div class="card"><h3>The AI</h3><p>Reads the files, checks them, builds the sheet, writes the morning summary, and keeps your preferences.</p></div>
+   <div class="card"><h3>The AI</h3><p>Reads the files, checks them, builds the sheet, writes a written summary, and keeps your preferences.</p></div>
    <div class="card"><h3>IT, If Something Is Blocked</h3><p>We do not know yet what is blocked. Try it yourself first. If your access is blocked, IT sets it up or opens it up.</p></div></div>
-  <details class="card it"><summary>If You Need IT: What Each System Can Do</summary>
+  <div class="card it"><h3 class="it-h">If You Need IT: What Each System Can Do</h3>
    <p><b>Automated export route</b></p><ul>
     <li><b>Anaplan:</b> Its scheduled integrations (CloudWorks) export to Amazon S3, Azure Blob or Google BigQuery. SharePoint and OneDrive are not listed, so a step is needed to move the file.</li>
     <li><b>Tableau:</b> Scheduled subscriptions are email only, as a PNG image or PDF, not a data file. Other options are Tableau Prep flows that output files, or the REST API, which returns summary-level view data as CSV to people with export permission.</li>
@@ -550,76 +568,129 @@ function renderOptions(){
    <p><b>ChatGPT route</b></p><ul>
     <li><b>Tableau:</b> Tableau's own documentation lists ChatGPT as a supported client of its connector. Sign-in is per person, and the connector is read-only.</li>
     <li><b>Anaplan:</b> Anaplan's AI Gateway does not name ChatGPT. It needs a custom connector or an outside bridge.</li>
-    <li><b>Limits:</b> ChatGPT connectors need a hosted server and a sign-in per person. Scheduled tasks allow 10 active tasks and no file uploads, so unattended daily runs are not confirmed.</li></ul>
+    <li><b>Limits:</b> ChatGPT connectors need a hosted server and a sign-in per person. Scheduled tasks allow 10 active tasks and no file uploads, so unattended scheduled runs are not confirmed.</li></ul>
    <p><b>Copilot route</b></p><ul>
     <li><b>Anaplan:</b> The AI Gateway names Microsoft Copilot as a client. Its page is inconsistent on read-only versus write-back, and does not state licensing.</li>
     <li><b>Tableau:</b> Microsoft's Tableau Cloud connector indexes published sheets and details such as name, project, workbook and tags. It needs Tableau Cloud (not Server), a Microsoft 365 AI admin and a Tableau site admin. Microsoft's pages do not say whether the numbers behind a dashboard are included.</li>
-    <li><b>Daily runs:</b> Copilot Studio agents can run on a repeating schedule. Runs use Copilot Credits, use the maker's sign-in, and admins can block them.</li>
+    <li><b>Scheduled runs:</b> Copilot Studio agents can run on a repeating schedule. Runs use Copilot Credits, use the maker's sign-in, and admins can block them.</li>
     <li><b>Not confirmed:</b> That Copilot can produce a fully formatted Excel file on its own. This is the first thing to test in a pilot.</li></ul>
    <p class="conf">Last checked November 2026 from the vendors' own pages. Confirm with IT before relying on any of this.</p>
-   <p class="conf">Sources: <a href="https://help.anaplan.com/cloudworks-96f951fe-52fc-45a3-b6cb-16b7fe38e1aa" target="_blank" rel="noopener">Anaplan CloudWorks</a> · <a href="https://help.tableau.com/current/online/en-us/subscribe_user.htm" target="_blank" rel="noopener">Tableau subscriptions</a> · <a href="https://help.tableau.com/current/online/en-us/prep_conductor_schedule_flow_task.htm" target="_blank" rel="noopener">Tableau Prep flows</a> · <a href="https://learn.microsoft.com/en-us/connectors/excelonlinebusiness/" target="_blank" rel="noopener">Excel connector</a> · <a href="https://www.anaplan.com/platform/anaplan-ai-gateway/" target="_blank" rel="noopener">Anaplan AI Gateway</a> · <a href="https://learn.microsoft.com/en-us/microsoft-365/copilot/connectors/tableau-cloud-deployment" target="_blank" rel="noopener">Tableau connector for Copilot</a> · <a href="https://learn.microsoft.com/microsoft-copilot-studio/authoring-triggers-about" target="_blank" rel="noopener">Copilot Studio triggers</a></p></details>
-  <details class="card it"><summary>Extras</summary><p class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="x-load">Replay Today's Data Check</button><button class="btn" id="x-flow">Data Flow Map</button><button class="btn" id="x-email">Daily Email Preview</button><button class="btn" id="x-set">Advanced Thresholds</button><button class="btn" id="x-csv">Download CSV</button><button class="btn" id="x-reset">Reset Demo</button></p></details>
+   <p class="conf">Sources: <a href="https://help.anaplan.com/cloudworks-96f951fe-52fc-45a3-b6cb-16b7fe38e1aa" target="_blank" rel="noopener">Anaplan CloudWorks</a> · <a href="https://help.tableau.com/current/online/en-us/subscribe_user.htm" target="_blank" rel="noopener">Tableau subscriptions</a> · <a href="https://help.tableau.com/current/online/en-us/prep_conductor_schedule_flow_task.htm" target="_blank" rel="noopener">Tableau Prep flows</a> · <a href="https://learn.microsoft.com/en-us/connectors/excelonlinebusiness/" target="_blank" rel="noopener">Excel connector</a> · <a href="https://www.anaplan.com/platform/anaplan-ai-gateway/" target="_blank" rel="noopener">Anaplan AI Gateway</a> · <a href="https://learn.microsoft.com/en-us/microsoft-365/copilot/connectors/tableau-cloud-deployment" target="_blank" rel="noopener">Tableau connector for Copilot</a> · <a href="https://learn.microsoft.com/microsoft-copilot-studio/authoring-triggers-about" target="_blank" rel="noopener">Copilot Studio triggers</a></p></div>
   </div>`;
   const o=$('#v-options');
   $$('[data-nav]',o).forEach(b=>b.onclick=()=>go(b.dataset.nav));
-  $('#x-load').onclick=()=>A.openLoad(true);$('#x-flow').onclick=()=>A.openFlow();$('#x-email').onclick=A.openEmail;
-  $('#x-set').onclick=A.openSettings;$('#x-csv').onclick=A.downloadCsv;$('#x-reset').onclick=()=>{cols=DEFAULT.slice();saveCols();msgs=[hello()];rowsMode='attn';A.reset();renderAll()};
-}
+  }
 /* ---------- customize ---------- */
-const hello=()=>({w:'ai',t:'This is a simulated example of a conversation with your AI agent. Tell it what you are not seeing in your daily sheet and it changes the sheet. Tap one of the examples below, or type a request.'});
+const hello=()=>({w:'ai',t:'This is a simulated practice chat. Tap an example below, or type a request. Nothing on this site changes.'});
 let msgs=[hello()];
 const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add the ABC class.','Add the peak months and promo status.','Show the peak lift and how many extra units it means.','Show which items were out of stock last peak.','Show the AI forecast next to the system forecast.','Compare my order quantity with the AI Recommended Qty.','Show how many units to add for the peak and promo, and why.','Show last year\'s promo weeks and the units it sold.','Show whether the promo falls inside the peak weeks.','Add the order quantity I plan to place.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
 const PAT=[['aifdiff',/ai.*(vs|versus|minus|differ).*(system )?forecast|forecast.*(difference|gap).*ai/],['nextarrq',/arrival (qty|quantity|units)|units arriving/],['arr2',/second arrival|2nd arrival|later arrival/],['aifcst',/ai (suggested )?forecast|forecast.*(from|by) (the )?ai|ai.*forecast/],['cmpai',/difference.*ai|minus ai|how far.*ai/],['cmptxt',/compare.*ai|compared to (the )?ai|vs\.? (the )?ai|close to (the )?ai|match (the )?ai|my (qty|quantity).*ai/],['stocklp',/out of stock last|stock last peak|stock.?out last (year|peak)|was there (even )?stock/],['totlift',/peak (\+|and|plus) promo|total (extra |lift )?units|promo and peak units/],['promoext',/promo extra|extra units.*promo|promo.*extra|units.*promo (add|brings)|promo.*units.*add/],['overlap',/overlap|(inside|during|in) (the )?peak.*promo|promo.*(inside|during|falls? in|in) (the )?peak|promo.*peak weeks/],['lypromo',/last (year'?s? )?promo|promo.*last year|previous promo|promo weeks? (from )?last/],['lyunits',/promo units|units sold.*promo|promo.*units sold/],['bump',/peak bump|extra units|bump/],['peakgap',/short of peak|units short.*peak|peak (gap|shortfall)/],['addwhy',/why.*(add|order)|reason.*(add|suggest|order)|explain.*(add|suggest)/],['addqty',/(add|order) (more )?(for|to cover) (the )?(peak|promo)|suggested add|units to add|how many (more )?units.*(peak|promo)|ai (suggest|recommend)/],['ordovr',/total (suggested )?(qty|quantity)|order (qty|quantity) with override|with override/],['ovrwhy',/override reason/],['ovr',/override|my own peak|change the peak/],['plan',/(qty|quantity|order).*(to place|i plan|planned|place)|plan to order/],['needby',/needed by|need.?by date/],['suggest',/suggested order|how much (should i|to) order|order qty|order quantity/],['peaklift',/peak lift|how (big|much).*peak/],['filest',/new items?|new today|new skus?/],['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();
-  if(/show all|all items|every (item|sku)|not just/.test(t)){rowsMode='all';dashStat='All statuses';return 'Done. The Dashboard now starts on all statuses, not just the items that need attention. Your recipe is updated.'}
-  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t)){rowsMode='attn';dashStat='Needs attention';return 'Done. The Dashboard starts on the items that need attention.'}
+  if(/show all|all items|every (item|sku)|not just/.test(t))return 'I would set the Planning Dashboard to start on all statuses, not only the items that need attention. <b>Next run:</b> your planning spreadsheet opens that way.';
+  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t))return 'I would set the Planning Dashboard to start on the items that need attention. <b>Next run:</b> your planning spreadsheet opens that way.';
   const hit=PAT.find(p=>p[1].test(t));
   if(hit){const k=hit[0],C=COLS[k],has=cols.includes(k);
-    if(RM.test(t)){if(C.core)return `I would keep "${C.h}" because the sheet is hard to read without it. I can hide any of the other columns.`;
-      if(!has)return `"${C.h}" is not on the Dashboard right now.`;if(cols.length<=MINCOLS)return `I would keep at least ${MINCOLS} columns on the Dashboard, because the boxes above it need the width. The Master List always keeps every column.`;cols=cols.filter(x=>x!==k);saveCols();return `Done. I removed "${C.h}" from the Dashboard and from your recipe. It stays on the Master List.`}
-    if(has)return `"${C.h}" is already on your Dashboard.`;
-    cols.push(k);saveCols();
-    return `Done. I added "${C.h}" to the Dashboard (${C.src||'it is on the Master List'}).${INK.includes(k)?' You type it on the Master List and it shows here, and it carries over to tomorrow\'s file by SKU.':''} I saved it in your recipe, so tomorrow's sheet has it too. <a href="#" data-see>See it in the sheet</a>`}
-  return 'I only know a few requests in this demo. In the real chat you would explain it in your own words, and the AI works out which data to use. If the data is not in your files, it asks you where to find it or what file to add.';
+    if(RM.test(t)){if(C.core)return `I would keep "${C.h}" because the spreadsheet is hard to read without it. I can hide any of the other columns.`;
+      if(!has)return `"${C.h}" is not on the Planning Dashboard right now.`;
+      return `I would remove "${C.h}" from the Planning Dashboard and from your saved recipe. It stays on the Master List. <b>Next run:</b> your planning spreadsheet no longer shows it there.`}
+    if(has)return `"${C.h}" is already on your Planning Dashboard. This example does not change anything.`;
+    return `I can add "${C.h}" to the Planning Dashboard (${C.src||'it is on the Master List'}).${INK.includes(k)?' You would type it on the Master List and it shows on the dashboard. It carries over to the next run by SKU.':''} <b>Next run:</b> your planning spreadsheet includes it.`}
+  return 'I only know a few requests in this practice chat. With your real AI agent you explain it in your own words, and it works out which data to use. If the data is not in your files, it asks where to find it or what file to add.';
 }
+/* demo video: a looping scripted conversation */
+let demoId=0,demoPaused=false;
+const SCENES=[
+ {you:'I don\'t see the supplier lead time on my sheet.',ai:'Supplier lead time is in your Anaplan export, so I can add it. I will put Lead Time (Weeks) next to Order By on the Planning Dashboard and the Master List.',ok:'Saved to your recipe. Your next planning spreadsheet will include it.'},
+ {you:'Show the AI forecast next to the system forecast.',ai:'I will add AI Forecast Per Week and AI Vs System Forecast right after the system forecast column.',ok:'Saved to your recipe. Your next planning spreadsheet will include it.'},
+ {you:'I changed the colors by hand in this file. Here it is.',file:'Planning-Sheet-edited.xlsx',ai:'Thanks. Comparing it with your recipe, I see you color Watch rows orange and moved Order By beside Stock-Out Week. I will use both from now on.',ok:'Saved. Every future run keeps your format.'}];
+function startDemo(){
+  const box=$('#vid');if(!box)return;const id=++demoId;
+  const bubble=(cls,html)=>{const d=document.createElement('div');d.className='vmsg '+cls;d.innerHTML=html;box.appendChild(d);box.scrollTop=box.scrollHeight;return d};
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){SCENES.forEach(sc=>{bubble('you',esc(sc.you)+(sc.file?`<div class="vfile">${esc(sc.file)}</div>`:''));bubble('ai',esc(sc.ai));bubble('ok','✔ '+esc(sc.ok))});$('#v-pause').hidden=true;return}
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const alive=()=>id===demoId&&document.getElementById('vid')===box;
+  const hold=async ms=>{let t=0;while(t<ms){if(!alive())return false;if(demoPaused){await sleep(150);continue}await sleep(60);t+=60}return alive()};
+  (async()=>{while(alive()){box.innerHTML='';
+    for(const sc of SCENES){
+      const u=bubble('you','');let txt='';
+      for(const ch of sc.you){txt+=ch;u.textContent=txt;if(!await hold(28))return}
+      if(sc.file)u.insertAdjacentHTML('beforeend',`<div class="vfile">${esc(sc.file)}</div>`);
+      if(!await hold(450))return;
+      const th=bubble('ai think','<span></span><span></span><span></span>');if(!await hold(1000))return;
+      th.className='vmsg ai';th.textContent=sc.ai;box.scrollTop=box.scrollHeight;if(!await hold(1700))return;
+      bubble('ok','✔ '+esc(sc.ok));if(!await hold(2300))return}
+    if(!await hold(2600))return}})();
+}
+function renderEmailBox(k){return esc(A.emailText(k))}
+let emailKind='top';
+function renderEmail(){
+  const F={top:['Top Items','The five biggest items, then what is new or missing in the files.'],risk:['At Risk Only','A short list of what needs action now.'],week:['Weekly Summary','Counts by status, decisions to make and the biggest three.']};
+  $('#v-email').innerHTML=`<div class="page"><div class="pg-h"><h1>Custom Email</h1><span class="pill">Recommended Option</span></div>
+  <div class="card sec2"><ul class="mini big"><li>A second, optional flow. Your agent opens the <b>finished</b> planning spreadsheet in the shared folder, checks it and emails you a written summary.</li>
+   <li><b>Your format:</b> each person picks their own email, or no email at all. The spreadsheet does not need it.</li>
+   <li><b>Read only:</b> the email never changes the data or the calculations.</li></ul></div>
+  <h2 class="sec-h">Two Flows, Kept Separate</h2>
+  <div class="card flowcard"><div class="flowcap"><b>Flow 1: Build The Spreadsheet</b> <span class="conf">Everyone. It also carries typed work over from the previous run by SKU.</span></div>${flowSvg([['Your sources','Anaplan + Tableau'],['AI agent','Merges and checks the data'],['Planning sheet','Saved to the shared folder']],'Flow 1')}</div>
+  <div class="card flowcard"><div class="flowcap"><b>Flow 2: Email The Spreadsheet</b> <span class="pill">Optional</span> <span class="conf">Only if you want an email.</span></div>${flowSvg([['Shared folder','Finished planning sheet'],['AI agent','Opens and checks it'],['Written summary','In your format'],['Your inbox','Or no email']],'Flow 2')}</div>
+  <h2 class="sec-h">Example Emails</h2><p class="pg-sub" style="margin-top:0">The same checked spreadsheet, written up three ways. Each person chooses theirs.</p>
+  <div class="row" role="group" aria-label="Email format" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${Object.keys(F).map(k=>`<button class="chip" data-ek="${k}" aria-pressed="${emailKind===k}">${F[k][0]}</button>`).join('')}</div>
+  <p class="conf" style="margin:0 0 8px">${F[emailKind][1]}</p>
+  <div class="email">${renderEmailBox(emailKind)}</div>
+  <p style="margin-top:18px"><button class="btn pri" data-nav="sheet">See The Spreadsheet</button></p></div>`;
+  const e=$('#v-email');$$('[data-ek]',e).forEach(b=>b.onclick=()=>{emailKind=b.dataset.ek;renderEmail()});$$('[data-nav]',e).forEach(b=>b.onclick=()=>go(b.dataset.nav));
+}
+const RULEPAT={history_gap:S_=>`Flagged when supply is more than ${S_.historyGapPct}% below need`,promo_repeat:S_=>`Shortfalls under ${S_.promoCushionPct}% are ignored`,overstock:S_=>`Above ${S_.overstockWOS} weeks of supply`,
+ channel_fill:S_=>`Shipments above ${S_.channelRatio}x sales over 8 weeks`,pos_outpacing:S_=>`Sales above ${S_.outpaceRatio}x forecast for ${S_.outpaceWeeks} weeks in a row`,peak_cover:()=>'Under 2 weeks of peak cover',
+ missed_order:S_=>S_.leadTimeBasis==='p80'?'Uses the typical lead time from supplier history':'Uses the quoted lead time',late_po:S_=>S_.leadTimeBasis==='p80'?'Uses the typical lead time from supplier history':'Uses the quoted lead time'};
 function renderCustom(){
-  $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize With Your AI Agent</h1><span class="conf">Example conversation</span></div>
-  <div class="demo-note"><div class="dn-t">This is an example, not the live chat</div><p>On this site you can see what a conversation with your AI agent looks like. In real use, you talk to your own AI agent (for example Claude or ChatGPT) instead of using this page. Replies here are simulated and recognize only a small set of requests.</p><p><b>The real sheet is changed only through that conversation.</b> To add, remove or reorder columns, or change colors and rules, you tell your agent. It updates the saved recipe, rebuilds the sheet and uses it for every future run. Nothing is edited in the file by hand.</p></div>
-  <div class="chat-wrap"><div class="leftcol"><div class="card chat"><div class="chat-h"><span>Example Conversation With Your AI Agent</span><span class="conf demo-tag">Simulated replies</span></div>
+  const S_=A.st.settings,RU=A.RULES;
+  $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize</h1></div>
+  <div class="demo-note"><div class="dn-t">This page shows examples. The real conversation happens with your own AI agent.</div><p>In real use you talk to your own AI agent (for example Claude or ChatGPT), not to this site. The video and the practice chat below are simulated, and nothing on this site changes.</p><p><b>Your spreadsheet changes only through that conversation.</b> Columns, colors and rules all live in the agent's saved recipe, and every future run uses it.</p></div>
+  <h2 class="sec-h" style="margin-top:6px">Watch An Example</h2>
+  <div class="card vid"><div class="vid-h"><span>A conversation with your AI agent <span class="conf demo-tag">Simulated</span></span><button class="btn sm" id="v-pause" aria-pressed="false">Pause</button></div><div class="vid-body" id="vid" aria-live="off"></div></div>
+  <h2 class="sec-h">Try An Example Request</h2><p class="pg-sub" style="margin-top:0">A simulated practice chat. It answers a small set of requests and changes nothing.</p>
+  <div class="card chat"><div class="chat-h"><span>Practice Chat</span><span class="conf demo-tag">Simulated replies</span></div>
    <div class="msgs" id="msgs" aria-live="polite">${msgs.map(m=>`<div class="msg ${m.w}">${m.w==='you'?esc(m.t):m.t}</div>`).join('')}</div>
-   <div class="sug-h">Try an example request (simulated)</div><div class="sug">${SUG.map((s,i)=>`<button class="chip" data-sug="${i}">${esc(s)}</button>`).join('')}</div>
-   <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Try an example request (simulated)" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
-   <div class="card recipe" style="margin-top:14px"><h3>Example Prompts To Start With</h3><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the daily sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div></div>
-  <div><div class="card recipe"><h3>Your Recipe</h3><p class="conf" style="margin:0 0 8px">The AI agent's memory of how your sheet is built. Scheduled runs read it every morning. It changes only when you tell your agent.</p>
-   <p class="conf" style="margin:0 0 6px"><b>Dashboard columns</b> (view only: ask your agent to change them)</p><ol>${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
-   <p style="margin:10px 0 0"><b>Master List:</b> every column, with light yellow columns to type in (${INK.map(k=>esc(COLS[k].h)).join(', ')}). Those carry over to tomorrow\'s file by SKU.</p>
-   <p style="margin:6px 0 0"><b>Tabs:</b> ${TABS.map(t=>esc(t[1])).join(', ')}.</p>
-   <p style="margin:10px 0 0"><b>Rows:</b> ${rowsMode==='all'?'All items':'Items that need attention'}</p>
-   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Sheet</button><button class="btn" id="c-reset">Reset The Example</button></div></div>
-   <div class="card recipe" style="margin-top:14px"><h3>How This Works In Real Life</h3><ol><li>You describe what you want, or what you are not seeing, in your own words.</li><li>The AI finds the field in your data, or asks you where it lives.</li><li>It updates the recipe and rebuilds the sheet.</li><li>Tomorrow's scheduled run uses the saved recipe.</li></ol>
-   <p style="margin:10px 0 0"><button class="btn sm" id="c-adv">Advanced Thresholds</button></p></div></div></div></div>`;
+   <div class="sug-h">Example requests</div><div class="sug">${SUG.map((x,i)=>`<button class="chip" data-sug="${i}">${esc(x)}</button>`).join('')}</div>
+   <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Type a request (simulated)" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
+  <h2 class="sec-h">Example Prompts To Start With</h2>
+  <div class="card recipe"><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the planning sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div>
+  <h2 class="sec-h">Your Recipe</h2>
+  <div class="card recipe"><p class="conf" style="margin:0 0 10px">The AI agent's saved memory of how your spreadsheet is built. Every run reads it. It changes only when you tell your agent. Read only here.</p>
+   <h3 class="rh">Planning Dashboard Columns</h3><ol class="two">${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
+   <h3 class="rh">Master List</h3><p>Every column, with light yellow columns to type in: ${INK.map(k=>esc(COLS[k].h)).join(', ')}. Those carry over to the next run by SKU.</p>
+   <h3 class="rh">Tabs</h3><p>${TABS.map(t=>esc(t[1])).join(', ')}.</p>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Spreadsheet</button><button class="btn dl" id="c-dl">Download Sheet</button></div></div>
+  <h2 class="sec-h">How Items Get Flagged</h2><p class="pg-sub" style="margin-top:0">The same rules apply to every planner. To change one, tell your AI agent.</p>
+  <div class="card recipe"><ul class="rules two">${Object.keys(RU).filter(k=>k!=='check_data'||true).map(k=>`<li><b>${esc(RU[k][0])}</b><span>${esc(RU[k][1])}</span>${RULEPAT[k]?`<em>${esc(RULEPAT[k](S_))}</em>`:''}</li>`).join('')}</ul></div>
+  <h2 class="sec-h" id="recustom">Re-Customize Anytime For Your Next Custom Spreadsheet</h2><span class="pill">Optional</span>
+  <div class="card recipe" style="margin-top:8px"><ul class="mini big"><li><b>Use the same flow.</b> Tell your AI agent what to change. It updates the saved recipe, and the next run uses it, whether that run is daily, weekly or on request.</li>
+   <li><b>Edited the spreadsheet yourself?</b> Share the edited file with your agent. It reads what you changed, learns how you like it and builds it into the recipe.</li>
+   <li><b>Cannot describe the change?</b> Make it in the spreadsheet yourself and share the file. Showing it is enough.</li></ul>
+   <div class="card rule" style="margin-top:12px"><b>Good to know</b><span>Your own edits do not carry into the next run unless your agent knows about them. The next run rebuilds from the saved recipe. Only the light yellow typing columns carry over by SKU on their own.</span></div></div>
+  </div>`;
   const v=$('#v-custom'),box=$('#msgs');box.scrollTop=box.scrollHeight;
-  const send=t=>{if(!t.trim())return;msgs.push({w:'you',t});msgs.push({w:'ai',t:reply(t)});renderCustom();renderSheet()};
+  const send=t=>{if(!t.trim())return;msgs.push({w:'you',t});msgs.push({w:'ai',t:reply(t)});renderCustom()};
   $$('[data-sug]',v).forEach(b=>b.onclick=()=>send(SUG[b.dataset.sug]));
   $('#chat-f').onsubmit=e=>{e.preventDefault();send($('#chat-t').value)};
-  $$('[data-see]',v).forEach(a=>a.onclick=e=>{e.preventDefault();tab='dash';go('sheet')});
   $$('[data-nav]',v).forEach(b=>b.onclick=()=>go(b.dataset.nav));
-  $('#c-reset').onclick=()=>{cols=DEFAULT.slice();rowsMode='attn';saveCols();msgs=[hello()];renderCustom();renderSheet()};
-  $('#c-adv').onclick=A.openSettings;
+  $('#c-dl').onclick=downloadXlsx;
+  const pb=$('#v-pause');pb.onclick=()=>{demoPaused=!demoPaused;pb.textContent=demoPaused?'Play':'Pause';pb.setAttribute('aria-pressed',String(demoPaused))};
+  startDemo();
 }
 /* ---------- routing ---------- */
-const VIEWS=['home','sheet','custom','visual','options'];
+const VIEWS=['home','custom','sheet','visual','email','options'];
 function go(v){
   if(!VIEWS.includes(v))v='home';A.closeAll();
   VIEWS.forEach(x=>$('#v-'+x).classList.toggle('on',x===v));
   $$('.nav button').forEach(b=>{if(b.dataset.nav===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
-  if(v==='sheet')renderSheet();if(v==='custom')renderCustom();if(v==='visual')A.renderApp();
+  if(v==='sheet')renderSheet();if(v==='custom')renderCustom();if(v==='email')renderEmail();if(v==='visual')A.renderApp();
   if(location.hash!=='#'+v)history.replaceState(null,'','#'+v);window.scrollTo(0,0);
   const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px');
 }
-function renderAll(){renderHome();renderOptions();renderSheet();renderCustom();A.renderApp()}
+function renderAll(){renderHome();renderOptions();renderSheet();renderCustom();renderEmail();A.renderApp()}
 $$('.nav button').forEach(b=>b.onclick=()=>go(b.dataset.nav));
 addEventListener('hashchange',()=>go(location.hash.slice(1)));
 renderAll();go(location.hash.slice(1)||'home');

@@ -12,7 +12,7 @@ const TIERS=['At risk','Watch','Overstocked','No risk'];
 const TCLS={'At risk':'t-risk','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
 const TICON={'At risk':'▲','Watch':'◉','Overstocked':'■','No risk':'✔'};
 const DEC={order_more:['Order more or expedite','Stock will run short'],too_much:['Too much stock','Cash tied up in stock'],forecast_off:['Forecast looks off','Sales moving away from plan'],check_data:['Check the data','Something looks wrong in a source']};
-const SRC={planning:'Planning system',bi:'Reporting tool',sharepoint:'Shared file',calc:'Calculated'};
+const SRC={planning:'Planning system',bi:'Reporting tool',sharepoint:'Shared file',calc:'Calculated',sheet:'Typed by you',ai:'AI recommendation'};
 const REASONS=['Budget','Focus is on another line','Supplier constraint','Planned promo change','Other'],CREASONS=['Supplier update','Promo update','Waiting on Sales','Data issue','Follow-up','Other'];
 function noteFor(id){const ns=Object.values(E.activeNotes(st.notes)).filter(x=>x.sku===id).sort((a,b)=>a.id-b.id);if(!ns.length)return null;const l=ns[ns.length-1];
   return {topic:E.NOTE_LABEL[l.flag]||l.flag,reason:l.reason,text:l.text,by:l.who,date:l.date,line:ns.map(n=>n.reason+': '+n.text).join(' | ')}}
@@ -129,7 +129,7 @@ function snapTiles(){const r=st.res,K=r.kpi,AC=E.accuracyTotal(snap()),attn=r.ro
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({settings:st.settings,notes:st.notes}))}catch(e){}}
 const saved=load();
-const st={snap:'today',settings:merge(DEFSET,saved&&saved.settings),notes:(saved&&saved.notes)||JSON.parse(JSON.stringify(D.seedNotes)),
+const st={snap:'today',settings:merge(DEFSET,{}),notes:(saved&&saved.notes)||JSON.parse(JSON.stringify(D.seedNotes)),
  tier:'attn',dec:null,sub:'',q:'',tab:'attn',open:null,wi:{slip:0,lift:0,qty:0,h:2},res:null,prev:null};
 function merge(a,b){const o=JSON.parse(JSON.stringify(a));if(!b)return o;for(const k in b){if(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k])&&o[k]&&typeof o[k]==='object')o[k]=merge(o[k],b[k]);else o[k]=b[k]}return o}
 const NOW=new Date(),TODAY_LONG=NOW.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}),TODAY_SHORT=NOW.toLocaleDateString('en-US',{month:'short',day:'numeric'}),TODAY_ISO=NOW.getFullYear()+'-'+String(NOW.getMonth()+1).padStart(2,'0')+'-'+String(NOW.getDate()).padStart(2,'0');
@@ -161,18 +161,18 @@ function renderApp(){
   const dsum=Object.keys(DEC).map(k=>{const it=rows.filter(x=>x.decision===k&&tierOK(x)),d=sumD(it);return `<button class="dtile" aria-pressed="${st.dec===k}" data-dec="${k}">
      <div class="t">${DEC[k][0]}</div><div class="n">${it.length}</div><div class="d">${DEC[k][1]}</div>
      <div class="h">${d>0?money(d)+' at stake':'&nbsp;'}</div></button>`}).join('');
-  $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${st.snap==='today'?'Today, '+esc(TODAY_LONG):'Yesterday (comparison)'}</span></div>
-   <p class="pg-sub">The same results as the Daily Sheet's Dashboard, shown as cards you can click, with the same Decision and Status choices and the same columns. Open any item to add a note, and that note shows in the Daily Sheet's Master List too. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list, which has a Seasonality and promos tab with the peak lift, the extra units it means and whether stock covers it. Peak overrides and order quantities to place are typed on the Master List in the Daily Sheet and show here.</p>${health}${snapHtml}${sinceHtml()}
-   <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision, for the status chosen below, the same as the four boxes on the Daily Sheet dashboard. Tap a box to filter the list.</p>
+  $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${esc(TODAY_LONG)}</span></div>
+   <div class="card vv-note"><b>A visual way to see the Planning Dashboard if you would rather not download the sheet.</b><ul class="mini"><li>It reads the same custom spreadsheet, so the numbers always match.</li><li>Click any item to see why it was flagged, its sales history and the options.</li><li>It can be built for real. It needs a place to live, such as a hosted page, a SharePoint or Teams page, or a BI tool. This demo is hosted on a free site.</li></ul></div>${health}${snapHtml}
+   <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision, for the status chosen below, the same as the four boxes on the Custom Spreadsheet dashboard. Tap a box to filter the list.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
-   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, forecast accuracy, and seasonality and promos.</p>
+   <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><ul class="mini sec-sub"><li><b>Each item</b> shows the reason it was flagged. Click a row for the numbers behind it.</li><li><b>$ At Stake</b> is the unit gap times the unit price.</li><li><b>Tabs</b> switch between items that need attention, accepted risks, forecast accuracy, and seasonality and promos.</li></ul>
    <div class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="${st.tab==='attn'}" data-tab="attn" data-g="tab-attn">Needs attention</button>
     <button class="tab" role="tab" aria-selected="${st.tab==='acc'}" data-tab="acc" data-g="tab-accepted">Accepted risks (${r.accepted})</button>
     <button class="tab" role="tab" aria-selected="${st.tab==='acc2'}" data-tab="acc2" data-g="tab-accuracy">Forecast accuracy</button>
     <button class="tab" role="tab" aria-selected="${st.tab==='season'}" data-tab="season" data-g="tab-season">Seasonality and promos</button></div>
    <div id="tabbody"></div>
-   <p class="foot">Sample data, not Mattel data. Every brand, supplier and number here is invented. Built from fields a planning team already has: POS, shipments, on-hand, in-transit, open POs, forecast, promo calendar, supplier lead times and 3 years of history.</p>`;
+   <p class="foot">Sample data, not Mattel data. Every brand, supplier and number here is invented.</p>`;
   bindApp();renderTab();
 }
 function sinceHtml(){
@@ -185,12 +185,12 @@ function sinceHtml(){
   const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
     return `<div class="sc ${cls}"><div class="sc-h"><span>${title}</span><b>${items.length}</b></div><div class="sc-sub">${sub}</div>
     ${items.length?`<ul>${shown.map(fmt).join('')}</ul>${more>0?`<div class="sc-more">and ${more} more in the list below</div>`:''}`:'<div class="sc-none">None today</div>'}</div>`};
-  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} missing items. They are listed on the New And Missing Items tab of the Daily Sheet.</p>
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since The Last Run</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} missing items. They are listed on the New And Missing Items tab of the Custom Spreadsheet.</p>
    <div class="since4" data-g="since">
     ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-fixed','Fixed','An order was placed or the gap closed',d.recovered,i=>`<li>${lk(i)}</li>`)}
-    ${col('c-still','Still At Risk','Same as yesterday, no change',still,i=>`<li>${lk(i)}</li>`)}
+    ${col('c-still','Still At Risk','Same as the last run, no change',still,i=>`<li>${lk(i)}</li>`)}
    </div>`;
 }
 function bindApp(){
@@ -405,7 +405,7 @@ function drawerHtml(){
   const sku=skuOf(st.open),res=rowOf(st.open),top=res.flags.find(f=>!f.accepted)||res.flags[0];
   const flag=top;
   let why='';
-  if(flag){const ru=RULES[flag.type];why=`<div class="card sec" data-g="why"><h3>Why this was flagged</h3><div class="hl">${esc(flag.text)}</div>
+  if(flag){const ru=RULES[flag.type];why=`<div class="card sec" data-g="why"><h3>Why This Was Flagged</h3><div class="hl">${esc(flag.text)}</div>
    <div class="mute" style="margin-bottom:10px">Rule: <b>${esc(ru[0])}</b>. ${esc(ru[1])}</div>
    <div class="ev">${evidence(sku,res,flag).map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div>
    ${flag.type==='history_gap'?`<p class="conf">*Adjusted for: last year's stock-out weeks (counted as demand that went unmet), one-time promos last year that are not repeating, and this year's sales pace vs last year.</p>`:''}
@@ -413,39 +413,51 @@ function drawerHtml(){
   else why=`<div class="card sec"><h3>No flags</h3><p>Supply covers the forecast and last year's pattern.</p></div>`;
   const opts=flag?E.options(sku,snap(),res):[];
   const inv=sku.isNew?null:invCharts(sku,res);
+  const IB=sku.isNew?null:itemBlocks(sku,res);
   const others=res.flags.filter(f=>f!==flag);
   $('#drawer').innerHTML=`<div class="dr-h"><div style="flex:1">${tierB(res.tier)}${res.reAlert?'<span class="re">RE-ALERT</span>':''}<div class="hl" style="margin:6px 0 0">${esc(res.name)}</div>
    <div class="mute">${res.id} · ${esc(res.sub)} · ${esc(sku.supplier)} · $${sku.price.toFixed(2)} each</div></div><button class="btn" id="d-close">Close</button></div>
    <div class="dr-b">${why}
-   ${sku.isNew?'':seasonCard(sku,res)}
-   ${sku.isNew?analogHtml(sku,res):`<div class="card sec" data-g="drill-chart"><h3>Sales: this year, forecast, and prior years</h3>${demandChart(sku,res)}</div>`}
-   ${inv?`<div class="card sec" data-g="whatif"><h3>Stock projection and what-if</h3><div id="wi-chart">${inv.html}</div><div id="wi-v">${inv.v}</div>
+   ${sku.isNew?analogHtml(sku,res):`<div class="card sec" data-g="drill-chart"><h3>Sales History: This Year, Forecast, And Prior Years</h3>${demandChart(sku,res)}</div>`}
+   ${sku.isNew?'':IB.grid}
+   ${inv?`<div class="card sec" data-g="whatif"><h3>Stock Projection And What-If</h3><div id="wi-chart">${inv.html}</div><div id="wi-v">${inv.v}</div>
      ${(sku.isNew||!res.metrics.lt||sku.inv.onHand<0)?'':`<div style="margin-top:12px">
      <div class="slider"><label for="s-slip">Supplier ETA slips by</label><input id="s-slip" type="range" min="0" max="8" value="${st.wi.slip}"><output id="o-slip"></output></div>
      <div class="slider"><label for="s-lift">Demand vs forecast</label><input id="s-lift" type="range" min="-30" max="60" step="5" value="${st.wi.lift}"><output id="o-lift"></output></div>
      <div class="slider"><label for="s-qty">Add an order of</label><input id="s-qty" type="range" min="0" max="${inv.wiMax}" step="50" value="${st.wi.qty}"><output id="o-qty"></output></div>
      <div class="slider"><label for="s-h">Arriving in week</label><input id="s-h" type="range" min="1" max="8" value="${st.wi.h}"><output id="o-h"></output></div>
      <button class="btn sm" id="wi-reset">Reset what-if</button></div>`}</div>`:''}
-   ${opts.length?`<div class="card sec" data-g="options"><h3>Options from the data</h3>${opts.map(o=>`<div class="opt"><b>${esc(o.t)}</b><span>${esc(o.note)}</span></div>`).join('')}
+   ${opts.length?`<div class="card sec" data-g="options"><h3>Options From The Data</h3>${opts.map(o=>`<div class="opt"><b>${esc(o.t)}</b><span>${esc(o.note)}</span></div>`).join('')}
      <div class="conf">These come from numbers in the sources. Cost, margin and customer terms are not in the data, so they are marked for a human.</div></div>`:''}
-   ${others.length?`<div class="card sec"><h3>Other flags on this SKU</h3>${others.map(f=>`<div style="margin-bottom:6px">${tierB(f.tier)} ${esc(f.text)}${f.accepted?' <span class="tag">accepted</span>':''}</div>`).join('')}</div>`:''}
+   ${others.length?`<div class="card sec"><h3>Other Flags On This SKU</h3>${others.map(f=>`<div style="margin-bottom:6px">${tierB(f.tier)} ${esc(f.text)}${f.accepted?' <span class="tag">accepted</span>':''}</div>`).join('')}</div>`:''}
+   ${sku.isNew?'':IB.more}
    ${notesHtml(sku,res)}</div>`;
   bindDrawer(sku,res,inv);updateOut();
 }
-function seasonCard(sku,res){const m=res.metrics,pc=m.peakCover;
-  const rows=[['Peak months (last 2 years)',pv('peak',res),'calc'],['Peak weeks in the next 12',pv('peakwk',res),'calc'],
-   ['Lowest stock in those weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Peak cover',pv('peakcover',res),'calc'],['Units short of peak cover',fv('peakgap',pv('peakgap',res)),'calc'],
-   ['Peak lift (calculated)',pv('peaklift',res)===''?'—':fv('peaklift',pv('peaklift',res)),'calc'],['Peak bump (extra units)',pv('bump',res)===''?'—':fmt(pv('bump',res)),'calc'],['Stock last peak',pv('stocklp',res),'calc'],
-   ['Your peak lift override',pv('ovr',res)===''?'None typed':fv('ovr',pv('ovr',res))+(pv('ovrwhy',res)?' ('+pv('ovrwhy',res)+')':''),'sheet'],['Order qty to place',pv('plan',res)===''?'None typed':fmt(pv('plan',res))+(pv('needby',res)?', needed by '+pv('needby',res):''),'sheet'],
-   ['This year promo (weeks starting)',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Last year promo (weeks starting)',pv('lypromo',res),'calc'],['Last promo units sold',pv('lyunits',res)===''?'—':fmt(pv('lyunits',res)),'calc'],['Last promo lift',pv('lift',res)===''?'—':fv('lift',pv('lift',res)),'calc'],['Promo and peak overlap',pv('overlap',res),'calc'],['Promo extra units',pv('promoext',res)===''?'—':fmt(pv('promoext',res)),'calc'],['Peak + promo units above a normal week',pv('totlift',res)===''?'—':fmt(pv('totlift',res)),'calc'],['Promo status',pv('promo',res),'calc']];
-  return `<div class="card sec" data-g="season-sku"><h3>Season And Promos</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`}
+function itemBlocks(sku,res){
+  const m=res.metrics,V=k=>{const v=pv(k,res);return v===''||v==null?'—':(typeof v==='number'?fv(k,v):String(v))};
+  const blk=(t,rows)=>`<div class="card sec"><h3>${t}</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`;
+  const arr2=m.nextArr2?[['2nd arrival',V('arr2')+', '+fmt(m.nextArr2.qty)+' units','planning']]:[];
+  const b1=blk('Stock And Orders',[['On hand',V('onhand'),'planning'],['In transit',V('transit'),'planning'],['Open PO',V('openpo'),'planning'],['Next arrival',m.nextArr?V('nextarr')+', '+fmt(m.nextArr.qty)+' units':'None','planning'],...arr2,
+    ['Weeks of supply',V('wos'),'calc'],['Stock-out week',V('stockout'),'calc'],['Order by',V('orderby'),'calc']]);
+  const b2=blk('Forecast',[['System forecast per week',V('fcstwk'),'planning'],['AI forecast per week',V('aifcst'),'ai'],['AI vs system forecast',V('aifdiff'),'calc'],['Sales vs forecast (last 3 weeks)',V('salesvs'),'calc']]);
+  const b3=blk('Peak And Promo',[['Peak weeks in the next 12',V('peakwk'),'calc'],['Peak cover',V('peakcover'),'calc'],['Peak lift',V('peaklift'),'calc'],['This year promo (weeks starting)',V('nextpromo')+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Last year promo (weeks starting)',V('lypromo'),'calc'],['Promo and peak overlap',V('overlap'),'calc']]);
+  const b4=blk('Your Order And The AI',[['AI recommended qty (stock gap)',V('suggest'),'ai'],['AI recommended add (peak + promo)',V('addqty'),'ai'],['AI recommended qty (total)',V('ordovr'),'ai'],['Your qty to place',pv('plan',res)===''?'None typed':fmt(pv('plan',res))+(pv('needby',res)?', needed by '+pv('needby',res):''),'sheet'],['Your qty vs AI',V('cmptxt'),'calc']]);
+  const pc=m.peakCover;
+  const more=`<details class="card sec more"><summary>More Details</summary><div class="ev" style="margin-top:10px">${[
+   ['Lowest stock in the peak weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Units short of peak cover',V('peakgap'),'calc'],['Peak bump (extra units)',V('bump'),'calc'],['Stock last peak',V('stocklp'),'calc'],
+   ['Your peak lift override',pv('ovr',res)===''?'None typed':fv('ovr',pv('ovr',res))+(pv('ovrwhy',res)?' ('+pv('ovrwhy',res)+')':''),'sheet'],['Peak months (last 2 years)',V('peak'),'calc'],
+   ['Last promo units sold',V('lyunits'),'calc'],['Last promo lift',V('lift'),'calc'],['Promo extra units',V('promoext'),'calc'],['Peak + promo units above a normal week',V('totlift'),'calc'],['Promo status',V('promo'),'calc']
+  ].map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></details>`;
+  return {grid:`<div class="blk-grid" data-g="season-sku">${b1}${b2}${b3}${b4}</div>`,more};
+}
 function updateOut(){const w=st.wi,set=(i,t)=>{const e=$('#'+i);if(e)e.textContent=t};
   set('o-slip',w.slip+' wk');set('o-lift',(w.lift>0?'+':'')+w.lift+'%');set('o-qty',fmt(w.qty));set('o-h','wk +'+w.h)}
 function bindDrawer(sku,res,inv){
   $('#d-close').onclick=closeAll;
   if(!$('#s-slip'))return bindNotes(sku,res);
   [['slip','s-slip'],['lift','s-lift'],['qty','s-qty'],['h','s-h']].forEach(([k,id])=>$('#'+id).oninput=e=>{st.wi[k]=+e.target.value;updateOut();const r=invCharts(sku,res);$('#wi-chart').innerHTML=r.html;$('#wi-v').innerHTML=r.v;
-    const dc=$('[data-g=drill-chart]');if(k==='lift'&&dc)dc.innerHTML='<h3>Sales: this year, forecast, and prior years</h3>'+demandChart(sku,res)});
+    const dc=$('[data-g=drill-chart]');if(k==='lift'&&dc)dc.innerHTML='<h3>Sales History: This Year, Forecast, And Prior Years</h3>'+demandChart(sku,res)});
   $('#wi-reset').onclick=()=>{st.wi={slip:0,lift:0,qty:0,h:2};drawerHtml()};
   bindNotes(sku,res);
 }
@@ -530,20 +542,20 @@ function openLoad(replay){
   const rep=D.loadReport,ic={ok:'<span class="ok-t">✔</span>',new_field:'<span style="color:var(--watch)">◉</span>',quarantined:'<span class="bad-t">▲</span>'};
   openModal(replay?'Loading today\'s files':'What happened in today\'s load',`<p class="mute">Each file is checked before it is used. Fixable changes are handled. Anything risky is held back and shown to you.</p><ul class="log" id="lg"></ul><div class="row" id="lg-done"></div>`);
   let i=0;const lg=$('#lg');
-  (function step(){if(i>=rep.length){const dn=$('#lg-done');if(dn){dn.innerHTML='<button class="btn pri" id="lg-go">Show what changed since yesterday</button>';$('#lg-go').onclick=()=>{st.snap='today';recompute();renderApp();closeAll()}}return}
+  (function step(){if(i>=rep.length){const dn=$('#lg-done');if(dn){dn.innerHTML='<button class="btn pri" id="lg-go">Show what changed since the last run</button>';$('#lg-go').onclick=()=>{st.snap='today';recompute();renderApp();closeAll()}}return}
    const r=rep[i++],src_=D.sources.find(s=>s.id===r.src);lg.insertAdjacentHTML('beforeend',`<li>${ic[r.status]}<div><b>${esc(r.file)}</b> <span class="conf">from ${esc(src_?src_.name:'')}</span><div>${esc(r.msg)}</div></div></li>`);
    window.__loadTimer=setTimeout(step,replay?(matchMedia('(prefers-reduced-motion: reduce)').matches?0:750):0)})();
 }
 const SRCPANEL={
- planning:{h:'API pull from the planning system',steps:['Scheduled job calls the planning system each morning','Pulls forecast, open POs and inventory','Checks every field against the expected shape','Passes clean rows to the combiner'],real:'Needs read access from IT. If direct API is not allowed, the same data can arrive as a scheduled export instead.',sample:[['SKU','On hand','Open PO','ETA'],['FD-1012','1,950','1,740','Dec 1'],['BB-1009','5,610','0','—']]},
- bi:{h:'Scheduled export from the reporting tool',steps:['The reporting tool sends or saves its daily export','The tool watches the inbox or shared folder','Downloads the file and reads the columns','Renamed columns are matched; odd values are held back'],real:'Whether the tool can email or save a data file (not just a picture of a dashboard) depends on how it is set up. If it cannot, a scheduled export to a shared folder is the usual route.',sample:[['SKU','Week','POS units','Shipped'],['FD-1012','45','63','60'],['SM-1033','45','1,980','3,020']]},
- sharepoint:{h:'Shared file that someone maintains',steps:['A person updates the file (lead times, promo calendar)','The tool reads it on a schedule','Changes since yesterday are noted','Missing values pause only the flags that need them'],real:'Good for data that lives in a spreadsheet and has no feed. The owner of the file just keeps it current.',sample:[['Supplier','Quoted weeks','Promo','Weeks'],['Lotus Doll Factory','10','Holiday feature','49-50'],['Bluegate','9','—','—']]},
+ planning:{h:'API pull from the planning system',steps:['Scheduled job calls the planning system each run','Pulls forecast, open POs and inventory','Checks every field against the expected shape','Passes clean rows to the combiner'],real:'Needs read access from IT. If direct API is not allowed, the same data can arrive as a scheduled export instead.',sample:[['SKU','On hand','Open PO','ETA'],['FD-1012','1,950','1,740','Dec 1'],['BB-1009','5,610','0','—']]},
+ bi:{h:'Scheduled export from the reporting tool',steps:['The reporting tool sends or saves its scheduled export','The tool watches the inbox or shared folder','Downloads the file and reads the columns','Renamed columns are matched; odd values are held back'],real:'Whether the tool can email or save a data file (not just a picture of a dashboard) depends on how it is set up. If it cannot, a scheduled export to a shared folder is the usual route.',sample:[['SKU','Week','POS units','Shipped'],['FD-1012','45','63','60'],['SM-1033','45','1,980','3,020']]},
+ sharepoint:{h:'Shared file that someone maintains',steps:['A person updates the file (lead times, promo calendar)','The tool reads it on a schedule','Changes since the last run are noted','Missing values pause only the flags that need them'],real:'Good for data that lives in a spreadsheet and has no feed. The owner of the file just keeps it current.',sample:[['Supplier','Quoted weeks','Promo','Weeks'],['Lotus Doll Factory','10','Holiday feature','49-50'],['Bluegate','9','—','—']]},
  manual:{h:'Manual drop: any file a planner wants checked',steps:['Drag a file in','The tool reads the headers and guesses what each column is','Anything unsure is shown for a one-click confirm','The file joins the combined data, new columns kept']
   ,real:'This is how a new dataset gets added the first time. After one confirm, the tool remembers the mapping.',sample:[['Column in file','Looks like','Sure?'],['sell_thru_units','POS units','Yes'],['xfer_qty','Unclear','Ask'] ]}};
 function openFlow(){
   const S=D.sources,col={api:'#2b4cc7',email:'#1f7a34',file:'#b45309',manual:'#6d4fb3'},lab={api:'API pull',email:'Scheduled export',file:'Shared file',manual:'Manual drop'};
   const nodes=S.map((s,i)=>({s,x:12,y:14+i*98,w:236,h:78}));
-  const outs=[['Website','site'],['Workbook','xl'],['Daily email','em']].map((o,i)=>({n:o[0],id:o[1],x:760,y:40+i*110,w:228,h:78}));
+  const outs=[['Website','site'],['Workbook','xl'],['Custom email','em']].map((o,i)=>({n:o[0],id:o[1],x:760,y:40+i*110,w:228,h:78}));
   let sv=`<svg class="flow-svg" viewBox="0 0 1000 420" role="group" aria-label="Animated data flow">`;
   nodes.forEach((n,i)=>{const d=`M${n.x+n.w} ${n.y+n.h/2} C 330 ${n.y+n.h/2}, 340 210, 392 210`;sv+=`<path id="p${i}" d="${d}" fill="none" stroke="${col[n.s.type]}" stroke-width="2.5" opacity=".35"/>`;
     for(let k=0;k<3;k++)sv+=`<circle r="6" fill="${col[n.s.type]}" opacity="0"><animateMotion dur="3.6s" begin="${(k*1.2+i*.35).toFixed(2)}s" repeatCount="indefinite"><mpath href="#p${i}"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.06;.94;1" dur="3.6s" begin="${(k*1.2+i*.35).toFixed(2)}s" repeatCount="indefinite"/></circle>`});
@@ -570,21 +582,26 @@ function flowPanel(id){
      <p><b>In practice:</b> ${esc(P.real)}</p>
      ${lr.length?`<b>Today's load from this route</b><ul class="log" style="opacity:1">${lr.map(r=>`<li style="opacity:1;transform:none;animation:none">${r.status==='ok'?'✔':r.status==='quarantined'?'▲':'◉'} <div><b>${esc(r.file)}</b><div>${esc(r.msg)}</div></div></li>`).join('')}</ul>`:''}`}
   else if(id==='hub')h=`<h3 style="margin-top:0">Check, match, combine</h3><ul><li><b>Match:</b> a renamed column is recognised by name and by the numbers in it. Safe matches happen on their own. Quantity or date fields wait for one click.</li>
-   <li><b>Hold back:</b> a file whose values jump 10x or change units is set aside; yesterday's values stay and you are told.</li><li><b>Keep:</b> a brand-new field is stored and tagged "not used yet", so the dataset grows without breaking anything.</li>
-   <li><b>Pause only what is affected:</b> a missing lead time pauses lead-time flags for that supplier and says why.</li><li><b>Safe daily run:</b> results are written to a temp file and swapped in only if complete, so a failed run never leaves a half-updated file.</li></ul>`;
+   <li><b>Hold back:</b> a file whose values jump 10x or change units is set aside; the previous values stay and you are told.</li><li><b>Keep:</b> a brand-new field is stored and tagged "not used yet", so the dataset grows without breaking anything.</li>
+   <li><b>Pause only what is affected:</b> a missing lead time pauses lead-time flags for that supplier and says why.</li><li><b>Safe scheduled run:</b> results are written to a temp file and swapped in only if complete, so a failed run never leaves a half-updated file.</li></ul>`;
   else if(id==='site')h=`<h3 style="margin-top:0">Website</h3><p>The view you are looking at: decisions first, one line why, click for charts. Updates when the daily file refreshes.</p>`;
   else if(id==='xl')h=`<h3 style="margin-top:0">Workbook</h3><p>Everything combined in one sheet with each column tagged by source, plus notes, settings and a data-health tab. This is the version that can live on a shared drive and be filtered or pivoted.</p><button class="btn" id="f-dl">Download combined data (CSV)</button>`;
-  else if(id==='em')h=`<h3 style="margin-top:0">Daily email</h3><p>Top findings, what changed since yesterday, and data issues. Short enough to read in a minute.</p><button class="btn" id="f-em">Preview today's email</button>`;
+  else if(id==='em')h=`<h3 style="margin-top:0">Custom email</h3><p>Top findings, what changed since the last run, and data issues. Short enough to read in a minute.</p><button class="btn" id="f-em">Preview today's email</button>`;
   p.innerHTML=h;const d=$('#f-dl');if(d)d.onclick=downloadCsv;const e=$('#f-em');if(e)e.onclick=openEmail;
 }
-function openEmail(){
-  const live=st.res.rows.filter(r=>r.headline).sort((a,b)=>E.TIER_ORDER[a.tier]-E.TIER_ORDER[b.tier]||b.dollars-a.dollars),top=live.slice(0,5),t=st.res.tiers;
-  let b=`Subject: Demand planning, ${t['At risk']} at risk, ${t['Watch']} to watch (${TODAY_SHORT})\n\nGood morning. Top items to look at today:\n\n`;
-  top.forEach((r,i)=>{b+=`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n   ${r.dollars>0?money(r.dollars)+' at risk':''}\n\n`});
-  if(st.diff){b+='Since yesterday:\n';st.diff.toAtRisk.forEach(i=>b+=`  - Newly at risk: ${rowOf(i).name}\n`);st.diff.reAlerted.forEach(i=>b+=`  - Re-alert (gap grew): ${rowOf(i).name}\n`);st.diff.recovered.forEach(i=>b+=`  - Fixed: ${rowOf(i).name}\n`);b+='\n'}
-  {const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files today:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing today: ${x.name} (${x.id}), check the shared files${x.plan?' (you had '+fmt(x.plan)+' units to place)':''}\n`);b+='\n'}}
-  b+=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept. Open the tool for charts and options.\n\nSample data, not Mattel data.`;
-  openModal('Daily email preview',`<p class="mute">Sent each morning after the files refresh. Accepted risks stay out of it unless they re-alert.</p><div class="email">${esc(b)}</div>`);
+function emailText(kind){
+  const live=st.res.rows.filter(r=>r.headline).sort((a,b)=>E.TIER_ORDER[a.tier]-E.TIER_ORDER[b.tier]||b.dollars-a.dollars),t=st.res.tiers,at=live.filter(r=>r.tier==='At risk');
+  const line=(r,i)=>`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n${r.dollars>0?'   '+money(r.dollars)+' at stake\n':''}\n`;
+  const files=()=>{let b='';const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing: ${x.name} (${x.id}), check the shared files\n`);b+='\n'}return b};
+  const health=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept.\n\n`;
+  const foot='Sample data, not Mattel data.';
+  if(kind==='risk'){let b=`Subject: ${at.length} items at risk (${TODAY_SHORT})\n\nItems that need action now:\n\n`;at.slice(0,8).forEach((r,i)=>b+=line(r,i));return b+foot}
+  if(kind==='week'){const dc=Object.keys(DEC).map(k=>`  - ${DEC[k][0]}: ${st.res.rows.filter(x=>x.decision===k).length}`).join('\n');
+    let b=`Subject: Weekly planning summary (${TODAY_SHORT})\n\nWhere things stand:\n  - At risk: ${t['At risk']}\n  - Watch: ${t['Watch']}\n  - Overstocked: ${t['Overstocked']}\n  - No risk: ${t['No risk']}\n\nDecisions to make:\n${dc}\n\nBiggest three:\n\n`;
+    live.slice(0,3).forEach((r,i)=>b+=line(r,i));return b+files()+foot}
+  let b=`Subject: Planning summary, ${t['At risk']} at risk, ${t['Watch']} to watch (${TODAY_SHORT})\n\nTop items to look at:\n\n`;
+  live.slice(0,5).forEach((r,i)=>b+=line(r,i));
+  return b+files()+health+foot;
 }
 /* ---------- csv ---------- */
 function downloadCsv(){
@@ -599,7 +616,7 @@ function downloadCsv(){
 const HG1=D.ids.HG1,STEPS=[
  {t:'[data-g=badge]',h:'This is sample data',b:'Every brand, supplier and number is invented. What matters is what can be built from data a planning team already has.',pre:()=>closeAll()},
  {t:'[data-g=health]',h:'Data from several places, checked first',b:'Files from the planning system, the reporting tool and shared sheets are combined. A renamed column is matched, a new field is kept, and a file with odd values is held back.',pre:()=>closeAll()},
- {t:'[data-g=since]',h:'What changed overnight',b:'Newly at risk, fixed, and worse than yesterday. This is the part a planner would otherwise rebuild by hand every morning.',pre:()=>closeAll()},
+ {t:'[data-g=since]',h:'What changed overnight',b:'Newly at risk, fixed, and worse than the last run. This is the part a planner would otherwise rebuild by hand every run.',pre:()=>closeAll()},
  {t:'[data-g=decisions]',h:'Four decisions, not 120 rows',b:'Order more, too much, forecast looks off, check the data. Click one to filter. Dollars show what is at stake.',pre:()=>closeAll()},
  {t:'[data-g=list]',h:'Ranked, with one line why',b:'Every SKU has a status. Click a row to see the data behind it.',pre:()=>{closeAll();window.scrollTo(0,0)}},
  {t:'[data-g=drill-chart]',h:'Order 700, last year sold 1,000',b:'Supply covers the forecast, so a normal check passes. But the same weeks last year needed more. This is the gap that is easy to miss by hand.',pre:()=>openSku(HG1),side:true},
@@ -628,7 +645,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={isoOf,aiTiles,AIK,histData,HIST_MON,newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={RULES,emailText,isoOf,aiTiles,AIK,histData,HIST_MON,newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();

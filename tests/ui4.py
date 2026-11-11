@@ -16,12 +16,10 @@ with sync_playwright() as p:
         t=pg.locator('#msgs').inner_text()
         if 'I only know a few requests' in t:bad.append(i)
     ok('every Customize example chip gets a real reply (%d chips)'%n,not bad)
-    pg.click('#c-reset');pg.wait_for_timeout(100)
     # 2. typed-in columns can be requested and say where they are typed
     pg.fill('#chat-t','Add the date the units are needed by.');pg.click('#chat-f button');pg.wait_for_timeout(100)
     ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Needed By' in pg.locator('#msgs').inner_text())
-    pg.click('#c-reset')
-    rc=pg.locator('.recipe:has(h3:text("Your Recipe"))').inner_text()
+    rc=pg.locator('#v-custom').inner_text()
     ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Seasonal And Promo Lifts' in rc)
     # 3. no stale wording on any page or sheet tab
     allt=[]
