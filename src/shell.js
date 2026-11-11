@@ -569,7 +569,7 @@ function renderHome(){
   <div class="steps">
    <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach your AI agent. The map below follows your choice.</p>
     <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
-    <div class="routebox" id="routebox"><h3>${RD[route].name}</h3><div class="route-lead ${RD[route].lead[0]}">${RD[route].lead[1]}</div><ul class="mini">${RD[route].sys.map((x,k)=>`<li><b>${SYSN[k]}:</b> ${RSTAT[x.s][0].replace(/^\S+ /,'')}. ${x.t}<div class="why"><b>Why this path:</b> ${x.why}</div></li>`).join('')}${RD[route].extra.map(e=>`<li>${e}</li>`).join('')}<li><b>Why a shared folder:</b> The AI agent builds the spreadsheet from files in one folder, so every route ends there, even when part of the data is pulled directly.</li><li><b>What it needs:</b> ${RD[route].needs}</li></ul></div></div>
+    <div class="routebox" id="routebox"><h3>${RD[route].name}</h3><div class="route-lead ${RD[route].lead[0]}">${RD[route].lead[1]}</div><ul class="mini">${RD[route].sys.map((x,k)=>`<li><b>${SYSN[k]}:</b> ${RSTAT[x.s][0].replace(/^\S+ /,'')}. ${x.t}<ul class="sub"><li><b>Why this path:</b> ${x.why}</li></ul></li>`).join('')}${RD[route].extra.map(e=>`<li>${e}</li>`).join('')}<li><b>Why a shared folder:</b> The AI agent builds the spreadsheet from files in one folder, so every route ends there, even when part of the data is pulled directly.</li><li><b>What it needs:</b> ${RD[route].needs}</li></ul></div></div>
     <div class="flowwrap"><h3 class="flowh">Data Flow: ${esc(r[0])}</h3>${flowRich(route)}</div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Customize With Your AI Agent</h2></div><p>Prepare your custom spreadsheet. Describe it, show examples of sheets you like, and explain how to combine your data.</p>
     <button class="btn pri go" data-nav="custom">See Customize</button></div>
@@ -712,7 +712,7 @@ function renderEmail(){
   <p style="margin-top:18px"><button class="btn pri" data-nav="sheet">See The Spreadsheet</button> <button class="btn" data-nav="custom">Customize Your Email</button></p></div>`;
   const e=$('#v-email');$$('[data-ek]',e).forEach(b=>b.onclick=()=>{emailKind=b.dataset.ek;renderEmail()});$$('[data-nav]',e).forEach(b=>b.onclick=()=>go(b.dataset.nav));
 }
-const RULEPAT={history_gap:S_=>`Flagged when supply is more than ${S_.historyGapPct}% below need`,promo_repeat:S_=>`Shortfalls under ${S_.promoCushionPct}% are ignored`,overstock:S_=>`Above ${S_.overstockWOS} weeks of supply`,
+const RULEPAT={history_gap:S_=>`Supply more than ${S_.historyGapPct}% below need`,promo_repeat:S_=>`Shortfalls under ${S_.promoCushionPct}% are ignored`,overstock:S_=>`Above ${S_.overstockWOS} weeks of supply`,
  channel_fill:S_=>`Shipments above ${S_.channelRatio}x sales over 8 weeks`,pos_outpacing:S_=>`Sales above ${S_.outpaceRatio}x forecast for ${S_.outpaceWeeks} weeks in a row`,peak_cover:()=>'Under 2 weeks of peak cover',
  eta_slipped:S_=>`Arrival ${S_.etaSlipDays} or more days later than first promised`,stuck_origin:S_=>`Waiting at origin ${S_.stuckExtraDays} or more days longer than usual`,
  missed_order:S_=>S_.leadTimeBasis==='p80'?'Uses the typical lead time from supplier history':'Uses the quoted lead time',late_po:S_=>S_.leadTimeBasis==='p80'?'Uses the typical lead time from supplier history':'Uses the quoted lead time'};
@@ -740,7 +740,7 @@ function renderCustom(){
    <h3 class="rh">Tabs</h3><p>${TABS.map(t=>esc(t[1])).join(', ')}.</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Spreadsheet</button><button class="btn dl" id="c-dl">Download Sheet</button></div></details>
   <details class="card fold" data-id="rules"${open('rules')}><summary><h2 class="fold-h">How Items Get Flagged</h2><span class="conf">The same rules for every planner.</span></summary>
-   <ul class="rules two">${Object.keys(RU).map(k=>`<li><b>${esc(RU[k][0])}</b><span>${esc(RU[k][1])}</span>${RULEPAT[k]?`<em>${esc(RULEPAT[k](S_))}</em>`:''}</li>`).join('')}</ul></details>
+   <ul class="rules two">${Object.keys(RU).map(k=>`<li><b>${esc(RU[k][0])}</b><ul class="sub"><li>${esc(RU[k][1])}</li>${RULEPAT[k]?`<li><b>Setting:</b> ${esc(RULEPAT[k](S_))}</li>`:''}</ul></li>`).join('')}</ul></details>
   </div>`;
   const v=$('#v-custom'),box=$('#msgs');box.scrollTop=box.scrollHeight;
   const send=t=>{if(!t.trim())return;msgs.push({w:'you',t});msgs.push({w:'ai',t:reply(t)});renderCustom()};

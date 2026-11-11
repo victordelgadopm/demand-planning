@@ -83,5 +83,15 @@ with sync_playwright() as p:
             for c in row:
                 if isinstance(c,str):cs('xlsx-'+sh.title,c)
     ok('every colon is followed by a capital letter '+str(badc[:5]),not badc)
+    LIJS="""()=>{const out=[];document.querySelectorAll('li').forEach(li=>{if(!li.offsetParent)return;const blk=[...li.children].filter(k=>['DIV','BR','P','OL'].includes(k.tagName)||(k.tagName==='UL'&&!k.classList.contains('sub')));if(blk.length)out.push(li.innerText.slice(0,50))});return out}"""
+    badli=[]
+    for n in ['home','custom','sheet','visual','email','options']:
+        pg.click(f'nav [data-nav={n}]');pg.wait_for_timeout(150)
+        if n=='custom':pg.evaluate("document.querySelectorAll('details').forEach(d=>d.open=true)")
+        if n=='home':
+            for r in ['manual','folder','copilot','chatgpt']:
+                pg.click(f'[data-route={r}]');badli+=pg.evaluate(LIJS)
+        badli+=pg.evaluate(LIJS)
+    ok('second lines in lists are nested sub-bullets '+str(badli[:3]),not badli)
     ok('console clean',not errs)
 print(sum(R),'/',len(R))
