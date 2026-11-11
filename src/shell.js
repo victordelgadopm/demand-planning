@@ -4,14 +4,12 @@ const A=window.__app,E=A.E,D=A.D,st=A.st,esc=A.esc,money=A.money;
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 const CK='dpa.cols.v4';
 /* ---------- columns ---------- */
-const OWN={Fashion:'Planner A',Collector:'Planner B',Small:'Planner C',Baby:'Planner A',"Playsets & Houses":'Planner B',Accessories:'Planner C'};
 const TODO={order_more:'Place or expedite an order',too_much:'Pause new orders and review promos',forecast_off:'Review the forecast',check_data:'Fix the source data first'};
 const TS={'At risk':'t_risk','Medium':'t_med','Watch':'t_watch','Overstocked':'t_much','No risk':'t_ok'};
 const TCLASS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
 const COLS={
  status:{h:'Status',w:13,core:1},sku:{h:'SKU',w:11,core:1},product:{h:'Product',w:32,core:1},sub:{h:'Line',w:17},abc:{h:'ABC Class',w:9,src:'from the Planning system: A items make up the first 80% of 12-week forecast sales value, B the next 15%, C the last 5%'},
  supplier:{h:'Supplier',w:18,src:'from the Shared file'},
- owner:{h:'Owner (Sample)',w:14,src:'as a sample, by line. Your real owner list would come from a file you share'},
  onhand:{h:'On Hand (Units)',w:11,num:'int',src:'from the Planning system: units in the warehouse today'},
  transit:{h:'In Transit (Units)',w:11,num:'int',src:'from the Planning system: units on the way, with a delivery date'},
  openpo:{h:'Open PO (Units)',w:11,num:'int',src:'from the Planning system: units ordered from the supplier that have not shipped yet'},
@@ -41,13 +39,12 @@ const COLS={
  lift:{h:'Promo Lift (Last Year)',w:12,num:'pctS',src:'calculated: last year\'s promo weeks compared with the normal weeks around them'},
  decision:{h:'Decision',w:21,src:'calculated: the action the item needs (order more, too much stock, forecast looks off, check the data)'},
  attn:{h:'Needs Attention',w:11,src:'calculated: Yes when any check flagged the item today'},
- noteby:{h:'Noted By',w:13,src:'typed in the Master List next to the note'},
  notedate:{h:'Note Date',w:11,src:'typed in the Master List next to the note'},
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
  note:{h:'Note',w:48,wide:1,src:'typed in the Master List, one note per item'}};
 const DEFAULT=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','note','conf'];
-const MASTER='Master List (Work Here)',INK=['note','noteby','notedate'],MINCOLS=12;
-const FULLK=['status','sku','product','sub','decision','attn','abc','supplier','owner','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note','noteby','notedate'];
+const MASTER='Master List (Work Here)',INK=['note','notedate'],MINCOLS=12;
+const FULLK=['status','sku','product','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note','notedate'];
 const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
@@ -64,8 +61,8 @@ function val(k,r){
    case 'conf':return r.headline?r.confidence:'';
    case 'lt':return m.lt&&m.lt.q!=null?m.lt.q:'';
    case 'ly':return Math.round(m.lyRaw||0);
-   case 'supplier':return sk?sk.supplier:'';case 'owner':return OWN[r.sub]||'Planner A';
-   case 'note':return n?n.line:'';case 'noteby':return n?n.by:'';case 'notedate':return n?n.date:'';
+   case 'supplier':return sk?sk.supplier:'';
+   case 'note':return n?n.line:'';case 'notedate':return n?n.date:'';
    case 'decision':return r.decision?A.DEC[r.decision][0]:'No decision needed';case 'attn':return r.headline?'Yes':'No';}
   return '';
 }
@@ -176,7 +173,7 @@ function planGrid(rows){
     body.push({id:r.id,c:[...id(0),{t:'Peak / Promo Weeks'},{t:''},...b.mark.map(v=>({t:v,cls:v?'warn':''})),{t:''},{t:''},{t:''}]})});
   return {html:gridHtml(heads,body,{empty:'Nothing needs attention.'}),n:rows.length};
 }
-const NK=['status','sku','product','note','noteby','notedate','going'];
+const NK=['status','sku','product','note','notedate','going'];
 const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peakcover','going','note'];
 const SEASON_KEY='How to read this: 1.00x is a normal month. 1.50x or more is a peak and is shaded. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak.';
 const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short.`;
@@ -357,7 +354,7 @@ function downloadXlsx(){
   span(15,0,2,{v:'Items matching your choices:',s:'label'});put(15,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
   span(15,4,6,{v:'Total $ at stake:',s:'label'});put(15,7,{f:`SUMIFS(${rng('dollars')},${rShow},">0")`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(15,8,10,{v:'No decision needed:',s:'label'});put(15,11,{f:`IF($B$4="All decisions",D15-${BOX.map(b=>C(b[0])+'7').join('-')},0)`,v:matched0.filter(r=>!r.decision).length,s:'int'});R(15).h=24;
   DK.forEach((k,c)=>put(16,c,{v:dh(k),s:'head'}));R(16).h=34;
-  const CTRK=new Set(['status','sku','stockout','orderby','nextarr','peakcover','promo','nextpromo','peak','peakwk','abc','attn','gaptype','conf','noteby','notedate']),STY=new Proxy({dollars:'money0'},{get:(o,k)=>o[k]||(CTRK.has(k)?'ctr':COLS[k]&&COLS[k].num||'txt')});
+  const CTRK=new Set(['status','sku','stockout','orderby','nextarr','peakcover','promo','nextpromo','peak','peakwk','abc','attn','gaptype','conf','notedate']),STY=new Proxy({dollars:'money0'},{get:(o,k)=>o[k]||(CTRK.has(k)?'ctr':COLS[k]&&COLS[k].num||'txt')});
   const matched=allRows.filter(dashMatch);
   for(let i=0;i<N;i++){const row=first+i,src=matched[i],hc=`$${C(HC)}${row}`;
     put(row,HC,{f:`IFERROR(MATCH(${i+1},${rShow},0),"")`,v:src?i+1+0:'',s:'txt'});
@@ -375,6 +372,7 @@ function downloadXlsx(){
    {name:'Since Yesterday',fit:true,widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
    notesSheet,
    {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the green Master List (Work Here) tab. It is the only tab you type in: filter any column, and type notes in the three green columns. Every other tab reads from it, so a note typed there shows on the Dashboard, 12-Week Plan, Promos And Peaks, Since Yesterday and Notes tabs. Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
+   [{v:'One File Per Planner',s:'bold'},{v:'Each planner has their own file, built from their own demand line, so nobody shares edits and there is no need to track who wrote a note. To set one up for someone else, give them the same recipe and point it at the files for their line.',s:'txt'}],
    [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each morning the run builds a new file. In the real setup the run reads the Note columns back from yesterday\'s file first, so notes carry forward.',s:'txt'}],
    [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Promos And Peaks and Notes lists update as soon as you change the Master List. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
    [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
@@ -412,7 +410,7 @@ function renderHome(){
     ${miniSheet()}
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Sheet</button></div></div>
    <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
-    <div class="quotes"><p class="quote">“I don't see the supplier lead time.”</p><p class="quote">“Add who owns each item.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">Try It Now</button></div>
+    <div class="quotes"><p class="quote">“I don't see the supplier lead time.”</p><p class="quote">“Add the ABC class.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">Try It Now</button></div>
   </div>
   <h2 class="sec-h">What Connects To What</h2>
   <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026. Shown for Anaplan and Tableau, the two sources in this example. Any other source works the same way: if it can export a file, it can go in the shared folder.</p>
@@ -498,8 +496,8 @@ function renderOptions(){
 /* ---------- customize ---------- */
 const hello=()=>({w:'ai',t:'Hi. Tell me what you are not seeing in your daily sheet, and I will change it. In this demo, tap one of the examples below or type your own.'});
 let msgs=[hello()];
-const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add who owns each item.','Add the ABC class.','Add the peak months and promo status.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
-const PAT=[['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['owner',/owner|who owns|responsible|assigned/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
+const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add the ABC class.','Add the peak months and promo status.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
+const PAT=[['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();
