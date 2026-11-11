@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright
 import openpyxl,re
 R=[]
 def ok(n,c):R.append(bool(c));print('ok  ' if c else 'FAIL',n)
-BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks|Seasonal Items']
+BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks|Seasonal Items|Seasonal Calendar|Since Yesterday, Notes']
 with sync_playwright() as p:
     b=p.chromium.launch();pg=b.new_page(viewport={'width':1366,'height':850},accept_downloads=True)
     errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
@@ -18,8 +18,8 @@ with sync_playwright() as p:
     ok('every Customize example chip gets a real reply (%d chips)'%n,not bad)
     pg.click('#c-reset');pg.wait_for_timeout(100)
     # 2. typed-in columns can be requested and say where they are typed
-    pg.fill('#chat-t','Add the order quantity I plan to place.');pg.click('#chat-f button');pg.wait_for_timeout(100)
-    ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Order Qty To Place' in pg.locator('#msgs').inner_text())
+    pg.fill('#chat-t','Add the date the units are needed by.');pg.click('#chat-f button');pg.wait_for_timeout(100)
+    ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Needed By' in pg.locator('#msgs').inner_text())
     pg.click('#c-reset')
     rc=pg.locator('.recipe:has(h3:text("Your Recipe"))').inner_text()
     ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Seasonal And Promo Lifts' in rc)
@@ -52,7 +52,7 @@ with sync_playwright() as p:
     # 7. peak, promo and order chain: columns adjacent, history tab present, a typed override reaches the order total
     mh=[c.value for c in wb['Master List (Work Here)'][1]]
     ok('promo columns sit together',mh.index('Last Promo Lift (x)')==mh.index('Last Year Promo (Weeks Starting)')+2 and mh.index('Promo Extra Units')==mh.index('Promo And Peak Overlap')+1)
-    ok('order columns sit together',[mh.index(h) for h in ['Suggested Order Qty','Suggested Add For Peak And Promo (Units)','Why Add It','Total Suggested Qty (With Override)','Order Qty To Place (Type Here)']]==list(range(mh.index('Suggested Order Qty'),mh.index('Suggested Order Qty')+5)))
+    ok('order columns sit together',[mh.index(h) for h in ['AI Suggested Order Qty (Stock Gap)','AI Suggested Add For Peak And Promo (Units)','AI Why (Peak And Promo)','AI Total Suggested Qty (Includes Your Override)','Order Qty To Place (Type Here)','Your Qty Minus AI (Units)','Compared To AI']]==list(range(mh.index('AI Suggested Order Qty (Stock Gap)'),mh.index('AI Suggested Order Qty (Stock Gap)')+7)))
     hs=wb['Sales History'];ok('Sales History has 4 rows per SKU',(hs.max_row-1)%4==0 and hs.max_row>100 and hs['E2'].value=='2026 Forecast' and hs['E5'].value=='2024 Sold')
     pg.click('nav [data-nav=sheet]');pg.click('[data-xt=hist]');ok('Sales History tab shows on the site',pg.locator('.xt tbody tr').count()>100)
     ok('console clean',not errs)
