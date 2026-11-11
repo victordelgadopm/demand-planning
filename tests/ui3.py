@@ -48,7 +48,7 @@ with sync_playwright() as p:
         ok('note column on '+sh,('Note (Type Here)' if sh.startswith('Master') else 'Note') in [c.value for c in wb[sh][hr]])
     wv=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx',data_only=True)['Master List (Work Here)'];ok('master list note filled for 15 items',sum(1 for r in range(2,125) if wv.cell(r,[c.value for c in wv[1]].index('Note (Type Here)')+1).value)==15)
     ok('only the master list is unlocked',[n for n in wb.sheetnames if not wb[n].protection.sheet]==['Master List (Work Here)'])
-    ok('master has green input columns',all(h in [c.value for c in wm[1]] for h in ['Peak Lift Override (Type Here)','Planned Order Qty (Type Here)','Needed By (Type Here)','Note (Type Here)','Note Date (Type Here)']))
+    ok('master has green input columns',all(h in [c.value for c in wm[1]] for h in ['Peak Lift Override (Type Here)','Order Qty To Place (Type Here)','Needed By (Type Here)','Note (Type Here)','Note Date (Type Here)']))
     ok('master tab green, dashboard blue',wm.sheet_properties.tabColor.rgb=='FF2E7D32' and wb['Dashboard'].sheet_properties.tabColor.rgb=='FF1F3864')
     ok('master has decision and needs attention columns',all(h in [c.value for c in wm[1]] for h in ['Decision','Needs Attention']))
     ok('xlsx all items 123',wb['Master List (Work Here)'].max_row==124)
