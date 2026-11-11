@@ -99,7 +99,7 @@
     const creates = events.filter(e => e.t === 'create');
     const dead = new Set(events.filter(e => e.t === 'close').map(e => e.target).concat(creates.filter(e => e.supersedes).map(e => e.supersedes)));
     const out = {};
-    creates.slice().sort((a, b) => a.id - b.id).forEach(n => { if (!dead.has(n.id)) out[n.sku + '|' + n.flag] = n; });
+    creates.slice().sort((a, b) => a.id - b.id).forEach(n => { if (!dead.has(n.id)) out[n.sku + '|' + n.flag + (n.kind === 'comment' ? '|c' : '')] = n; });
     return out;
   }
 
@@ -379,6 +379,7 @@
     return o;
   }
 
-  return { H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthUnits, analogsFor, activeNotes, leadWeeks, options,
+  const NOTE_LABEL = Object.assign({}, FLAG_LABEL, { promo: 'Promo or season', general: 'General' });
+  return { NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthUnits, analogsFor, activeNotes, leadWeeks, options,
     weekStart, weekNum, fmtDate, fmtNum, fmtMoney, parseDay, addDays, sum, mean, sd };
 });

@@ -300,3 +300,6 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .sub-h{margin:18px 0 6px;font-size:1rem}
 .src-list>div{margin:9px 0}
 .src-list .tag{margin-left:6px}
+[hidden]{display:none!important}
+#v-sheet .note-box{background:#eef1fb;color:#1b2430}
+.lscroll .list .icol{min-width:190px}.lscroll .list .gcol{min-width:330px}.lscroll .list .ncol{min-width:230px}

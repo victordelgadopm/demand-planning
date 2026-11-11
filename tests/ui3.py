@@ -34,14 +34,24 @@ with sync_playwright() as p:
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Today']
-    ok('xlsx 10 sheets',wb.sheetnames==['Dashboard','Today','All Items','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Promos And Peaks','Since Yesterday','Notes','Recipe'])
+    ok('xlsx 10 sheets',wb.sheetnames==['Dashboard','Today','Master List','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Promos And Peaks','Since Yesterday','Notes','Recipe'])
     ok('xlsx includes added column','Lead Time (Weeks)' in [c.value for c in ws[1]])
     ok('xlsx frozen+filter',ws.freeze_panes=='A2' and ws.auto_filter.ref is not None)
-    ok('xlsx status colored',ws['A2'].fill.fgColor.rgb=='FFF8D7DA')
-    hd=[c.value for c in wb['All Items'][1]]
+    ok('xlsx status colored',wb['Master List']['A2'].fill.fgColor.rgb=='FFF8D7DA')
+    hd=[c.value for c in wb['Master List'][1]]
     ok('all items has planner columns',all(h in hd for h in ['On Hand (Units)','In Transit (Units)','Open PO (Units)','Weeks Of Supply','Forecast Per Week (Units)','Stock-Out Week','Order By','ABC Class','Forecast Accuracy (13 Wks)']))
     ok('plan sheet 4 rows per item',wb['12-Week Plan'].max_row==1+123*4)
-    ok('xlsx all items 123',wb['All Items'].max_row==124)
+    nt=wb['Notes'];ok('notes tab has 15 notes',nt.max_row==16)
+    for sh,hr in [('Today',1),('Master List',1),('Promos And Peaks',1),('12-Week Plan',1),('Since Yesterday',1),('Dashboard',16)]:
+        ok('note column on '+sh,'Note' in [c.value for c in wb[sh][hr]])
+    wv=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx',data_only=True)['Master List'];ok('master list note filled for 15 items',sum(1 for r in range(2,125) if wv.cell(r,[c.value for c in wv[1]].index('Note')+1).value)==15)
+    ok('xlsx all items 123',wb['Master List'].max_row==124)
+    # Visual View follows the same status choice and decision boxes as the Daily Sheet dashboard
+    for stl,chip in [('Needs attention','attn'),('Watch','Watch'),('Medium','Medium'),('All statuses','all')]:
+        pg.click('nav [data-nav=sheet]');pg.wait_for_timeout(100);pg.select_option('#ds',stl);pg.wait_for_timeout(100)
+        a=pg.locator('.dbn').all_inner_texts();pg.click('nav [data-nav=visual]');pg.wait_for_timeout(100)
+        pg.click('[data-tier=%s]'%chip);pg.wait_for_timeout(100);b=pg.locator('.dtile .n').all_inner_texts()
+        ok('visual boxes match dashboard for '+stl+' '+str((a,b)),a==b)
     pg.set_viewport_size({'width':390,'height':800});
     for v in ['home','sheet','custom','visual']:
         pg.click('nav [data-nav=%s]'%v);pg.wait_for_timeout(100)

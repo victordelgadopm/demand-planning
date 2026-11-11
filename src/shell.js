@@ -2,7 +2,7 @@
 'use strict';
 const A=window.__app,E=A.E,D=A.D,st=A.st,esc=A.esc,money=A.money;
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-const CK='dpa.cols.v2';
+const CK='dpa.cols.v3';
 /* ---------- columns ---------- */
 const OWN={Fashion:'Planner A',Collector:'Planner B',Small:'Planner C',Baby:'Planner A',"Playsets & Houses":'Planner B',Accessories:'Planner C'};
 const TODO={order_more:'Place or expedite an order',too_much:'Pause new orders and review promos',forecast_off:'Review the forecast',check_data:'Fix the source data first'};
@@ -41,10 +41,10 @@ const COLS={
  lift:{h:'Promo Lift (Last Year)',w:12,num:'pctS',src:'calculated: last year\'s promo weeks compared with the normal weeks around them'},
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
  note:{h:'Note',w:48,wide:1,src:'from the notes you save on each item'}};
-const DEFAULT=['status','sku','product','sub','onhand','onorder','wos','fcstwk','salesvs','stockout','gap','dollars','going','conf'];
+const DEFAULT=['status','sku','product','sub','onhand','onorder','wos','fcstwk','salesvs','stockout','gap','dollars','going','note','conf'];
 const FULLK=['status','sku','product','sub','abc','supplier','owner','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note'];
-const DASHK=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','conf'];
-const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On'};
+const DASHK=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','note','conf'];
+const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
 const saveCols=()=>{try{localStorage.setItem(CK,JSON.stringify(cols))}catch(e){}};
@@ -52,7 +52,7 @@ let rowsMode='attn',tab='dash';
 const PLK=new Set(['onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lift']);
 function val(k,r){
   if(PLK.has(k))return A.pv(k,r);
-  const m=r.metrics,sk=A.skuOf(r.id),n=r.acceptedFlags&&r.acceptedFlags[0]&&r.acceptedFlags[0].note;
+  const m=r.metrics,sk=A.skuOf(r.id),n=A.noteFor(r.id);
   switch(k){
    case 'status':return A.tn(r.tier);case 'sku':return r.id;case 'product':return r.name;case 'sub':return r.sub;
    case 'going':return r.headline||(r.isAccepted?'Accepted risk (see note)':'No flags. Supply covers the forecast.');
@@ -61,7 +61,7 @@ function val(k,r){
    case 'lt':return m.lt&&m.lt.q!=null?m.lt.q:'';
    case 'ly':return Math.round(m.lyRaw||0);
    case 'supplier':return sk?sk.supplier:'';case 'owner':return OWN[r.sub]||'Planner A';
-   case 'note':return n?(n.reason+': '+n.text):'';}
+   case 'note':return n?n.line:'';}
   return '';
 }
 function sheetRows(mode){
@@ -101,7 +101,7 @@ function sinceItems(){
   add('Newly at risk',d.toAtRisk);add('Re-alert',d.reAlerted);add('New flag',d.newFlags);add('Got worse',d.worsened);add('Fixed',d.recovered);return out;
 }
 function noteItems(){
-  return Object.values(E.activeNotes(st.notes)).map(n=>{const r=A.rowOf(n.sku);return [n.sku,r?r.name:'',E.FLAG_LABEL[n.flag]||n.flag,n.reason,n.text,n.who,n.date,Math.round(n.acceptedGap||0)]});
+  return Object.values(E.activeNotes(st.notes)).sort((a,b)=>a.id-b.id).map(n=>{const r=A.rowOf(n.sku);return [n.sku,r?r.name:'',E.NOTE_LABEL[n.flag]||n.flag,n.kind==='comment'?'Comment':'Accepted risk',n.reason,n.text,n.who,n.date,n.kind==='comment'?'':Math.round(n.acceptedGap||0)]});
 }
 const DEFS=[
  ['On Hand / In Transit / Open PO','Units in the warehouse today / units on the way with a delivery date / units ordered from the supplier that have not shipped. On Order is In Transit plus Open PO. Total Supply is On Hand plus On Order.'],
@@ -161,29 +161,30 @@ function colGrid(keys,rows,empty){
   return {html:gridHtml(heads,body,{empty}),n:rows.length};
 }
 function planGrid(rows){
-  const wl=weekLabels(),heads=[{t:'Status'},{t:'SKU'},{t:'Product'},{t:'Measure'},{t:'On Hand Now',cls:'money'},...wl.map(t=>({t,cls:'money'})),{t:'12-Wk Total',cls:'money'},{t:'Lowest Point',cls:'money'}];
+  const wl=weekLabels(),heads=[{t:'Status'},{t:'SKU'},{t:'Product'},{t:'Measure'},{t:'On Hand Now',cls:'money'},...wl.map(t=>({t,cls:'money'})),{t:'12-Wk Total',cls:'money'},{t:'Lowest Point',cls:'money'},{t:'Note'}];
   const body=[],nf=v=>E.fmtNum(v);
   planBlocks(rows).forEach(b=>{const r=b.r,low=Math.min(...b.inv);
     const id=(first)=>first?[{t:A.tn(r.tier),cls:'st '+TCLASS[r.tier]},{t:r.id},{t:r.name}]:[{t:''},{t:''},{t:''}];
-    body.push({id:r.id,c:[...id(1),{t:'Forecast Demand'},{t:''},...b.dem.map(v=>({t:nf(v),cls:'money'})),{t:nf(b.dem.reduce((a,v)=>a+v,0)),cls:'money'},{t:''}]});
-    body.push({id:r.id,c:[...id(0),{t:'Receipts (Transit + PO)'},{t:''},...b.rec.map(v=>({t:v?nf(v):'',cls:'money'})),{t:nf(b.rec.reduce((a,v)=>a+v,0)),cls:'money'},{t:''}]});
-    body.push({id:r.id,c:[...id(0),{t:'Projected On Hand',cls:'bold'},{t:nf(b.onHand),cls:'money'},...b.inv.map(v=>({t:nf(v),cls:'money'+(v<0?' bad':'')})),{t:''},{t:nf(low),cls:'money'+(low<0?' bad':'')}]});
-    body.push({id:r.id,c:[...id(0),{t:'Peak / Promo Weeks'},{t:''},...b.mark.map(v=>({t:v,cls:v?'warn':''})),{t:''},{t:''}]})});
+    body.push({id:r.id,c:[...id(1),{t:'Forecast Demand'},{t:''},...b.dem.map(v=>({t:nf(v),cls:'money'})),{t:nf(b.dem.reduce((a,v)=>a+v,0)),cls:'money'},{t:''},{t:val('note',r),cls:'wide'}]});
+    body.push({id:r.id,c:[...id(0),{t:'Receipts (Transit + PO)'},{t:''},...b.rec.map(v=>({t:v?nf(v):'',cls:'money'})),{t:nf(b.rec.reduce((a,v)=>a+v,0)),cls:'money'},{t:''},{t:''}]});
+    body.push({id:r.id,c:[...id(0),{t:'Projected On Hand',cls:'bold'},{t:nf(b.onHand),cls:'money'},...b.inv.map(v=>({t:nf(v),cls:'money'+(v<0?' bad':'')})),{t:''},{t:nf(low),cls:'money'+(low<0?' bad':'')},{t:''}]});
+    body.push({id:r.id,c:[...id(0),{t:'Peak / Promo Weeks'},{t:''},...b.mark.map(v=>({t:v,cls:v?'warn':''})),{t:''},{t:''},{t:''}]})});
   return {html:gridHtml(heads,body,{empty:'Nothing needs attention.'}),n:rows.length};
 }
-const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peakcover','going'];
-const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short. Shaded months are each line's peaks.`;
+const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peakcover','going','note'];
+const SEASON_KEY='How to read this: 1.00x is a normal month. 1.50x or more is a peak and is shaded. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak.';
+const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short.`;
 function seasonGrid(){
-  const d=A.seasonData(),heads=[{t:'Line'},...A.MONS.map(m=>({t:m,cls:'money'}))];
-  const body=d.lines.map(l=>{const a=l==='All Lines'?d.sz.all:d.sz.lines[l];return {c:[{t:l,cls:'bold'},...a.map(x=>({t:A.pctN(x,0),cls:'money'+(x>=A.PEAKSH?' warn':'')}))]}});
+  const d=A.seasonData(),heads=[{t:'Line'},...A.MONS.map(m=>({t:m,cls:'money'})),{t:'Q4 Share',cls:'money'},{t:'Peak Months'}];
+  const body=d.lrow.map(l=>({c:[{t:l.line,cls:'bold'},...l.idx.map(x=>({t:x.toFixed(2)+'x',cls:'money'+(x>=1.5?' warn':'')})),{t:A.pctN(l.q4,0),cls:'money'},{t:l.peak}]}));
   const srcs=gridHtml(['Topic','Where It Comes From','How'].map(t=>({t})),A.SEASON_SRC.map(x=>({c:[{t:x[0],cls:'bold'},{t:x[1],cls:'st'},{t:x[2],cls:'wide'}]})));
-  return `<div class="note-box">${esc(seasonSummary(d))}</div>`+gridHtml(heads,body)+`<h3 class="sub-h">Where This Comes From</h3>`+srcs;
+  return `<div class="note-box">${esc(seasonSummary(d))}</div><div class="note-box">${esc(SEASON_KEY)}</div>`+gridHtml(heads,body)+`<h3 class="sub-h">Where This Comes From</h3>`+srcs;
 }
 function accGrid(){
   const rows=accRows(),heads=['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal'].map((t,i)=>({t,cls:i>=1&&i<=4?'money':''}));
   return {html:gridHtml(heads,rows.map(x=>({c:[{t:x.line,cls:'bold'},{t:String(x.n),cls:'money'},{t:A.pctN(1-x.w),cls:'money'},{t:A.pctN(x.w),cls:'money'},{t:A.pctSN(x.b),cls:'money'},{t:tgtText(x.w,x.b),cls:({'On target':'','Watch':'warn','Off target':'bad'})[tgtText(x.w,x.b)]},{t:x.sig,cls:'wide'}]}))),n:rows.length-1};
 }
-const TABS=[['dash','Dashboard'],['today','Today'],['all','All Items'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
+const TABS=[['dash','Dashboard'],['today','Today'],['all','Master List'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
 function renderSheet(){
   const v=$('#v-sheet'),total=st.res.total;
   let inner,count='';
@@ -194,8 +195,8 @@ function renderSheet(){
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
   else if(tab==='season'){inner=seasonGrid();count='12 months, by line'}
   else if(tab==='promos'){const d=A.seasonData(),g=colGrid(PPK,d.list);inner=g.html;count=`${g.n} items with a promo or a thin peak`}
-  else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail'].map(t=>({t})),it.map(r=>({id:r[2],c:r.map(t=>({t}))})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
-  else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map(t=>({t:String(t)}))})),{empty:'No notes yet.'});count=it.length+' notes'}
+  else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail','Note'].map(t=>({t})),it.map(r=>({id:r[2],c:[...r.map(t=>({t})),{t:val('note',A.rowOf(r[2])),cls:'wide'}]})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
+  else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','About','Type','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map((t,i)=>({t:String(t),cls:i===5?'wide':''}))})),{empty:'No notes yet.'});count=it.length+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
    <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. The download opens in Excel with the same colors and formatting, on an interactive Dashboard where the yellow dropdowns change the boxes and the list.</p>
@@ -205,7 +206,7 @@ function renderSheet(){
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Dashboard opens first. Today lists what needs you, with the columns you chose. All Items has every item and every column. 12-Week Plan projects stock week by week. Forecast Accuracy shows how the forecast has done by line. Since Yesterday is what changed. Notes holds the decisions you logged. Recipe explains how the sheet is built and defines every column.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Dashboard opens first. Today lists what needs you, with the columns you chose. Master List is the primary tab: it has every item and every column, and Dashboard, Today and Promos And Peaks read from it, so a change there shows up in all three. 12-Week Plan projects stock week by week. Forecast Accuracy shows how the forecast has done by line. Since Yesterday is what changed. Notes is where notes are typed, and the Master List pulls each item's note from it, so the Note column on every tab follows. Recipe explains how the sheet is built and defines every column.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
@@ -238,10 +239,10 @@ function downloadXlsx(){
   const since=sinceItems(),notes=noteItems(),rec=recipeItems();
   const allRows=sheetRows('all'),N=allRows.length;
   const STATL=STAT(),D0=dashDec,S0=dashStat;
-  /* ---- All Items: every item, every column, plus four hidden helper columns that drive the dashboard ---- */
+  /* ---- Master List: every item, every column, plus four hidden helper columns that drive the dashboard ---- */
   const nf=FULLK.length,ix=k=>FULLK.indexOf(k);
   const HELP=['Decision','Needs Attention','Status Match','Show'];
-  const dataSheet=mk(allRows,'All Items',FULLK);
+  const dataSheet=mk(allRows,'Master List',FULLK);
   dataSheet.freezeCols=3;
   dataSheet.rows[0].push(...HELP.map(t=>({v:t,s:'head'})));
   const hL=i=>C(nf+i),sCol=C(ix('status'));
@@ -252,8 +253,20 @@ function downloadXlsx(){
      {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${hL(0)}${er}=Dashboard!$B$4),${hL(2)}${er}=1),MAX(${hL(3)}$1:${hL(3)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
   dataSheet.widths=[...dataSheet.widths,...HELP.map(()=>14)];
   dataSheet.hide=HELP.map((_,i)=>nf+i);
-  const rng=k=>{const c=C(typeof k==='number'?nf+k:ix(k));return `'All Items'!$${c}$2:$${c}$${N+1}`};
+  const rng=k=>{const c=C(typeof k==='number'?nf+k:ix(k));return `'Master List'!$${c}$2:$${c}$${N+1}`};
   const rDec=rng(0),rAtt=rng(1),rSM=rng(2),rShow=rng(3);
+  /* Notes are typed on the Notes tab. The Master List pulls each item's first note by SKU, and every other tab pulls it from the Master List. */
+  const NA='Notes!$A$2:$A$500',NE='Notes!$E$2:$E$500',NF='Notes!$F$2:$F$500',skuC=C(ix('sku')),noteI=ix('note');
+  allRows.forEach((r,i)=>{const er=i+2;dataSheet.rows[i+1][noteI]={f:`IFERROR(INDEX(${NE},MATCH($${skuC}${er},${NA},0))&": "&INDEX(${NF},MATCH($${skuC}${er},${NA},0)),"")`,v:val('note',r),s:'txt'}});
+  const TN0=['At risk','Medium','Watch','Overstocked','No risk'];
+  /* list tabs that read every cell from the Master List by SKU */
+  const mkL=(rows,name,keys)=>{const si=keys.indexOf('sku');if(si<0)return mk(rows,name,keys);const sc=C(si),skuR=rng('sku');
+    const data=rows.map((r,i)=>{const er=i+2;return keys.map(k=>{if(k==='sku')return {v:r.id,s:'ctr'};
+      const Cc=COLS[k],rg=rng(k),m=`MATCH($${sc}${er},${skuR},0)`,v=val(k,r);
+      return {f:`IFERROR(IF(INDEX(${rg},${m})="","",INDEX(${rg},${m})),"")`,v:v,s:k==='status'?'ctr':Cc.num||'txt'}})});
+    const sh={name,widths:keys.map(k=>COLS[k].w),rows:[hdr(keys.map(k=>COLS[k].h)),...data],freeze:1,filter:data.length+1,cf:cfList(keys,2,data.length+1)};
+    const stc=keys.indexOf('status');if(stc>=0&&data.length)sh.cf.push({ref:`${C(stc)}2:${C(stc)}${data.length+1}`,rules:TN0.map((t,j)=>({type:'cellIs',op:'equal',dxf:j,formula:`"${A.tn(t)}"`}))});
+    return sh};
   /* ---- Forecast Accuracy ---- */
   const ac=accRows(),AR=ac.length+1;
   const accSheet={name:'Forecast Accuracy',widths:[20,9,16,16,12,16,40],freeze:1,rows:[hdr(['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal']),
@@ -265,16 +278,16 @@ function downloadXlsx(){
   accSheet.rows[AR+2].h=48;
   /* ---- 12-Week Plan: forecast, receipts and projected on hand for every item ---- */
   const PB=planBlocks(allRows),wl=weekLabels(),W=E.H;
-  const plan={name:'12-Week Plan',widths:[13,11,32,24,12,...Array(W).fill(9),12,12],freeze:1,freezeCols:4,rows:[hdr(['Status','SKU','Product','Measure','On Hand Now',...wl,'12-Wk Total','Lowest Point'])],cf:[]};
+  const plan={name:'12-Week Plan',widths:[13,11,32,24,12,...Array(W).fill(9),12,12,46],freeze:1,freezeCols:4,rows:[hdr(['Status','SKU','Product','Measure','On Hand Now',...wl,'12-Wk Total','Lowest Point','Note'])],cf:[]};
   const wc0=5,wcN=4+W,tc=5+W,lc=6+W;
   PB.forEach((b,i)=>{const r=b.r,r1=2+i*4,r2=r1+1,r3=r1+2,id=[{v:A.tn(r.tier),s:TS[r.tier]},{v:r.id,s:'txt'},{v:r.name,s:'txt'}];
     const rd=Math.round,v3=x=>Math.round(x*1000)/1000;
-    plan.rows.push([...id,{v:'Forecast Demand',s:'txt'},{v:'',s:'txt'},...b.dem.map(x=>({v:v3(x),s:'int'})),{f:`SUM(${C(wc0)}${r1}:${C(wcN)}${r1})`,v:b.dem.reduce((a,x)=>a+v3(x),0),s:'int'},{v:'',s:'txt'}]);
-    plan.rows.push([...id,{v:'Receipts (Transit + PO)',s:'txt'},{v:'',s:'txt'},...b.rec.map(x=>({v:x||0,s:'int'})),{f:`SUM(${C(wc0)}${r2}:${C(wcN)}${r2})`,v:b.rec.reduce((a,x)=>a+x,0),s:'int'},{v:'',s:'txt'}]);
+    plan.rows.push([...id,{v:'Forecast Demand',s:'txt'},{v:'',s:'txt'},...b.dem.map(x=>({v:v3(x),s:'int'})),{f:`SUM(${C(wc0)}${r1}:${C(wcN)}${r1})`,v:b.dem.reduce((a,x)=>a+v3(x),0),s:'int'},{v:'',s:'txt'},{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($B${r1},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($B${r1},${rng('sku')},0))),"")`,v:val('note',r),s:'txt'}]);
+    plan.rows.push([...id,{v:'Receipts (Transit + PO)',s:'txt'},{v:'',s:'txt'},...b.rec.map(x=>({v:x||0,s:'int'})),{f:`SUM(${C(wc0)}${r2}:${C(wcN)}${r2})`,v:b.rec.reduce((a,x)=>a+x,0),s:'int'},{v:'',s:'txt'},{v:'',s:'txt'}]);
     let prev=b.onHand;const proj=b.dem.map((d,h)=>{prev=prev+(b.rec[h]||0)-v3(d);return prev});
     plan.rows.push([...id,{v:'Projected On Hand',s:'bold'},{v:b.onHand,s:'int'},...proj.map((x,h)=>({f:`${C(wc0+h-1)}${r3}+${C(wc0+h)}${r2}-${C(wc0+h)}${r1}`,v:x,s:'int'})),{v:'',s:'txt'},
-      {f:`MIN(${C(wc0)}${r3}:${C(wcN)}${r3})`,v:Math.min(...proj),s:'int'}]);
-    plan.rows.push([...id,{v:'Peak / Promo Weeks',s:'txt'},{v:'',s:'txt'},...b.mark.map(x=>({v:x,s:'ctr'})),{v:'',s:'txt'},{v:'',s:'txt'}]);
+      {f:`MIN(${C(wc0)}${r3}:${C(wcN)}${r3})`,v:Math.min(...proj),s:'int'},{v:'',s:'txt'}]);
+    plan.rows.push([...id,{v:'Peak / Promo Weeks',s:'txt'},{v:'',s:'txt'},...b.mark.map(x=>({v:x,s:'ctr'})),{v:'',s:'txt'},{v:'',s:'txt'},{v:'',s:'txt'}]);
   });
   const pl=plan.rows.length;plan.filter=pl;
   // first projected week starts from On Hand Now (column E)
@@ -282,21 +295,23 @@ function downloadXlsx(){
   plan.cf.push({ref:`${C(wc0)}2:${C(wcN)}${pl}`,rules:[{type:'expression',dxf:1,formula:`AND($D2="Peak / Promo Weeks",${C(wc0)}2<>"")`}]});
   /* ---- Seasonal Calendar and Promos And Peaks ---- */
   const SD=A.seasonData(),SR=SD.lines.length,sc0=5;
-  const season={name:'Seasonal Calendar',widths:[22,...Array(12).fill(9),4],freeze:0,rows:[],merges:[],cf:[]};
+  const season={name:'Seasonal Calendar',widths:[24,...Array(12).fill(8),10,16],freeze:0,rows:[],merges:[],cf:[]};
   const sput=(r,c,o)=>{while(season.rows.length<r)season.rows.push([]);season.rows[r-1][c]=o};
   const sspan=(r,c0,c1,o)=>{sput(r,c0,o);for(let c=c0+1;c<=c1;c++)sput(r,c,{v:'',s:o.s});if(c1>c0)season.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
-  sspan(1,0,12,{v:'Seasonal Calendar (Sample Data)',s:'title'});
-  sspan(2,0,12,{f:`COUNTIF(${rng('promo')},"<>None")&" of "&COUNTA(${rng('sku')})&" items have a promo this year or last year. "&(COUNTIF(${rng('peakcover')},"Thin")+COUNTIF(${rng('peakcover')},"Short"))&" items would run thin or short into a peak in the next 12 weeks. Shaded months are each line's peaks (1.5x an average month or more)."`,
-    v:`${SD.n.promo} of ${SD.n.items} items have a promo this year or last year. ${SD.n.thin} items would run thin or short into a peak in the next 12 weeks. Shaded months are each line's peaks (1.5x an average month or more).`,s:'note'});
-  season.rows[1].h=34;
-  sput(4,0,{v:'Line (Share Of A Year\'s Sales)',s:'head'});A.MONS.forEach((m,j)=>sput(4,1+j,{v:m,s:'head'}));season.rows[3].h=30;
-  SD.lines.forEach((l,i)=>{const a=l==='All Lines'?SD.sz.all:SD.sz.lines[l];sput(5+i,0,{v:l,s:'bold'});a.forEach((x,j)=>sput(5+i,1+j,{v:x,s:'pct'}))});
-  season.cf.push({ref:`B5:M${4+SR}`,rules:[{type:'cellIs',op:'greaterThanOrEqual',dxf:1,formula:String(A.PEAKSH)}]});
-  const wr=6+SR;sspan(wr,0,12,{v:'Where This Comes From',s:'sect'});
-  A.SEASON_SRC.forEach((x,i)=>{const r=wr+1+i;sspan(r,0,0,{v:x[0],s:'bold'});sspan(r,1,2,{v:x[1],s:'ctr'});sspan(r,3,12,{v:x[2],s:'note'});season.rows[r-1].h=48});
-  const promoSheet=mk(SD.list,'Promos And Peaks',PPK);promoSheet.freezeCols=3;
+  const LC=14;
+  sspan(1,0,LC,{v:'Seasonal Calendar (Sample Data)',s:'title'});
+  sspan(2,0,LC,{f:`COUNTIF(${rng('promo')},"<>None")&" of "&COUNTA(${rng('sku')})&" items have a promo this year or last year. "&(COUNTIF(${rng('peakcover')},"Thin")+COUNTIF(${rng('peakcover')},"Short"))&" items would run thin or short into a peak in the next 12 weeks."`,
+    v:`${SD.n.promo} of ${SD.n.items} items have a promo this year or last year. ${SD.n.thin} items would run thin or short into a peak in the next 12 weeks.`,s:'note'});
+  sspan(3,0,LC,{v:SEASON_KEY,s:'note'});
+  season.rows[1].h=22;season.rows[2].h=34;
+  sput(5,0,{v:'Line (Compared With A Normal Month)',s:'head'});A.MONS.forEach((m,j)=>sput(5,1+j,{v:m,s:'head'}));sput(5,13,{v:'Q4 Share',s:'head'});sput(5,14,{v:'Peak Months',s:'head'});season.rows[4].h=30;
+  SD.lrow.forEach((l,i)=>{const r=6+i;sput(r,0,{v:l.line,s:'bold'});l.idx.forEach((x,j)=>sput(r,1+j,{v:x,s:'x2'}));sput(r,13,{f:`SUM(K${r}:M${r})/12`,v:l.q4,s:'pct'});sput(r,14,{v:l.peak,s:'txt'})});
+  season.cf.push({ref:`B6:M${5+SR}`,rules:[{type:'cellIs',op:'greaterThanOrEqual',dxf:1,formula:'1.5'}]});
+  const wr=7+SR;sspan(wr,0,LC,{v:'Where This Comes From',s:'sect'});
+  A.SEASON_SRC.forEach((x,i)=>{const r=wr+1+i;sspan(r,0,0,{v:x[0],s:'bold'});sspan(r,1,2,{v:x[1],s:'ctr'});sspan(r,3,LC,{v:x[2],s:'note'});season.rows[r-1].h=40});
+  const promoSheet=mkL(SD.list,'Promos And Peaks',PPK);promoSheet.freezeCols=3;
   /* ---- Dashboard ---- */
-  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:56,conf:10};
+  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
   const nd=DASHK.length,HC=nd; // helper column index on the dashboard
   const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:[...DASHK.map(k=>DW[k]),6],hide:[HC],rows:[],merges:[],cf:[],dv:[]};
   const R=n=>{while(dash.rows.length<n)dash.rows.push([]);return dash.rows[n-1]};
@@ -315,7 +330,7 @@ function downloadXlsx(){
     span(8,c0,c1,{f:`SUMIFS(${rng('dollars')},${rDec},${C(c0)}6,${rSM},1)`,v:dol,s:'boxS'});
     dash.cf.push({ref:`${C(c0)}6:${C(c1)}8`,rules:[{type:'expression',dxf:5,formula:`$B$4=$${C(c0)}$6`}]})});
   R(6).h=22;R(7).h=40;R(8).h=20;
-  /* portfolio snapshot: live formulas over All Items */
+  /* portfolio snapshot: live formulas over the Master List */
   const K=st.res.kpi,AC=E.accuracyTotal(A.snap()),attn=allRows.filter(r=>r.headline).length;
   span(10,0,nd-1,{v:'Portfolio Snapshot (all items, not filtered by the picks above)',s:'sect'});R(10).h=22;
   const sumP=allRows.reduce((t,r)=>t+r.metrics.onHand*r.price,0);
@@ -333,23 +348,24 @@ function downloadXlsx(){
   span(15,0,2,{v:'Items matching your choices:',s:'label'});put(15,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
   span(15,4,6,{v:'Total $ at stake:',s:'label'});put(15,7,{f:`SUM(${C(DASHK.indexOf('dollars'))}${first}:${C(DASHK.indexOf('dollars'))}${last})`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(15,8,10,{v:'No decision needed:',s:'label'});put(15,11,{f:'IF($B$4="All decisions",D15-A7-D7-I7-M7,0)',v:matched0.filter(r=>!r.decision).length,s:'int'});R(15).h=24;
   DASHK.forEach((k,c)=>put(16,c,{v:dh(k),s:'head'}));R(16).h=34;
-  const STY={status:'ctr',sku:'ctr',product:'txt',onhand:'int',onorder:'int',wos:'dec1',fcstwk:'int',salesvs:'pctS',stockout:'ctr',nextarr:'ctr',peakcover:'ctr',nextpromo:'ctr',gap:'int',dollars:'money0',going:'txt',conf:'ctr'};
+  const STY={status:'ctr',sku:'ctr',product:'txt',onhand:'int',onorder:'int',wos:'dec1',fcstwk:'int',salesvs:'pctS',stockout:'ctr',nextarr:'ctr',peakcover:'ctr',nextpromo:'ctr',gap:'int',dollars:'money0',going:'txt',note:'txt',conf:'ctr'};
   const matched=allRows.filter(dashMatch);
   for(let i=0;i<N;i++){const row=first+i,src=matched[i],hc=`$${C(HC)}${row}`;
     put(row,HC,{f:`IFERROR(MATCH(${i+1},${rShow},0),"")`,v:src?i+1+0:'',s:'txt'});
     DASHK.forEach((k,c)=>{const rg=rng(k);let v=src?val(k,src):'';if(k==='dollars'&&src)v=Math.round(src.dollars>0?src.dollars:0);
       put(row,c,{f:`IF(${hc}="","",IF(INDEX(${rg},${hc})="","",INDEX(${rg},${hc})))`,v:v,s:STY[k]})});
-    R(row).h=32}
-  // helper cell shows the position in All Items, not the running number
+    R(row).h=46}
+  // helper cell shows the position in the Master List, not the running number
   matched.forEach((r,i)=>{R(first+i)[HC].v=allRows.indexOf(r)+1});
   const TN=['At risk','Medium','Watch','Overstocked','No risk'];
   dash.cf.push({ref:`A${first}:A${last}`,rules:TN.map((t,i)=>({type:'cellIs',op:'equal',dxf:i,formula:`"${A.tn(t)}"`}))});
   dash.cf.push(...cfList(DASHK,first,last));
   dash.freeze=4;
-  const sheets=[dash,mk(sheetRows(rowsMode),'Today',cols),dataSheet,plan,accSheet,season,promoSheet,
-   {name:'Since Yesterday',widths:[16,32,11,70],rows:[hdr(['Change','Product','SKU','Detail']),...since.map(r=>r.map(t=>({v:t,s:'txt'})))],freeze:1},
-   {name:'Notes',widths:[11,30,18,20,60,10,10,14],rows:[hdr(['SKU','Product','Flag','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===7?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
-   {name:'Recipe',widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the All Items sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
+  const sheets=[dash,mkL(sheetRows(rowsMode),'Today',cols),dataSheet,plan,accSheet,season,promoSheet,
+   {name:'Since Yesterday',widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
+   {name:'Notes',widths:[11,30,20,15,20,64,11,9,14],rows:[hdr(['SKU','Product','About','Type','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===8&&t!==''?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
+   {name:'Recipe',widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'How The Tabs Connect',s:'bold'},{v:'Notes are typed on the Notes tab. The Master List pulls each item\'s first note by SKU. Dashboard, Today and Promos And Peaks read every column from the Master List by SKU, and 12-Week Plan and Since Yesterday read their Note column from it. Update the Notes tab or the Master List and those tabs follow. Do not delete or move the SKU column.',s:'txt'}],
+   [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the All Items sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);

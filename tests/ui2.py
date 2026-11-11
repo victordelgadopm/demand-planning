@@ -17,7 +17,7 @@ with sync_playwright() as p:
     pg.screenshot(path=SP+'/d1.png')
     pg.evaluate("document.getElementById('drawer').scrollTop=700");pg.wait_for_timeout(200);pg.screenshot(path=SP+'/d2.png')
     # add note
-    pg.fill('#n-text','Budget does not allow this quantity.');pg.click('#n-save');pg.wait_for_timeout(300)
+    pg.select_option('#n-kind','accept');pg.fill('#n-text','Budget does not allow this quantity.');pg.click('#n-save');pg.wait_for_timeout(300)
     ok('note saved shows note-box',pg.locator('.note-box').count()==1)
     pg.click('#d-close');ok('accepted tab count 2',' (2)' in pg.locator('[data-tab=acc]').inner_text(),pg.locator('[data-tab=acc]').inner_text())
     # persistence

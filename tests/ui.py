@@ -17,7 +17,7 @@ with sync_playwright() as p:
     pg.click('#d-close')
     pg.locator('tr.r',has_text='Treehouse').click();pg.wait_for_selector('#s-slip')
     pg.screenshot(path='/tmp/claude-0/-home-claude/3084b18b-3036-5981-a313-c78cc3bf82d1/scratchpad/s3.png',full_page=False)
-    pg.fill('#n-text','test note') if pg.locator('#n-text').count() else None
+    pg.fill('#n-text','test note') if pg.locator('#n-text').is_visible() else None
     ok('console clean',not errs,errs)
     b.close()
 print(sum(1 for _,c in res if c),'/',len(res))

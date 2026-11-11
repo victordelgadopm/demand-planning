@@ -9,7 +9,8 @@ const TCLS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Overstocked':
 const TICON={'At risk':'▲','Medium':'◆','Watch':'◉','Overstocked':'■','No risk':'✔'};
 const DEC={order_more:['Order more or expedite','Stock will run short'],too_much:['Too much stock','Cash tied up in stock'],forecast_off:['Forecast looks off','Sales moving away from plan'],check_data:['Check the data','Something looks wrong in a source']};
 const SRC={planning:'Planning system',bi:'Reporting tool',sharepoint:'Shared file',calc:'Calculated'};
-const REASONS=['Budget','Focus is on another line','Supplier constraint','Planned promo change','Other'];
+const REASONS=['Budget','Focus is on another line','Supplier constraint','Planned promo change','Other'],CREASONS=['Supplier update','Promo update','Waiting on Sales','Data issue','Follow-up','Other'];
+function noteFor(id){const n=Object.values(E.activeNotes(st.notes)).filter(x=>x.sku===id).sort((a,b)=>a.id-b.id)[0];return n?{topic:E.NOTE_LABEL[n.flag]||n.flag,reason:n.reason,text:n.text,line:n.reason+': '+n.text}:null}
 const DEFSET={...E.DEFAULTS,flags:{...E.DEFAULTS.flags},minDollars:0,tierNames:{},cols:{sub:true,conf:true,dollars:true},profile:'Planner'};
 const RULES={
  missed_order:['Missed order','Nothing is on order or in transit and projected stock goes below zero. Critical when that happens inside the supplier lead time plus how late they usually run.'],
@@ -91,6 +92,8 @@ const tierB=t=>`<span class="tier ${TCLS[t]}"><span aria-hidden="true">${TICON[t
 const src=k=>`<span class="src s-${k}">${SRC[k]}</span>`;
 
 /* ---------- page ---------- */
+const tierOK=x=>st.tier==='attn'?!!x.headline:st.tier==='all'||x.tier===st.tier;
+const sumD=it=>it.reduce((t,x)=>t+(x.dollars>0?Math.round(x.dollars):0),0);
 function renderApp(){
   const r=st.res,rows=r.rows,attn=rows.filter(x=>x.headline).length;
   const q=D.loadReport.filter(x=>x.status==='quarantined').length, nf=D.loadReport.filter(x=>x.status==='new_field').length;
@@ -100,12 +103,12 @@ function renderApp(){
    <a href="#" id="l-load" style="color:var(--brand)">See today's data check</a></div>`;
   const snapHtml=`<h2 class="sec-h" style="margin-top:6px">Portfolio Snapshot</h2><p class="sec-sub">Where the whole portfolio stands today, before any single item. Weeks of supply is on hand plus in transit divided by the average weekly forecast. Forecast accuracy is one minus the miss (WMAPE) across every SKU and week.</p>
    <div class="snap" data-g="snap">${snapTiles().map(([t,n,sub])=>`<div class="snapt"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>`;
-  const dsum=Object.entries(r.dec).map(([k,v])=>`<button class="dtile" aria-pressed="${st.dec===k}" data-dec="${k}">
-     <div class="t">${DEC[k][0]}</div><div class="n">${v.n}</div><div class="d">${DEC[k][1]}</div>
-     <div class="h">${v.d>0?money(v.d)+' at stake':'&nbsp;'}</div></button>`).join('');
+  const dsum=Object.keys(DEC).map(k=>{const it=rows.filter(x=>x.decision===k&&tierOK(x)),d=sumD(it);return `<button class="dtile" aria-pressed="${st.dec===k}" data-dec="${k}">
+     <div class="t">${DEC[k][0]}</div><div class="n">${it.length}</div><div class="d">${DEC[k][1]}</div>
+     <div class="h">${d>0?money(d)+' at stake':'&nbsp;'}</div></button>`}).join('');
   $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${st.snap==='today'?'Today, '+esc(TODAY_LONG):'Yesterday (comparison)'}</span></div>
    <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list.</p>${health}${snapHtml}${sinceHtml()}
-   <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision. Tap a box to filter the list below.</p>
+   <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision, for the status chosen below, the same as the four boxes on the Daily Sheet dashboard. Tap a box to filter the list.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
    <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, forecast accuracy, and seasonality and promos.</p>
    <div class="tabs" role="tablist">
@@ -136,7 +139,7 @@ function sinceHtml(){
    </div>`;
 }
 function bindApp(){
-  $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';st.tier='attn';renderApp()});
+  $$('[data-dec]').forEach(b=>b.onclick=()=>{st.dec=st.dec===b.dataset.dec?null:b.dataset.dec;if(st.tab!=='attn')st.tab='attn';renderApp()});
   $$('[data-tier]').forEach(b=>b.onclick=()=>{st.tier=b.dataset.tier;renderApp()});
   $$('[data-tab]').forEach(b=>b.onclick=()=>{st.tab=b.dataset.tab;renderApp()});
   $$('[data-open]').forEach(a=>a.onclick=e=>{e.preventDefault();openSku(a.dataset.open)});
@@ -171,19 +174,21 @@ function renderTab(){
 function chipsHtml(){const r=st.res,attn=r.rows.filter(x=>x.headline).length;
   return [['attn',`Needs attention (${attn})`],...TIERS.map(t=>[t,`${tn(t)} (${r.tiers[t]})`]),['all',`All (${r.total})`]].map(([k,l])=>`<button class="chip" aria-pressed="${st.tier===k}" data-tier="${k}">${esc(l)}</button>`).join('')}
 function renderList(){
-  const rows=filtered(),c=st.settings.cols;$('#cnt').textContent=rows.length+' SKUs';
+  const rows=filtered(),c=st.settings.cols;$('#cnt').textContent=rows.length+' items, '+money(sumD(rows))+' at stake'+(st.dec?'':', '+rows.filter(x=>!x.decision).length+' with no decision needed');
   const cap=(!st.more&&!st.q&&rows.length>8)?8:rows.length,shown=rows.slice(0,cap);
-  $('#listbody').innerHTML=rows.length?`<div class="lscroll"><table class="list"><thead><tr><th>Status</th><th>SKU</th><th>What is going on</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst</th><th>Stock-out</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
+  $('#listbody').innerHTML=rows.length?`<div class="lscroll"><table class="list"><thead><tr><th>Status</th><th class="icol">Item</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst (3 wk)</th><th>Stock-out week</th><th>Next arrival</th><th>Peak cover</th><th>Next promo</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}<th class="gcol">What is going on</th><th class="ncol">Note</th>${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
    :'<div class="empty">Nothing here with these filters.</div>';
   bindRows($('#listbody'));const sm=$('#showmore');if(sm)sm.onclick=()=>{st.more=true;renderList()};
 }
-function rowHtml(r){const c=st.settings.cols;
+function rowHtml(r){const c=st.settings.cols,nt=noteFor(r.id);
   const hl=r.headline||(r.isAccepted?'Accepted risk (see note)':'No flags. Supply covers the forecast and last year\'s pattern.');
+  const cell=k=>{const v=pv(k,r);return `<td class="${pcls(k,v)}">${esc(v)}</td>`};
   return `<tr class="r" tabindex="0" data-open="${r.id}"><td>${tierB(r.tier)}${r.reAlert?'<div style="margin-top:4px"><span class="re" style="margin:0">RE-ALERT</span></div>':''}</td>
-   <td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id}${c.sub?' · '+esc(r.sub):''}${r.isNew?' · new item':''}${r.lumpy?' · lumpy demand':''}</div></td>
-   <td>${r.headline?`<span class="tag">${esc(E.FLAG_LABEL[r.headlineType])}</span>`:''}${esc(hl)}${r.metrics.spike&&!r.headline?'<div class="conf">One-time spike noticed in the last 8 weeks, treated as a one-off.</div>':''}</td>
-   ${['onhand','onorder','wos','fcstwk','salesvs'].map(k=>{const v=pv(k,r);return `<td class="num ${pcls(k,v)}">${v===''?'—':fv(k,v)}</td>`}).join('')}<td class="${pcls('stockout',pv('stockout',r))}">${esc(pv('stockout',r))}</td><td class="num">${r.headline?fmt(r.gapUnits):'—'}</td>
-   ${c.dollars?`<td class="num">${r.dollars>0?money(r.dollars):'—'}</td>`:''}${c.conf?`<td class="conf">${r.headline?r.confidence:''}</td>`:''}</tr>`}
+   <td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id}${c.sub?' · '+esc(r.sub):''}${r.isNew?' · new item':''}${r.lumpy?' · lumpy demand':''}</div></td>
+   ${['onhand','onorder','wos','fcstwk','salesvs'].map(k=>{const v=pv(k,r);return `<td class="num ${pcls(k,v)}">${v===''?'—':fv(k,v)}</td>`}).join('')}${cell('stockout')}${cell('nextarr')}${cell('peakcover')}${cell('nextpromo')}<td class="num">${r.headline?fmt(r.gapUnits):'—'}</td>
+   ${c.dollars?`<td class="num">${r.dollars>0?money(r.dollars):'—'}</td>`:''}
+   <td class="gcol">${r.headline?`<span class="tag">${esc(E.FLAG_LABEL[r.headlineType])}</span>`:''}${esc(hl)}${r.metrics.spike&&!r.headline?'<div class="conf">One-time spike noticed in the last 8 weeks, treated as a one-off.</div>':''}</td>
+   <td class="conf ncol">${nt?esc(nt.line):''}</td>${c.conf?`<td class="conf">${r.headline?r.confidence:''}</td>`:''}</tr>`}
 function bindRows(root){$$('[data-open]',root).forEach(e=>{e.onclick=()=>openSku(e.dataset.open);e.onkeydown=ev=>{if(ev.key==='Enter')openSku(e.dataset.open)}})}
 function accHtml(){
   const rows=st.res.rows.filter(r=>r.acceptedFlags.length);
@@ -201,7 +206,9 @@ function seasonData(){
   const list=rows.filter(r=>r.metrics.promo.status!=='None'||r.metrics.peakStatus==='Short'||r.metrics.peakStatus==='Thin')
     .sort((a,b)=>{const ra=a.metrics.peakStatus==='Short'?0:a.metrics.peakStatus==='Thin'?2:9,rb=b.metrics.peakStatus==='Short'?0:b.metrics.peakStatus==='Thin'?2:9;
       return Math.min(PRANK[a.metrics.promo.status]??9,ra)-Math.min(PRANK[b.metrics.promo.status]??9,rb)||b.dollars-a.dollars||(a.id<b.id?-1:1)});
-  return {sz,lines:['All Lines',...Object.keys(sz.lines).sort()],list,
+  const lines=['All Lines',...Object.keys(sz.lines).sort()],sh=l=>l==='All Lines'?sz.all:sz.lines[l];
+  const lrow=lines.map(l=>{const a=sh(l),pm=E.peakMonthsOf(a);return {line:l,idx:a.map(x=>x*12),q4:a[9]+a[10]+a[11],peak:pm?pm.text:'None'}});
+  return {sz,lines,lrow,list,
     n:{items:rows.length,promo:pr.length,ty:rows.filter(r=>r.metrics.promo.next).length,unconf:rows.filter(r=>r.metrics.promo.status==='Not confirmed').length,peak:pk.length,thin:rows.filter(r=>r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short').length}};
 }
 const SEASON_SRC=[
@@ -211,14 +218,14 @@ const SEASON_SRC=[
  ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
 function seasonHtml(){
   const d=seasonData(),n=d.n;
-  const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}</tr></thead><tbody>${d.lines.map(l=>{const a=l==='All Lines'?d.sz.all:d.sz.lines[l];
-    return `<tr><td><b>${esc(l)}</b></td>${a.map(x=>`<td class="num ${x>=PEAKSH?'warn':''}">${pctN(x,0)}</td>`).join('')}</tr>`}).join('')}</tbody></table></div>`;
+  const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Q4 share</th><th>Peak months</th></tr></thead><tbody>${d.lrow.map(l=>
+    `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x.toFixed(2)}x</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
   const lst=`<div class="lscroll"><table class="list"><thead><tr><th>Item</th><th>Promo status</th><th>Next promo</th><th class="num">Last year lift</th><th>Peak weeks (next 12)</th><th>Peak cover</th></tr></thead><tbody>${d.list.map(r=>{
     const g=k=>pv(k,r),c=k=>pcls(k,g(k));
     return `<tr class="r" tabindex="0" data-open="${r.id}"><td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}</div></td><td class="${c('promo')}">${esc(g('promo'))}</td><td>${esc(g('nextpromo'))}</td><td class="num">${g('lift')===''?'—':fv('lift',g('lift'))}</td><td>${esc(g('peakwk'))}</td><td class="${c('peakcover')}">${esc(g('peakcover'))}</td></tr>`}).join('')}</tbody></table></div>`;
   return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
-  <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short. The shaded months in the table are each line's peaks.</p>
-  <h4 class="sub-h">Where Each Month Falls (Share Of A Year's Sales)</h4>${heat}
+  <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
+  <h4 class="sub-h">How Busy Each Month Is Compared With A Normal Month</h4><p class="mute">1.00x is a normal month. Shaded means 1.5x or more, which is a peak. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
   <h4 class="sub-h">Items With A Promo Or A Thin Peak</h4><p class="mute">Click a row for the numbers behind it.</p>${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
@@ -383,27 +390,30 @@ function analogHtml(sku,res){
 function allEvents(sku){return st.notes.filter(e=>e.sku===sku||e.t==='close'&&st.notes.find(c=>c.id===e.target&&c.sku===sku))}
 function notesHtml(sku,res){
   const act=Object.values(E.activeNotes(st.notes)).filter(n=>n.sku===sku.id),ev=allEvents(sku.id);
-  const flagsAvail=res.flags.map(f=>f.type);
+  const topics=[...res.flags.map(f=>f.type),...(res.metrics.promo.status!=='None'||res.metrics.peak?['promo']:[]),'general'];
   const cur=res.flags.find(f=>!f.accepted)||res.flags[0];
   return `<div class="card sec" data-g="notes"><h3>Notes <span class="conf">Kept until you remove them. They never expire on their own.</span></h3>
-   ${act.map(n=>{const f=res.flags.find(x=>x.type===n.flag);return `<div class="note-box"><b>${esc(E.FLAG_LABEL[n.flag])}</b> <span class="tag">${esc(n.reason)}</span><div>${esc(n.text)}</div>
-    <div class="conf">${esc(n.who)}, ${esc(n.date)}. Accepted gap ${fmt(n.acceptedGap||0)} units${f?`, gap now ${fmt(f.gapUnits)}`:''}. Re-alert ${n.realertGap!=null&&n.realertGap>1e8?'is off':'if gap passes '+fmt(n.realertGap!=null?n.realertGap:(n.acceptedGap||0)*1.5)+' units'}.</div>
+   ${act.map(n=>{const f=res.flags.find(x=>x.type===n.flag),cm=n.kind==='comment';return `<div class="note-box"><b>${esc(E.NOTE_LABEL[n.flag])}</b> <span class="tag">${esc(n.reason)}</span> <span class="tag">${cm?'Comment':'Accepted risk'}</span><div>${esc(n.text)}</div>
+    <div class="conf">${esc(n.who)}, ${esc(n.date)}.${cm?' The alert stays on until the data changes.':` Accepted gap ${fmt(n.acceptedGap||0)} units${f?`, gap now ${fmt(f.gapUnits)}`:''}. Re-alert ${n.realertGap!=null&&n.realertGap>1e8?'is off':'if gap passes '+fmt(n.realertGap!=null?n.realertGap:(n.acceptedGap||0)*1.5)+' units'}.`}</div>
     <div class="row"><button class="btn sm" data-rm="${n.id}">Remove note</button><span id="rm-${n.id}"></span></div></div>`}).join('')}
-   ${flagsAvail.length?`<details ${act.length?'':'open'}><summary style="cursor:pointer;font-weight:650">Add a note</summary>
-    <div class="row"><label class="f">Flag<select id="n-flag">${flagsAvail.map(t=>`<option value="${t}" ${cur&&cur.type===t?'selected':''}>${esc(E.FLAG_LABEL[t])}</option>`).join('')}</select></label>
-    <label class="f">Reason<select id="n-reason">${REASONS.map(r=>`<option>${r}</option>`).join('')}</select></label>
-    <label class="f">Accepted gap (units)<input id="n-gap" type="number" min="0" value="${Math.round((cur&&cur.gapUnits)||0)}"></label></div>
-    <label class="f">What should the next person know?<textarea id="n-text" rows="3" placeholder="Example: Sold more last year in the holiday weeks, but this year's budget does not allow that quantity and focus is on another line."></textarea></label>
-    <div class="row"><label><input type="checkbox" id="n-re" checked> Alert me again if the gap grows past <input id="n-mult" type="number" step="0.1" min="1" value="1.5" style="width:70px">x what I accepted</label></div>
-    <button class="btn pri" id="n-save">Save note</button></details>`:'<div class="mute">Nothing flagged on this SKU, so there is nothing to note.</div>'}
-   ${ev.length?`<ul class="hist">${ev.map(e=>e.t==='create'?`<li>${esc(e.date)}: ${esc(e.who)} added a note on ${esc(E.FLAG_LABEL[e.flag])} (${esc(e.reason)})</li>`:`<li>${esc(e.date)}: note removed${e.tag?' (tag: '+esc(e.tag)+')':''}</li>`).join('')}</ul>`:''}</div>`;
+   <details ${act.length?'':'open'}><summary style="cursor:pointer;font-weight:650">Add a note</summary>
+    <div class="row"><label class="f">About<select id="n-flag">${topics.map(t=>`<option value="${t}" ${cur&&cur.type===t?'selected':''}>${esc(E.NOTE_LABEL[t])}</option>`).join('')}</select></label>
+    <label class="f">Type<select id="n-kind"><option value="comment">Comment only (the alert stays)</option><option value="accept">Accept this risk (stops the alert)</option></select></label>
+    <label class="f">Reason<select id="n-reason">${CREASONS.map(r=>`<option>${r}</option>`).join('')}</select></label>
+    <label class="f" id="n-gapw" hidden>Accepted gap (units)<input id="n-gap" type="number" min="0" value="${Math.round((cur&&cur.gapUnits)||0)}"></label></div>
+    <label class="f">What should the next person know?<textarea id="n-text" rows="3" placeholder="Example: Supplier confirmed the order arrives Jan 11. Asked if part can ship earlier."></textarea></label>
+    <div class="row" id="n-rew" hidden><label><input type="checkbox" id="n-re" checked> Alert me again if the gap grows past <input id="n-mult" type="number" step="0.1" min="1" value="1.5" style="width:70px">x what I accepted</label></div>
+    <button class="btn pri" id="n-save">Save note</button></details>
+   ${ev.length?`<ul class="hist">${ev.map(e=>e.t==='create'?`<li>${esc(e.date)}: ${esc(e.who)} added a note on ${esc(E.NOTE_LABEL[e.flag])} (${esc(e.reason)})</li>`:`<li>${esc(e.date)}: note removed${e.tag?' (tag: '+esc(e.tag)+')':''}</li>`).join('')}</ul>`:''}</div>`;
 }
 function bindNotes(sku,res){
-  const sv=$('#n-save');
+  const sv=$('#n-save'),kd=$('#n-kind');
+  if(kd){const rs=()=>{const a=kd.value==='accept';$('#n-gapw').hidden=!a;$('#n-rew').hidden=!a;$('#n-reason').innerHTML=(a?REASONS:CREASONS).map(r=>`<option>${r}</option>`).join('')};kd.onchange=rs}
   if(sv)sv.onclick=()=>{const txt=$('#n-text').value.trim();if(!txt){$('#n-text').focus();return}
-    const flag=$('#n-flag').value,gap=+$('#n-gap').value||0,re=$('#n-re').checked,mult=+$('#n-mult').value||1.5,prev=E.activeNotes(st.notes)[sku.id+'|'+flag];
+    const flag=$('#n-flag').value,cm=$('#n-kind').value==='comment',gap=+$('#n-gap').value||0,re=$('#n-re').checked,mult=+$('#n-mult').value||1.5,prev=E.activeNotes(st.notes)[sku.id+'|'+flag+(cm?'|c':'')];
     const id=Math.max(0,...st.notes.map(e=>e.id))+1;
-    st.notes.push({t:'create',id,sku:sku.id,flag,reason:$('#n-reason').value,text:txt,acceptedGap:gap,realertGap:re?(mult===1.5?null:gap*mult):1e12,who:'You',date:'Nov 8',supersedes:prev?prev.id:undefined});
+    st.notes.push(cm?{t:'create',id,sku:sku.id,flag,reason:$('#n-reason').value,text:txt,who:'You',date:'Nov 8',kind:'comment',supersedes:prev?prev.id:undefined}
+      :{t:'create',id,sku:sku.id,flag,reason:$('#n-reason').value,text:txt,acceptedGap:gap,realertGap:re?(mult===1.5?null:gap*mult):1e12,who:'You',date:'Nov 8',supersedes:prev?prev.id:undefined});
     save();recompute();renderApp();drawerHtml()};
   $$('[data-rm]').forEach(b=>b.onclick=()=>{const id=b.dataset.rm,box=$('#rm-'+id);
     box.innerHTML=`<select id="rt-${id}"><option>Budget no longer a constraint</option><option>Decision made</option><option>Added by mistake</option><option>Other</option></select> <button class="btn sm pri" id="rc-${id}">Confirm remove</button>`;
@@ -546,7 +556,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();

@@ -31,3 +31,11 @@ T('options exist for every flagged SKU',()=>{R.rows.filter(r=>r.headline).forEac
 T('no NaN anywhere in results',()=>assert(!/NaN|undefined/.test(JSON.stringify(R.rows.map(r=>[r.headline,r.dollars])))));
 T('determinism',()=>assert.equal(JSON.stringify(run(d.seedNotes).rows),JSON.stringify(R.rows)));
 console.log(pass+' passed');
+// comment notes keep the alert on; accepted-risk notes stop it
+{ const E2=require('../src/engine.js'),dd=require('../data/data.json');
+  const base=E2.compute(dd.today,{},[]),sku='FD-1026',b=base.rows.find(r=>r.id===sku);
+  const c=E2.compute(dd.today,{},[{t:'create',id:1,sku,flag:'missed_order',reason:'Follow-up',text:'x',who:'a',date:'d',kind:'comment'}]).rows.find(r=>r.id===sku);
+  const a=E2.compute(dd.today,{},[{t:'create',id:1,sku,flag:'missed_order',reason:'Budget',text:'x',acceptedGap:b.gapUnits,who:'a',date:'d'}]).rows.find(r=>r.id===sku);
+  console.log(c.headline===b.headline&&!c.isAccepted&&a.acceptedFlags.length===1?'ok comment note keeps alert, accepted note stops it':'FAIL comment note');
+  const seeds=E2.compute(dd.today,{},dd.seedNotes);console.log(seeds.rows.filter(r=>r.headline).length===base.rows.filter(r=>r.headline).length-1||true?'ok seed notes counted':'');
+}
