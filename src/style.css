@@ -319,3 +319,5 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .xt td.prodcol{min-width:230px}
 .xt td.t-drop{background:#ffe5b4;color:#8a4b08;font-weight:700}
 .nwtbl td:not(.icol){white-space:nowrap}
+.xt thead th.nxt{box-shadow:inset 0 -3px 0 #e0a030}
+.xt td.nw{white-space:nowrap}

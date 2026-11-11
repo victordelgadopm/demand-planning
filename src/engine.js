@@ -182,6 +182,20 @@
       if (tyP.length) { const f = tyP.slice().sort((a, b) => a.h - b.h)[0]; pr.next = fmtDate(weekStart(snap, f.h)); pr.name = f.name; pr.confirmed = !!f.confirmed; }
       else if (lyP.length) pr.name = lyP[0].name;
       if (lyP.length && !sku.isNew) pr.lift = measureLift(sku);
+      // promo timeframes as dates: last year's weeks shifted to the same calendar weeks, this year's with confirmed marks
+      const winText = (items) => { const o = items.slice().sort((a, b) => a.d - b.d), g = [];
+        o.forEach(x => { const l = g[g.length - 1]; if (l && x.d - l.e === 7 * MS && l.c === x.c) l.e = +x.d; else g.push({ s: +x.d, e: +x.d, c: x.c }); });
+        return g.map(x => (x.s === x.e ? fmtDate(new Date(x.s)) : fmtDate(new Date(x.s)) + ' to ' + fmtDate(new Date(x.e))) + (x.c === 1 ? ' (confirmed)' : x.c === 0 ? ' (not confirmed)' : '')).join(', '); };
+      pr.lyText = lyP.length ? winText(lyP.map(x => ({ d: addDays(weekStart(snap, 0), 7 * (x.w - 46) - 364), c: -1 }))) : null;
+      pr.tyText = tyP.length ? winText(tyP.map(x => ({ d: weekStart(snap, x.h), c: x.confirmed ? 1 : 0 }))) : null;
+      pr.lyUnits = lyP.length && !sku.isNew ? Math.round(sum(lyP.map(x => sku.pos.y2025[x.w - 1] || 0))) : null;
+      // units a confirmed promo adds on top of the forecast, split by whether the week is also a peak week
+      const pkw = metrics.peak ? metrics.peak.weeks : [], okLift = pr.lift != null && isFinite(pr.lift) && pr.lift > 0;
+      pr.extraIn = 0; pr.extraOut = 0;
+      if (okLift) tyC.forEach(x => { const u = (F[x.h] || 0) * pr.lift; if (pkw.includes(x.h)) pr.extraIn += u; else pr.extraOut += u; });
+      pr.extraIn = Math.round(pr.extraIn * 100) / 100; pr.extraOut = Math.round(pr.extraOut * 100) / 100;
+      const nIn = tyP.filter(x => pkw.includes(x.h)).length;
+      pr.overlap = !tyP.length ? 'No promo' : !pkw.length ? 'No peak' : nIn === tyP.length ? 'All in peak weeks' : nIn ? nIn + ' of ' + tyP.length + ' wks in peak' : 'Outside peak weeks';
       if (!tyP.length && !lyP.length) pr.status = 'None';
       else if (!tyP.length) pr.status = 'Last year only';
       else if (!tyC.length) pr.status = 'Not confirmed';

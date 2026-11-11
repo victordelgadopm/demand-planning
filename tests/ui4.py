@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright
 import openpyxl,re
 R=[]
 def ok(n,c):R.append(bool(c));print('ok  ' if c else 'FAIL',n)
-BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks Seasonal']
+BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks|Seasonal Items']
 with sync_playwright() as p:
     b=p.chromium.launch();pg=b.new_page(viewport={'width':1366,'height':850},accept_downloads=True)
     errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
@@ -22,7 +22,7 @@ with sync_playwright() as p:
     ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Order Qty To Place' in pg.locator('#msgs').inner_text())
     pg.click('#c-reset')
     rc=pg.locator('.recipe:has(h3:text("Your Recipe"))').inner_text()
-    ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Promos And Peaks' in rc and 'Seasonal Items' in rc)
+    ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Seasonal And Promo Lifts' in rc)
     # 3. no stale wording on any page or sheet tab
     allt=[]
     for v in ['home','sheet','custom','visual']:
@@ -41,13 +41,19 @@ with sync_playwright() as p:
     ok('site tabs match workbook tabs',[t for _,t in tabs]==wb.sheetnames)
     hd=[c.value for c in wb['Master List (Work Here)'][1] if c.value]
     pg.click('[data-xt=all]');site=[x for x in pg.locator('.xt thead tr.heads th').all_inner_texts() if x.strip() and x.strip()!='1']
-    wbh=[h for h in hd if h not in('Status Match','Show','Base Wk Units','Peak Weeks','Peak Headroom')]
+    wbh=[h for h in hd if h not in('Status Match','Show','Base Wk Units','Peak Weeks','Peak Headroom','Promo Units In Peak','Promo Units Outside Peak')]
     ok('site Master columns equal workbook Master columns '+str([(a,b) for a,b in zip(site,wbh) if a!=b][:3]),site==wbh)
     # 5. each non-Master sheet reads the Master (no hard-coded stale copies): formulas present
-    for nm in ['Seasonal Items','Promos And Peaks','Notes']:
+    for nm in ['Seasonal And Promo Lifts','Notes']:
         ws=wb[nm];ok(nm+' reads from the Master List',any(isinstance(c.value,str) and c.value.startswith('=') for c in ws[2]))
     # 6. Recipe sheet mentions every tab that holds typed or carried work
     rs=wb['Recipe'];rt=' '.join(str(c.value) for r in rs.iter_rows() for c in r if c.value)
     ok('Recipe sheet mentions New And Missing Items and Order Qty To Place','New And Missing Items' in rt and 'Order Qty To Place' in rt)
+    # 7. peak, promo and order chain: columns adjacent, history tab present, a typed override reaches the order total
+    mh=[c.value for c in wb['Master List (Work Here)'][1]]
+    ok('promo columns sit together',mh.index('Last Promo Lift (x)')==mh.index('Last Year Promo (Weeks Starting)')+2 and mh.index('Promo Extra Units')==mh.index('Promo And Peak Overlap')+1)
+    ok('order columns sit together',[mh.index(h) for h in ['Suggested Order Qty','Suggested Add For Peak And Promo (Units)','Why Add It','Total Suggested Qty (With Override)','Order Qty To Place (Type Here)']]==list(range(mh.index('Suggested Order Qty'),mh.index('Suggested Order Qty')+5)))
+    hs=wb['Sales History'];ok('Sales History has 4 rows per SKU',(hs.max_row-1)%4==0 and hs.max_row>100 and hs['E2'].value=='2026 Forecast' and hs['E5'].value=='2024 Sold')
+    pg.click('nav [data-nav=sheet]');pg.click('[data-xt=hist]');ok('Sales History tab shows on the site',pg.locator('.xt tbody tr').count()>100)
     ok('console clean',not errs)
 print(sum(R),'/',len(R))

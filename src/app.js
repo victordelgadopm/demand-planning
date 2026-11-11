@@ -30,8 +30,22 @@ const RULES={
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int'};
+const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'x2',lyunits:'int',promoext:'int',totlift:'int',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int',addqty:'int'};
 const r3=x=>Math.round(x*10000)/10000;
+/* one chain for the peak and promo order: units short of 2 weeks of peak cover (after stock and orders on the way),
+   plus the units a confirmed promo adds, plus what a typed peak override adds, less what Suggested Order Qty already covers */
+function addParts(r,useOvr){const m=r.metrics,pc=m.peakCover,sg=pv('suggest',r)===''?0:pv('suggest',r),pr=m.promo||{};
+  const PG=pc?Math.max(0,Math.ceil(pc.safety-pc.minInv)):0,H=pc?R3k(Math.max(0,pc.minInv-pc.safety)):0,raw=PG-H;
+  const o=useOvr?pv('ovr',r):'',p=pv('peaklift',r),pe=useOvr?pv('promoext',r):Math.round((pr.extraIn||0)+(pr.extraOut||0));
+  const ovrx=o!==''&&p!==''&&m.baseWk?(o-p)*R3k(m.baseWk)*m.peakWks:0,X=raw+(pe===''?0:pe)+ovrx,a=X-sg<=0?0:Math.ceil((X-sg)/10)*10;
+  return {sg,raw,pe:pe===''?0:pe,ovrx,X,add:a,total:sg+a,hasPeakOrPromo:!!pc||(pr.extraIn+pr.extraOut>0)}}
+function addWhy(r){const m=r.metrics,pc=m.peakCover,q=addParts(r,false);if(!q.hasPeakOrPromo)return '';const nc=m.promo&&m.promo.status==='Not confirmed'?' The promo is not confirmed, so it is not counted.':'';return addWhy0(r,m,pc,q)+nc}
+function addWhy0(r,m,pc,q){
+  const pk=m.peak?(m.peak.start===m.peak.end?m.peak.start:m.peak.start+' to '+m.peak.end):'';
+  if(!q.add)return pc?'Stock and orders on the way cover the peak'+(q.pe?' and the promo':'')+'. No extra order needed.':'No peak in the next 12 weeks. Promo is covered.';
+  const bits=[];if(q.raw>0)bits.push('stock dips '+fmt(q.raw)+' below 2 weeks of peak cover'+(pk?' ('+pk+')':''));
+  if(q.pe)bits.push('the confirmed promo adds about '+fmt(q.pe)+' units'+(q.raw<0?', which uses up '+fmt(-q.raw)+' of spare stock':''));if(q.sg)bits.push(fmt(q.sg)+' is already in the suggested order');
+  return 'Add '+fmt(q.add)+': '+bits.join(', ')+'.'}
 const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
 function pv(k,r){const m=r.metrics,nw=r.isNew;
   switch(k){
@@ -59,13 +73,19 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'used':{const o=pv('ovr',r);return o!==''?o:pv('peaklift',r)}
    case 'bump':{const u=pv('used',r);return u===''||!m.baseWk?'':Math.round((u-1)*R3k(m.baseWk)*m.peakWks)}
    case 'peakgap':{const pc=m.peakCover;return pc?Math.max(0,Math.ceil(pc.safety-pc.minInv)):''}
-   case 'ordovr':{const o=pv('ovr',r),sg0=pv('suggest',r),p=pv('peaklift',r);if(o===''||p===''||!m.baseWk)return sg0;
-     const sg=sg0===''?0:sg0,ex=(o-p)*R3k(m.baseWk)*m.peakWks,H=m.peakCover?R3k(Math.max(0,m.peakCover.minInv-m.peakCover.safety)):0,need=sg>0?sg+ex:ex-H;return need<=0?'':Math.ceil(need/10)*10}
+   case 'ordovr':{const q=addParts(r,true);return q.total>0?q.total:''}
+   case 'addqty':{if(nw)return '';const q=addParts(r,false);return q.hasPeakOrPromo?q.add:''}
+   case 'addwhy':{if(nw)return '';return addWhy(r)}
    case 'peaklift':return nw||m.peakLift==null?'':r3(m.peakLift);
    case 'stocklp':return nw?'n/a':!m.peak?'No peak':m.stockLP;
    case 'promo':return m.promo.status;
-   case 'nextpromo':return m.promo.next?m.promo.next+(m.promo.confirmed?'':' (not confirmed)'):'None';
-   case 'lift':return m.promo.lift==null||!isFinite(m.promo.lift)?'':r3(m.promo.lift);}
+   case 'nextpromo':return m.promo.tyText||'None';
+   case 'lypromo':return m.promo.lyText||'None';
+   case 'lyunits':return m.promo.lyUnits==null?'':m.promo.lyUnits;
+   case 'overlap':return nw?'n/a':m.promo.overlap;
+   case 'promoext':{const pr=m.promo;if(nw||!pr||!(pr.extraIn+pr.extraOut>0))return nw?'':0;const u=pv('used',r),p=pv('peaklift',r),k=u!==''&&p!==''&&p>0?u/p:1;return Math.round(pr.extraIn*k+pr.extraOut)}
+   case 'totlift':{const b=pv('bump',r),x=pv('promoext',r);return b===''&&x===''?'':(b===''?0:b)+(x===''?0:x)}
+   case 'lift':return m.promo.lift==null||!isFinite(m.promo.lift)?'':r3(1+m.promo.lift);}
   return '';}
 function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!=='number')return String(v);
   switch(t){case 'int':return fmt(v);case 'dec1':return v.toFixed(1);case 'pct':return Math.round(v*100)+'%';case 'pctS':return (v>0?'+':'')+Math.round(v*100)+'%';
@@ -76,6 +96,7 @@ function pcls(k,v){if(v===''||v==null)return '';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
   if(k==='onhand'&&v<0)return 'bad';
+  if(k==='addqty')return typeof v==='number'&&v>0?'warn':'';
   if(k==='peakgap')return typeof v==='number'&&v>0?'warn':'';
   if(k==='stocklp')return String(v).startsWith('Out')?'warn':'';
   if(k==='peakcover')return v==='Short'?'bad':v==='Thin'?'warn':'';
@@ -223,13 +244,10 @@ const MONS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 const PRANK={'Confirmed, short':0,'Not confirmed':1,'Confirmed, covered':3,'New this year':4,'Last year only':5};
 function seasonData(){
   const sz=E.seasonality(snap()),rows=st.res.rows,pr=rows.filter(r=>r.metrics.promo.status!=='None'),pk=rows.filter(r=>r.metrics.peak);
-  const list=rows.filter(r=>r.metrics.promo.status!=='None'||r.metrics.peakStatus==='Short'||r.metrics.peakStatus==='Thin')
-    .sort((a,b)=>{const ra=a.metrics.peakStatus==='Short'?0:a.metrics.peakStatus==='Thin'?2:9,rb=b.metrics.peakStatus==='Short'?0:b.metrics.peakStatus==='Thin'?2:9;
-      return Math.min(PRANK[a.metrics.promo.status]??9,ra)-Math.min(PRANK[b.metrics.promo.status]??9,rb)||b.dollars-a.dollars||(a.id<b.id?-1:1)});
   const lines=['All Lines',...Object.keys(sz.lines).sort()],sh=l=>l==='All Lines'?sz.all:sz.lines[l];
   const lrow=lines.map(l=>{const a=sh(l),pm=E.peakMonthsOf(a);return {line:l,idx:E.monthIdx(a).map(x=>Math.round(x*100)/100),q4:a[9]+a[10]+a[11],peak:pm?pm.text:'None'}});
-  const items=rows.filter(r=>r.metrics.peak||r.metrics.promo.status!=='None').sort((a,b)=>(a.sub<b.sub?-1:a.sub>b.sub?1:0)||(b.metrics.peakLift||0)-(a.metrics.peakLift||0)||(a.id<b.id?-1:1));
-  return {sz,lines,lrow,list,items,
+  const items=rows.filter(r=>r.metrics.peak||r.metrics.promo.status!=='None').sort((a,b)=>(a.sub<b.sub?-1:a.sub>b.sub?1:0)||(a.metrics.promo.status==='None'?1:0)-(b.metrics.promo.status==='None'?1:0)||(b.metrics.peakLift||0)-(a.metrics.peakLift||0)||(a.id<b.id?-1:1));
+  return {sz,lines,lrow,items,
     n:{items:rows.length,promo:pr.length,ty:rows.filter(r=>r.metrics.promo.next).length,unconf:rows.filter(r=>r.metrics.promo.status==='Not confirmed').length,peak:pk.length,thin:rows.filter(r=>r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short').length}};
 }
 const SEASON_SRC=[
@@ -237,23 +255,35 @@ const SEASON_SRC=[
  ['This year\'s promos','From a file','Read from the promo calendar in the Shared file, with a confirmed or not confirmed mark. If a promo is missing from the file, it will not show here, so "None" means none on file, not none planned.'],
  ['Last year\'s promo lift','Calculated','Measured by comparing last year\'s promo weeks with the normal weeks around them. It only shows when last year\'s promo weeks are tagged in the history.'],
  ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
-let vShow='promo',vLine='All Lines';
-const VCOLS=['promo','nextpromo','lift','peakwk','peaklift','ovr','ovrwhy','used','bump','peakgap','stocklp','peakcover','suggest','ordovr','plan','needby'];
-const VHEAD={promo:'Promo status',nextpromo:'Next promo',lift:'Last year promo lift',peakwk:'Peak weeks (next 12)',peaklift:'Peak lift (calculated)',ovr:'Your override',ovrwhy:'Override reason',used:'Peak lift used',suggest:'Suggested order qty',bump:'Peak bump (units)',peakgap:'Units short of peak cover',stocklp:'Stock last peak',peakcover:'Peak cover',ordovr:'Order qty (with override)',plan:'Qty to place',needby:'Needed by'};
+/* weekly sales history for the Sales History tab: one row per SKU per year, from the Reporting tool, plus the forecast */
+const HIST_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function histData(line){
+  const t0=Date.parse(snap().meta.today+'T00:00:00Z')+86400000,DAY=86400000,med=a=>{const v=a.filter(x=>x!=null).slice().sort((x,y)=>x-y);return v.length?v[Math.floor(v.length/2)]:0};
+  const out=[];
+  st.res.rows.filter(r=>!r.isNew&&(!line||line==='All Lines'||r.sub===line)).forEach(r=>{const sk=skuOf(r.id);if(!sk.pos)return;
+    const f26=Array.from({length:52},(_,i)=>i<45?(sk.forecast26||[])[i]:(sk.fcstH||[])[i-45]);
+    [['2026 Forecast',f26,0],['2026 Sold',sk.pos.y2026,0],['2025 Sold',sk.pos.y2025,1],['2024 Sold',sk.pos.y2024,2]].forEach(([lab,arr,yo])=>{
+      const wk=Array.from({length:52},(_,i)=>arr&&arr[i]!=null?Math.round(arr[i]):null),mo=new Array(12).fill(null);
+      wk.forEach((v,i)=>{if(v==null)return;const m=new Date(t0+(7*(i+1-46)-364*yo)*DAY).getUTCMonth();mo[m]=(mo[m]||0)+v});
+      out.push({id:r.id,r,label:lab,wk,mo,norm:Math.round(med(wk))})})});
+  return out}
+let vShow='all',vLine='All Lines';
+const VCOLS=['peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','suggest','addqty','addwhy','ordovr','plan','needby'];
+const VHEAD={peakwk:'Peak weeks (next 12)',peaklift:'Peak lift (calculated)',ovr:'Your override',ovrwhy:'Override reason',used:'Peak lift used',bump:'Peak bump (units)',promo:'Promo status',nextpromo:'This year promo (weeks starting)',lypromo:'Last year promo (weeks starting)',lyunits:'Last promo units sold',lift:'Last promo lift',overlap:'Promo and peak overlap',promoext:'Promo extra units',totlift:'Peak + promo units above a normal week',stocklp:'Stock last peak',peakcover:'Peak cover',peakgap:'Units short of peak cover',suggest:'Suggested order qty',addqty:'Suggested add for peak and promo',addwhy:'Why add it',ordovr:'Total suggested qty (with override)',plan:'Qty to place',needby:'Needed by'};
 function bindSeason(tb){const a=$('#v-show',tb),b=$('#v-line',tb);if(a)a.onchange=()=>{vShow=a.value;renderTab()};if(b)b.onchange=()=>{vLine=b.value;renderTab()}}
 function seasonHtml(){
   const d=seasonData(),n=d.n;
   const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Q4 share</th><th>Peak months</th></tr></thead><tbody>${d.lrow.map(l=>
     `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x>=1.5?x.toFixed(2)+'x':'Normal'}</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
-  const pool=(vShow==='peak'?d.items:d.list).filter(r=>vLine==='All Lines'||r.sub===vLine);
-  const num=new Set(['lift','peaklift','ovr','used','bump','peakgap','suggest','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
+  const pool=d.items.filter(r=>vLine==='All Lines'||r.sub===vLine).filter(r=>vShow==='promo'?r.metrics.promo.status!=='None':vShow==='thin'?(r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short'):true);
+  const num=new Set(['lift','lyunits','promoext','totlift','peaklift','ovr','used','bump','peakgap','suggest','addqty','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
   const lst=`<div class="lscroll tall"><table class="list nwtbl"><thead><tr><th>Item</th>${VCOLS.map(k=>`<th class="${num.has(k)?'num':''}">${VHEAD[k]}</th>`).join('')}</tr></thead><tbody>${pool.map(r=>
     `<tr class="r" tabindex="0" data-open="${r.id}"><td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}${newToday(r.id)?' · new in today\'s files':''}</div></td>${VCOLS.map(k=>`<td class="${num.has(k)?'num ':''}${pcls(k,pv(k,r))}">${cellV(k,r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const picks=`<div class="row" style="gap:14px;flex-wrap:wrap;margin:6px 0 10px"><label>Show <select id="v-show"><option value="promo" ${vShow==='promo'?'selected':''}>Promo items and thin or short peaks</option><option value="peak" ${vShow==='peak'?'selected':''}>Every item with a peak</option></select></label><label>Line <select id="v-line">${d.lines.map(l=>`<option ${l===vLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label><span class="mute">${pool.length} items</span></div>`;
-  return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
+  const picks=`<div class="row" style="gap:14px;flex-wrap:wrap;margin:6px 0 10px"><label>Show <select id="v-show"><option value="all" ${vShow==='all'?'selected':''}>Every item with a peak or promo</option><option value="promo" ${vShow==='promo'?'selected':''}>Items with a promo</option><option value="thin" ${vShow==='thin'?'selected':''}>Thin or short peaks only</option></select></label><label>Line <select id="v-line">${d.lines.map(l=>`<option ${l===vLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label><span class="mute">${pool.length} items</span></div>`;
+  return `<div class="card sec" data-g="season"><h3>Seasonal And Promo Lifts</h3>
   <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
   <h4 class="sub-h">Which Months Are A Peak</h4><p class="mute">A normal month is the middle month of the year. A month that sells 1.5x that or more is a peak and shows its lift, shaded. Every other month is Normal. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
-  <h4 class="sub-h">Items To Check For Peaks And Promos</h4><p class="mute">Read left to right: when the peak weeks are, how big the lift is (calculated, then your override and reason, then the lift used), how many extra units that means, and whether stock and orders on the way cover it. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
+  <h4 class="sub-h">Items With A Peak Or A Promo</h4><p class="mute">Read left to right: the peak (when, how big the lift is, your override and reason, the lift used and its units), then the promo (this year's weeks, last year's weeks and units sold, the lift it gave, whether it falls inside the peak, and the extra units it adds), then whether stock and orders on the way cover it. Promo extra units sit on top of the peak level for weeks they share, so the two are added in units, never averaged. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
 function accuracyHtml(){
@@ -394,8 +424,7 @@ function seasonCard(sku,res){const m=res.metrics,pc=m.peakCover;
    ['Lowest stock in those weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Peak cover',pv('peakcover',res),'calc'],['Units short of peak cover',fv('peakgap',pv('peakgap',res)),'calc'],
    ['Peak lift (calculated)',pv('peaklift',res)===''?'—':fv('peaklift',pv('peaklift',res)),'calc'],['Peak bump (extra units)',pv('bump',res)===''?'—':fmt(pv('bump',res)),'calc'],['Stock last peak',pv('stocklp',res),'calc'],
    ['Your peak lift override',pv('ovr',res)===''?'None typed':fv('ovr',pv('ovr',res))+(pv('ovrwhy',res)?' ('+pv('ovrwhy',res)+')':''),'sheet'],['Order qty to place',pv('plan',res)===''?'None typed':fmt(pv('plan',res))+(pv('needby',res)?', needed by '+pv('needby',res):''),'sheet'],
-   ['Next promo',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Promo status',pv('promo',res),'calc'],
-   ['Promo lift last year',m.promo.lift==null?'—':fv('lift',r3(m.promo.lift)),'calc']];
+   ['This year promo (weeks starting)',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Last year promo (weeks starting)',pv('lypromo',res),'calc'],['Last promo units sold',pv('lyunits',res)===''?'—':fmt(pv('lyunits',res)),'calc'],['Last promo lift',pv('lift',res)===''?'—':fv('lift',pv('lift',res)),'calc'],['Promo and peak overlap',pv('overlap',res),'calc'],['Promo extra units',pv('promoext',res)===''?'—':fmt(pv('promoext',res)),'calc'],['Peak + promo units above a normal week',pv('totlift',res)===''?'—':fmt(pv('totlift',res)),'calc'],['Promo status',pv('promo',res),'calc']];
   return `<div class="card sec" data-g="season-sku"><h3>Season And Promos</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`}
 function updateOut(){const w=st.wi,set=(i,t)=>{const e=$('#'+i);if(e)e.textContent=t};
   set('o-slip',w.slip+' wk');set('o-lift',(w.lift>0?'+':'')+w.lift+'%');set('o-qty',fmt(w.qty));set('o-h','wk +'+w.h)}
@@ -586,7 +615,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={histData,HIST_MON,newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();

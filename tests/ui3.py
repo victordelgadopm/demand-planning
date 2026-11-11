@@ -14,7 +14,7 @@ with sync_playwright() as p:
     pg.select_option('#ds','Needs attention');ok('no Today tab',pg.locator('[data-xt=today]').count()==0)
     pg.click('[data-xt=all]');ok('master list has all 123 rows and a work-here banner',pg.locator('.xt tbody tr').count()==123 and 'Work here' in pg.locator('.role').inner_text())
     ok('master has green input columns',pg.locator('.xt th.inp').count()==6)
-    pg.click('[data-xt=promos]');ok('other tabs say view only','View only' in pg.locator('.role').inner_text())
+    pg.click('[data-xt=items]');ok('other tabs say view only','View only' in pg.locator('.role').inner_text())
     pg.click('[data-xt=dash]');pg.click('.dtab tbody tr');pg.wait_for_selector('#drawer.on');ok('row opens drawer',True);pg.keyboard.press('Escape')
     pg.click('nav [data-nav=custom]');pg.fill('#chat-t',"I need the supplier lead time");pg.press('#chat-t','Enter')
     ok('lead time column added',pg.evaluate("window.__shell.cols().includes('lt')"))
@@ -36,7 +36,7 @@ with sync_playwright() as p:
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Dashboard']
-    ok('xlsx 11 sheets, no Today tab',wb.sheetnames==['Dashboard','Master List (Work Here)','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Seasonal Items','Promos And Peaks','Since Yesterday','Notes','New And Missing Items','Recipe'])
+    ok('xlsx 11 sheets, no Today tab',wb.sheetnames==['Dashboard','Master List (Work Here)','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Seasonal And Promo Lifts','Sales History','Since Yesterday','Notes','New And Missing Items','Recipe'])
     ok('xlsx includes added column','Lead Time (Weeks)' in [c.value for c in ws[16]])
     wm=wb['Master List (Work Here)'];ok('master frozen+filter',wm.freeze_panes=='D2' and wm.auto_filter.ref is not None)
     ok('xlsx status colored',wb['Master List (Work Here)']['A2'].fill.fgColor.rgb=='FFF8D7DA')
@@ -44,7 +44,7 @@ with sync_playwright() as p:
     ok('all items has planner columns',all(h in hd for h in ['On Hand (Units)','In Transit (Units)','Open PO (Units)','Weeks Of Supply','Forecast Per Week (Units)','Stock-Out Week','Order By','ABC Class','Forecast Accuracy (13 Wks)']))
     ok('plan sheet 4 rows per item',wb['12-Week Plan'].max_row==1+123*4)
     nt=wb['Notes'];ok('notes tab has 15 notes',nt.max_row==16)
-    for sh,hr in [('Master List (Work Here)',1),('Seasonal Items',1),('12-Week Plan',1),('Since Yesterday',1),('Dashboard',16)]:
+    for sh,hr in [('Master List (Work Here)',1),('Seasonal And Promo Lifts',1),('12-Week Plan',1),('Since Yesterday',1),('Dashboard',16)]:
         ok('note column on '+sh,('Note (Type Here)' if sh.startswith('Master') else 'Note') in [c.value for c in wb[sh][hr]])
     wv=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx',data_only=True)['Master List (Work Here)'];ok('master list note filled for 15 items',sum(1 for r in range(2,125) if wv.cell(r,[c.value for c in wv[1]].index('Note (Type Here)')+1).value)==15)
     ok('only the master list is unlocked',[n for n in wb.sheetnames if not wb[n].protection.sheet]==['Master List (Work Here)'])
@@ -63,9 +63,9 @@ with sync_playwright() as p:
     pg.click('[data-xt=all]');ok('3 new rows highlighted on the master list',pg.locator('tr.newrow').count()==3 and pg.locator('td.t-new').count()==3)
     pg.click('[data-xt=dropped]');ok('new and dropped tab lists 3 new and 2 missing',pg.locator('.xt tbody tr').count()==5 and pg.locator('.xt td.t-drop').count()==2)
     pg.click('[data-xt=season]');ok('calendar shows Normal and shaded peaks',pg.locator('.xt td:has-text("Normal")').count()>=60 and pg.locator('.xt td.warn').count()>=6)
-    pg.click('[data-line=Collector]');ok('clicking a line opens Seasonal Items filtered to it',pg.locator('#il').input_value()=='Collector' and pg.locator('.xt tbody tr').count()==18)
+    pg.click('[data-line=Collector]');ok('clicking a line opens Seasonal And Promo Lifts filtered to it',pg.locator('#il').input_value()=='Collector' and pg.locator('.xt tbody tr').count()==18)
     wd=wb['New And Missing Items'];ok('xlsx new and dropped sheet has 5 rows',wd.max_row==6)
-    hm=[c.value for c in wm[1]];ok('xlsx master has file status and order columns',all(h in hm for h in ['File Status','Peak Lift (x)','Stock Last Peak','Suggested Order Qty','Order Qty With Override']))
+    hm=[c.value for c in wm[1]];ok('xlsx master has file status and order columns',all(h in hm for h in ['File Status','Peak Lift (x)','Stock Last Peak','Suggested Order Qty','Suggested Add For Peak And Promo (Units)','Why Add It','Total Suggested Qty (With Override)']))
     fs=hm.index('File Status')+1;ok('xlsx 3 New Today cells',sum(1 for r in range(2,125) if wm.cell(r,fs).value=='New Today')==3)
     ok('override has number validation',any(d.type=='decimal' for d in wm.data_validations.dataValidation))
     ok('dashboard carry-over line',wb['Dashboard']['A3'].value is not None)

@@ -322,6 +322,8 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .xt td.prodcol{min-width:230px}
 .xt td.t-drop{background:#ffe5b4;color:#8a4b08;font-weight:700}
 .nwtbl td:not(.icol){white-space:nowrap}
+.xt thead th.nxt{box-shadow:inset 0 -3px 0 #e0a030}
+.xt td.nw{white-space:nowrap}
 </style></head>
 <body>
 <header class="top"><div class="top-in">
@@ -533,6 +535,20 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
       if (tyP.length) { const f = tyP.slice().sort((a, b) => a.h - b.h)[0]; pr.next = fmtDate(weekStart(snap, f.h)); pr.name = f.name; pr.confirmed = !!f.confirmed; }
       else if (lyP.length) pr.name = lyP[0].name;
       if (lyP.length && !sku.isNew) pr.lift = measureLift(sku);
+      // promo timeframes as dates: last year's weeks shifted to the same calendar weeks, this year's with confirmed marks
+      const winText = (items) => { const o = items.slice().sort((a, b) => a.d - b.d), g = [];
+        o.forEach(x => { const l = g[g.length - 1]; if (l && x.d - l.e === 7 * MS && l.c === x.c) l.e = +x.d; else g.push({ s: +x.d, e: +x.d, c: x.c }); });
+        return g.map(x => (x.s === x.e ? fmtDate(new Date(x.s)) : fmtDate(new Date(x.s)) + ' to ' + fmtDate(new Date(x.e))) + (x.c === 1 ? ' (confirmed)' : x.c === 0 ? ' (not confirmed)' : '')).join(', '); };
+      pr.lyText = lyP.length ? winText(lyP.map(x => ({ d: addDays(weekStart(snap, 0), 7 * (x.w - 46) - 364), c: -1 }))) : null;
+      pr.tyText = tyP.length ? winText(tyP.map(x => ({ d: weekStart(snap, x.h), c: x.confirmed ? 1 : 0 }))) : null;
+      pr.lyUnits = lyP.length && !sku.isNew ? Math.round(sum(lyP.map(x => sku.pos.y2025[x.w - 1] || 0))) : null;
+      // units a confirmed promo adds on top of the forecast, split by whether the week is also a peak week
+      const pkw = metrics.peak ? metrics.peak.weeks : [], okLift = pr.lift != null && isFinite(pr.lift) && pr.lift > 0;
+      pr.extraIn = 0; pr.extraOut = 0;
+      if (okLift) tyC.forEach(x => { const u = (F[x.h] || 0) * pr.lift; if (pkw.includes(x.h)) pr.extraIn += u; else pr.extraOut += u; });
+      pr.extraIn = Math.round(pr.extraIn * 100) / 100; pr.extraOut = Math.round(pr.extraOut * 100) / 100;
+      const nIn = tyP.filter(x => pkw.includes(x.h)).length;
+      pr.overlap = !tyP.length ? 'No promo' : !pkw.length ? 'No peak' : nIn === tyP.length ? 'All in peak weeks' : nIn ? nIn + ' of ' + tyP.length + ' wks in peak' : 'Outside peak weeks';
       if (!tyP.length && !lyP.length) pr.status = 'None';
       else if (!tyP.length) pr.status = 'Last year only';
       else if (!tyC.length) pr.status = 'Not confirmed';
@@ -774,8 +790,22 @@ const RULES={
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int'};
+const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'x2',lyunits:'int',promoext:'int',totlift:'int',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int',addqty:'int'};
 const r3=x=>Math.round(x*10000)/10000;
+/* one chain for the peak and promo order: units short of 2 weeks of peak cover (after stock and orders on the way),
+   plus the units a confirmed promo adds, plus what a typed peak override adds, less what Suggested Order Qty already covers */
+function addParts(r,useOvr){const m=r.metrics,pc=m.peakCover,sg=pv('suggest',r)===''?0:pv('suggest',r),pr=m.promo||{};
+  const PG=pc?Math.max(0,Math.ceil(pc.safety-pc.minInv)):0,H=pc?R3k(Math.max(0,pc.minInv-pc.safety)):0,raw=PG-H;
+  const o=useOvr?pv('ovr',r):'',p=pv('peaklift',r),pe=useOvr?pv('promoext',r):Math.round((pr.extraIn||0)+(pr.extraOut||0));
+  const ovrx=o!==''&&p!==''&&m.baseWk?(o-p)*R3k(m.baseWk)*m.peakWks:0,X=raw+(pe===''?0:pe)+ovrx,a=X-sg<=0?0:Math.ceil((X-sg)/10)*10;
+  return {sg,raw,pe:pe===''?0:pe,ovrx,X,add:a,total:sg+a,hasPeakOrPromo:!!pc||(pr.extraIn+pr.extraOut>0)}}
+function addWhy(r){const m=r.metrics,pc=m.peakCover,q=addParts(r,false);if(!q.hasPeakOrPromo)return '';const nc=m.promo&&m.promo.status==='Not confirmed'?' The promo is not confirmed, so it is not counted.':'';return addWhy0(r,m,pc,q)+nc}
+function addWhy0(r,m,pc,q){
+  const pk=m.peak?(m.peak.start===m.peak.end?m.peak.start:m.peak.start+' to '+m.peak.end):'';
+  if(!q.add)return pc?'Stock and orders on the way cover the peak'+(q.pe?' and the promo':'')+'. No extra order needed.':'No peak in the next 12 weeks. Promo is covered.';
+  const bits=[];if(q.raw>0)bits.push('stock dips '+fmt(q.raw)+' below 2 weeks of peak cover'+(pk?' ('+pk+')':''));
+  if(q.pe)bits.push('the confirmed promo adds about '+fmt(q.pe)+' units'+(q.raw<0?', which uses up '+fmt(-q.raw)+' of spare stock':''));if(q.sg)bits.push(fmt(q.sg)+' is already in the suggested order');
+  return 'Add '+fmt(q.add)+': '+bits.join(', ')+'.'}
 const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
 function pv(k,r){const m=r.metrics,nw=r.isNew;
   switch(k){
@@ -803,13 +833,19 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'used':{const o=pv('ovr',r);return o!==''?o:pv('peaklift',r)}
    case 'bump':{const u=pv('used',r);return u===''||!m.baseWk?'':Math.round((u-1)*R3k(m.baseWk)*m.peakWks)}
    case 'peakgap':{const pc=m.peakCover;return pc?Math.max(0,Math.ceil(pc.safety-pc.minInv)):''}
-   case 'ordovr':{const o=pv('ovr',r),sg0=pv('suggest',r),p=pv('peaklift',r);if(o===''||p===''||!m.baseWk)return sg0;
-     const sg=sg0===''?0:sg0,ex=(o-p)*R3k(m.baseWk)*m.peakWks,H=m.peakCover?R3k(Math.max(0,m.peakCover.minInv-m.peakCover.safety)):0,need=sg>0?sg+ex:ex-H;return need<=0?'':Math.ceil(need/10)*10}
+   case 'ordovr':{const q=addParts(r,true);return q.total>0?q.total:''}
+   case 'addqty':{if(nw)return '';const q=addParts(r,false);return q.hasPeakOrPromo?q.add:''}
+   case 'addwhy':{if(nw)return '';return addWhy(r)}
    case 'peaklift':return nw||m.peakLift==null?'':r3(m.peakLift);
    case 'stocklp':return nw?'n/a':!m.peak?'No peak':m.stockLP;
    case 'promo':return m.promo.status;
-   case 'nextpromo':return m.promo.next?m.promo.next+(m.promo.confirmed?'':' (not confirmed)'):'None';
-   case 'lift':return m.promo.lift==null||!isFinite(m.promo.lift)?'':r3(m.promo.lift);}
+   case 'nextpromo':return m.promo.tyText||'None';
+   case 'lypromo':return m.promo.lyText||'None';
+   case 'lyunits':return m.promo.lyUnits==null?'':m.promo.lyUnits;
+   case 'overlap':return nw?'n/a':m.promo.overlap;
+   case 'promoext':{const pr=m.promo;if(nw||!pr||!(pr.extraIn+pr.extraOut>0))return nw?'':0;const u=pv('used',r),p=pv('peaklift',r),k=u!==''&&p!==''&&p>0?u/p:1;return Math.round(pr.extraIn*k+pr.extraOut)}
+   case 'totlift':{const b=pv('bump',r),x=pv('promoext',r);return b===''&&x===''?'':(b===''?0:b)+(x===''?0:x)}
+   case 'lift':return m.promo.lift==null||!isFinite(m.promo.lift)?'':r3(1+m.promo.lift);}
   return '';}
 function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!=='number')return String(v);
   switch(t){case 'int':return fmt(v);case 'dec1':return v.toFixed(1);case 'pct':return Math.round(v*100)+'%';case 'pctS':return (v>0?'+':'')+Math.round(v*100)+'%';
@@ -820,6 +856,7 @@ function pcls(k,v){if(v===''||v==null)return '';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
   if(k==='onhand'&&v<0)return 'bad';
+  if(k==='addqty')return typeof v==='number'&&v>0?'warn':'';
   if(k==='peakgap')return typeof v==='number'&&v>0?'warn':'';
   if(k==='stocklp')return String(v).startsWith('Out')?'warn':'';
   if(k==='peakcover')return v==='Short'?'bad':v==='Thin'?'warn':'';
@@ -967,13 +1004,10 @@ const MONS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','D
 const PRANK={'Confirmed, short':0,'Not confirmed':1,'Confirmed, covered':3,'New this year':4,'Last year only':5};
 function seasonData(){
   const sz=E.seasonality(snap()),rows=st.res.rows,pr=rows.filter(r=>r.metrics.promo.status!=='None'),pk=rows.filter(r=>r.metrics.peak);
-  const list=rows.filter(r=>r.metrics.promo.status!=='None'||r.metrics.peakStatus==='Short'||r.metrics.peakStatus==='Thin')
-    .sort((a,b)=>{const ra=a.metrics.peakStatus==='Short'?0:a.metrics.peakStatus==='Thin'?2:9,rb=b.metrics.peakStatus==='Short'?0:b.metrics.peakStatus==='Thin'?2:9;
-      return Math.min(PRANK[a.metrics.promo.status]??9,ra)-Math.min(PRANK[b.metrics.promo.status]??9,rb)||b.dollars-a.dollars||(a.id<b.id?-1:1)});
   const lines=['All Lines',...Object.keys(sz.lines).sort()],sh=l=>l==='All Lines'?sz.all:sz.lines[l];
   const lrow=lines.map(l=>{const a=sh(l),pm=E.peakMonthsOf(a);return {line:l,idx:E.monthIdx(a).map(x=>Math.round(x*100)/100),q4:a[9]+a[10]+a[11],peak:pm?pm.text:'None'}});
-  const items=rows.filter(r=>r.metrics.peak||r.metrics.promo.status!=='None').sort((a,b)=>(a.sub<b.sub?-1:a.sub>b.sub?1:0)||(b.metrics.peakLift||0)-(a.metrics.peakLift||0)||(a.id<b.id?-1:1));
-  return {sz,lines,lrow,list,items,
+  const items=rows.filter(r=>r.metrics.peak||r.metrics.promo.status!=='None').sort((a,b)=>(a.sub<b.sub?-1:a.sub>b.sub?1:0)||(a.metrics.promo.status==='None'?1:0)-(b.metrics.promo.status==='None'?1:0)||(b.metrics.peakLift||0)-(a.metrics.peakLift||0)||(a.id<b.id?-1:1));
+  return {sz,lines,lrow,items,
     n:{items:rows.length,promo:pr.length,ty:rows.filter(r=>r.metrics.promo.next).length,unconf:rows.filter(r=>r.metrics.promo.status==='Not confirmed').length,peak:pk.length,thin:rows.filter(r=>r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short').length}};
 }
 const SEASON_SRC=[
@@ -981,23 +1015,35 @@ const SEASON_SRC=[
  ['This year\'s promos','From a file','Read from the promo calendar in the Shared file, with a confirmed or not confirmed mark. If a promo is missing from the file, it will not show here, so "None" means none on file, not none planned.'],
  ['Last year\'s promo lift','Calculated','Measured by comparing last year\'s promo weeks with the normal weeks around them. It only shows when last year\'s promo weeks are tagged in the history.'],
  ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
-let vShow='promo',vLine='All Lines';
-const VCOLS=['promo','nextpromo','lift','peakwk','peaklift','ovr','ovrwhy','used','bump','peakgap','stocklp','peakcover','suggest','ordovr','plan','needby'];
-const VHEAD={promo:'Promo status',nextpromo:'Next promo',lift:'Last year promo lift',peakwk:'Peak weeks (next 12)',peaklift:'Peak lift (calculated)',ovr:'Your override',ovrwhy:'Override reason',used:'Peak lift used',suggest:'Suggested order qty',bump:'Peak bump (units)',peakgap:'Units short of peak cover',stocklp:'Stock last peak',peakcover:'Peak cover',ordovr:'Order qty (with override)',plan:'Qty to place',needby:'Needed by'};
+/* weekly sales history for the Sales History tab: one row per SKU per year, from the Reporting tool, plus the forecast */
+const HIST_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function histData(line){
+  const t0=Date.parse(snap().meta.today+'T00:00:00Z')+86400000,DAY=86400000,med=a=>{const v=a.filter(x=>x!=null).slice().sort((x,y)=>x-y);return v.length?v[Math.floor(v.length/2)]:0};
+  const out=[];
+  st.res.rows.filter(r=>!r.isNew&&(!line||line==='All Lines'||r.sub===line)).forEach(r=>{const sk=skuOf(r.id);if(!sk.pos)return;
+    const f26=Array.from({length:52},(_,i)=>i<45?(sk.forecast26||[])[i]:(sk.fcstH||[])[i-45]);
+    [['2026 Forecast',f26,0],['2026 Sold',sk.pos.y2026,0],['2025 Sold',sk.pos.y2025,1],['2024 Sold',sk.pos.y2024,2]].forEach(([lab,arr,yo])=>{
+      const wk=Array.from({length:52},(_,i)=>arr&&arr[i]!=null?Math.round(arr[i]):null),mo=new Array(12).fill(null);
+      wk.forEach((v,i)=>{if(v==null)return;const m=new Date(t0+(7*(i+1-46)-364*yo)*DAY).getUTCMonth();mo[m]=(mo[m]||0)+v});
+      out.push({id:r.id,r,label:lab,wk,mo,norm:Math.round(med(wk))})})});
+  return out}
+let vShow='all',vLine='All Lines';
+const VCOLS=['peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','suggest','addqty','addwhy','ordovr','plan','needby'];
+const VHEAD={peakwk:'Peak weeks (next 12)',peaklift:'Peak lift (calculated)',ovr:'Your override',ovrwhy:'Override reason',used:'Peak lift used',bump:'Peak bump (units)',promo:'Promo status',nextpromo:'This year promo (weeks starting)',lypromo:'Last year promo (weeks starting)',lyunits:'Last promo units sold',lift:'Last promo lift',overlap:'Promo and peak overlap',promoext:'Promo extra units',totlift:'Peak + promo units above a normal week',stocklp:'Stock last peak',peakcover:'Peak cover',peakgap:'Units short of peak cover',suggest:'Suggested order qty',addqty:'Suggested add for peak and promo',addwhy:'Why add it',ordovr:'Total suggested qty (with override)',plan:'Qty to place',needby:'Needed by'};
 function bindSeason(tb){const a=$('#v-show',tb),b=$('#v-line',tb);if(a)a.onchange=()=>{vShow=a.value;renderTab()};if(b)b.onchange=()=>{vLine=b.value;renderTab()}}
 function seasonHtml(){
   const d=seasonData(),n=d.n;
   const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Q4 share</th><th>Peak months</th></tr></thead><tbody>${d.lrow.map(l=>
     `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x>=1.5?x.toFixed(2)+'x':'Normal'}</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
-  const pool=(vShow==='peak'?d.items:d.list).filter(r=>vLine==='All Lines'||r.sub===vLine);
-  const num=new Set(['lift','peaklift','ovr','used','bump','peakgap','suggest','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
+  const pool=d.items.filter(r=>vLine==='All Lines'||r.sub===vLine).filter(r=>vShow==='promo'?r.metrics.promo.status!=='None':vShow==='thin'?(r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short'):true);
+  const num=new Set(['lift','lyunits','promoext','totlift','peaklift','ovr','used','bump','peakgap','suggest','addqty','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
   const lst=`<div class="lscroll tall"><table class="list nwtbl"><thead><tr><th>Item</th>${VCOLS.map(k=>`<th class="${num.has(k)?'num':''}">${VHEAD[k]}</th>`).join('')}</tr></thead><tbody>${pool.map(r=>
     `<tr class="r" tabindex="0" data-open="${r.id}"><td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}${newToday(r.id)?' · new in today\'s files':''}</div></td>${VCOLS.map(k=>`<td class="${num.has(k)?'num ':''}${pcls(k,pv(k,r))}">${cellV(k,r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const picks=`<div class="row" style="gap:14px;flex-wrap:wrap;margin:6px 0 10px"><label>Show <select id="v-show"><option value="promo" ${vShow==='promo'?'selected':''}>Promo items and thin or short peaks</option><option value="peak" ${vShow==='peak'?'selected':''}>Every item with a peak</option></select></label><label>Line <select id="v-line">${d.lines.map(l=>`<option ${l===vLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label><span class="mute">${pool.length} items</span></div>`;
-  return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
+  const picks=`<div class="row" style="gap:14px;flex-wrap:wrap;margin:6px 0 10px"><label>Show <select id="v-show"><option value="all" ${vShow==='all'?'selected':''}>Every item with a peak or promo</option><option value="promo" ${vShow==='promo'?'selected':''}>Items with a promo</option><option value="thin" ${vShow==='thin'?'selected':''}>Thin or short peaks only</option></select></label><label>Line <select id="v-line">${d.lines.map(l=>`<option ${l===vLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label><span class="mute">${pool.length} items</span></div>`;
+  return `<div class="card sec" data-g="season"><h3>Seasonal And Promo Lifts</h3>
   <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
   <h4 class="sub-h">Which Months Are A Peak</h4><p class="mute">A normal month is the middle month of the year. A month that sells 1.5x that or more is a peak and shows its lift, shaded. Every other month is Normal. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
-  <h4 class="sub-h">Items To Check For Peaks And Promos</h4><p class="mute">Read left to right: when the peak weeks are, how big the lift is (calculated, then your override and reason, then the lift used), how many extra units that means, and whether stock and orders on the way cover it. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
+  <h4 class="sub-h">Items With A Peak Or A Promo</h4><p class="mute">Read left to right: the peak (when, how big the lift is, your override and reason, the lift used and its units), then the promo (this year's weeks, last year's weeks and units sold, the lift it gave, whether it falls inside the peak, and the extra units it adds), then whether stock and orders on the way cover it. Promo extra units sit on top of the peak level for weeks they share, so the two are added in units, never averaged. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
 function accuracyHtml(){
@@ -1138,8 +1184,7 @@ function seasonCard(sku,res){const m=res.metrics,pc=m.peakCover;
    ['Lowest stock in those weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Peak cover',pv('peakcover',res),'calc'],['Units short of peak cover',fv('peakgap',pv('peakgap',res)),'calc'],
    ['Peak lift (calculated)',pv('peaklift',res)===''?'—':fv('peaklift',pv('peaklift',res)),'calc'],['Peak bump (extra units)',pv('bump',res)===''?'—':fmt(pv('bump',res)),'calc'],['Stock last peak',pv('stocklp',res),'calc'],
    ['Your peak lift override',pv('ovr',res)===''?'None typed':fv('ovr',pv('ovr',res))+(pv('ovrwhy',res)?' ('+pv('ovrwhy',res)+')':''),'sheet'],['Order qty to place',pv('plan',res)===''?'None typed':fmt(pv('plan',res))+(pv('needby',res)?', needed by '+pv('needby',res):''),'sheet'],
-   ['Next promo',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Promo status',pv('promo',res),'calc'],
-   ['Promo lift last year',m.promo.lift==null?'—':fv('lift',r3(m.promo.lift)),'calc']];
+   ['This year promo (weeks starting)',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Last year promo (weeks starting)',pv('lypromo',res),'calc'],['Last promo units sold',pv('lyunits',res)===''?'—':fmt(pv('lyunits',res)),'calc'],['Last promo lift',pv('lift',res)===''?'—':fv('lift',pv('lift',res)),'calc'],['Promo and peak overlap',pv('overlap',res),'calc'],['Promo extra units',pv('promoext',res)===''?'—':fmt(pv('promoext',res)),'calc'],['Peak + promo units above a normal week',pv('totlift',res)===''?'—':fmt(pv('totlift',res)),'calc'],['Promo status',pv('promo',res),'calc']];
   return `<div class="card sec" data-g="season-sku"><h3>Season And Promos</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`}
 function updateOut(){const w=st.wi,set=(i,t)=>{const e=$('#'+i);if(e)e.textContent=t};
   set('o-slip',w.slip+' wk');set('o-lift',(w.lift>0?'+':'')+w.lift+'%');set('o-qty',fmt(w.qty));set('o-h','wk +'+w.h)}
@@ -1330,7 +1375,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={histData,HIST_MON,newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();
@@ -1466,7 +1511,9 @@ const COLS={
  used:{h:'Peak Lift Used',w:10,num:'x2',src:'formula: your override when you typed one, otherwise the calculated lift'},
  bump:{h:'Peak Bump (Units)',w:11,num:'int',src:'formula: the extra units the peak weeks sell above a normal week, using the lift in Peak Lift Used (so it moves when you type an override)'},
  peakgap:{h:'Units Short Of Peak Cover',w:12,num:'int',src:'calculated: units needed to keep 2 weeks of peak demand in stock through the peak weeks, after the stock and orders already on the way'},
- ordovr:{h:'Order Qty With Override',w:13,num:'int',src:'formula: the suggested order plus or minus the units your override adds across the peak weeks (after using any spare stock), rounded up to 10'},
+ addqty:{h:'Suggested Add For Peak And Promo (Units)',w:15,num:'int',src:'calculated: the extra units to order so stock stays above 2 weeks of peak demand through the peak weeks, counting this year\'s confirmed promo and less what Suggested Order Qty already covers, rounded up to 10. 0 means stock and orders on the way already cover it'},
+ addwhy:{h:'Why Add It',w:60,wide:1,src:'calculated: the reason in words (how far stock dips below peak cover, what the promo adds, and what is already in the suggested order)'},
+ ordovr:{h:'Total Suggested Qty (With Override)',w:15,num:'int',src:'formula: Suggested Order Qty plus the peak and promo add, recalculated with any Peak Lift Override you typed (the override changes the peak units and the promo units that fall inside the peak), rounded up to 10. With no override it equals Suggested Order Qty plus Suggested Add'},
  plan:{h:'Order Qty To Place',w:12,num:'int',src:'typed in the Master List: the new order you decide to place now, ready to copy into the planning system. It is not the orders already placed (those are In Transit and Open PO)'},
  needby:{h:'Needed By',w:11,src:'typed in the Master List: the date the units are needed'},
  status:{h:'Status',w:13,core:1},sku:{h:'SKU',w:11,core:1},product:{h:'Product',w:32,core:1},sub:{h:'Line',w:17},abc:{h:'ABC Class',w:9,src:'from the Planning system: A items make up the first 80% of 12-week forecast sales value, B the next 15%, C the last 5%'},
@@ -1496,8 +1543,13 @@ const COLS={
  peakwk:{h:'Peak Weeks (Next 12)',w:20,src:'calculated: the weeks in the next 12 that sold at least 1.5x a normal week last year'},
  peakcover:{h:'Peak Cover',w:11,src:'calculated: whether projected stock stays above 2 weeks of peak demand through the peak weeks (OK, Thin or Short)'},
  promo:{h:'Promo Status',w:18,src:'from the Shared file (the promo calendar) and last year\'s tagged promo weeks'},
- nextpromo:{h:'Next Promo',w:22,src:'from the Shared file: the next promo week on the calendar and whether it is confirmed'},
- lift:{h:'Promo Lift (Last Year)',w:12,num:'pctS',src:'calculated: last year\'s promo weeks compared with the normal weeks around them'},
+ nextpromo:{h:'This Year Promo (Weeks Starting)',w:26,src:'from the Shared file (the promo calendar): every promo week this year, grouped, with confirmed or not confirmed'},
+ lypromo:{h:'Last Year Promo (Weeks Starting)',w:22,src:'from the Reporting tool: the weeks last year\'s promo ran, moved to the same calendar weeks this year'},
+ lyunits:{h:'Last Promo Units Sold',w:12,num:'int',src:'from the Reporting tool: total units sold in last year\'s promo weeks'},
+ lift:{h:'Last Promo Lift (x)',w:11,num:'x2',src:'calculated: how much more last year\'s promo weeks sold than the normal weeks around them, after taking out the season (1.50x means 50% more)'},
+ overlap:{h:'Promo And Peak Overlap',w:19,src:'calculated: whether this year\'s promo weeks fall inside the peak weeks, so you know the promo lands on top of a busy season'},
+ promoext:{h:'Promo Extra Units',w:11,num:'int',src:'formula: units this year\'s confirmed promo adds on top of the forecast (forecast in the promo weeks times the last promo lift). For promo weeks inside the peak it moves with Peak Lift Used, so a peak override changes it. It is 0 when there is no confirmed promo, or no last-year promo to measure a lift from (status New this year), so for a new promo add your own estimate to the order'},
+ totlift:{h:'Peak + Promo Units Above A Normal Week',w:15,num:'int',src:'formula: Peak Bump plus Promo Extra Units. The two are added in units, never averaged'},
  decision:{h:'Decision',w:21,src:'calculated: the action the item needs (order more, too much stock, forecast looks off, check the data)'},
  attn:{h:'Needs Attention',w:11,src:'calculated: Yes when any check flagged the item today'},
  notedate:{h:'Note Date',w:11,src:'typed in the Master List next to the note'},
@@ -1505,13 +1557,13 @@ const COLS={
  note:{h:'Note',w:48,wide:1,src:'typed in the Master List, one note per item'}};
 const DEFAULT=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','note','conf'];
 const MASTER='Master List (Work Here)',INK=['ovr','ovrwhy','plan','needby','note','notedate'],MINCOLS=12;
-const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','stocklp','peakcover','peakgap','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','suggest','ordovr','plan','needby','note','notedate'];
+const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','suggest','addqty','addwhy','ordovr','plan','needby','note','notedate'];
 const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
 const saveCols=()=>{try{localStorage.setItem(CK,JSON.stringify(cols))}catch(e){}};
 let rowsMode='attn',tab='dash';
-const PLK=new Set(['filest','suggest','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lift']);
+const PLK=new Set(['filest','suggest','addqty','addwhy','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift']);
 function val(k,r){
   if(PLK.has(k))return A.pv(k,r);
   const m=r.metrics,sk=A.skuOf(r.id),n=A.noteFor(r.id);
@@ -1582,18 +1634,20 @@ const DEFS=[
  ['Peak Months / Peak Weeks','Peak months are the calendar months that sold at least 1.5x an average month, over the last two years. Peak weeks are the weeks in the next 12 that sold at least 1.5x a normal week last year.'],
  ['Peak Cover','OK means projected stock stays above 2 weeks of peak demand through the peak weeks. Thin means it dips below that. Short means stock goes below zero. "No peak" means no peak week falls in the next 12.'],
  ['Promo Status','None, Last year only, Not confirmed (this year\'s promo is on the calendar but not confirmed), Confirmed covered or short (supply against the base forecast plus last year\'s lift), or New this year.'],
- ['Promo Lift (Last Year)','Last year\'s promo weeks compared with the normal weeks around them.'],
+ ['Last Promo Lift And Units','Last year\'s promo weeks compared with the normal weeks around them, after taking out the season. 1.50x means the promo weeks sold 50% more. Last Promo Units Sold is the total sold in those weeks, so you can see the real number behind the lift. Both are measured from the weeks last year\'s promo ran, moved to the same calendar weeks this year.'],
+ ['Promo And Peak Overlap','Says whether this year\'s promo weeks fall inside the peak weeks. When they do, the promo lands on top of an already busy season.'],
+ ['Promo Extra Units And Peak + Promo Units','Peak Bump is the units the peak weeks sell above a normal week. Promo Extra Units is what the confirmed promo adds on top of the forecast in its weeks (forecast times the last promo lift). For a promo inside the peak it scales with the Peak Lift Used, so a peak override moves it. Peak + Promo Units adds the two in units. It is 0 for a promo with no last-year history (New this year), because there is no lift to measure. Nothing is averaged, and a week is never counted twice: the promo sits on top of the peak level, and the peak bump is measured against a normal week.'],
  ['12-Week Plan','Projected On Hand each week is last week plus receipts minus forecast demand. Red means below zero. Lowest Point is the lowest projected week. The Peak / Promo Weeks row marks PEAK weeks, PROMO weeks (PROMO? if not confirmed) and BOTH.']];
 function recipeItems(){
   return [['Rows Shown','The Master List holds every item, with the ones that need attention first, ranked by status then dollars. The Dashboard starts on the items that need attention.'],
    ['Dashboard Columns',cols.map(k=>COLS[k].h).join(', ')+'. The Master List always holds every column.'],
    ['Data Sources',D.sources.map(s=>s.name).join(', ')],
    ['Checks Run',Object.keys(E.FLAG_LABEL).filter(k=>st.settings.flags[k]).map(k=>E.FLAG_LABEL[k]).join(', ')],
-   ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal Calendar tab lists what is calculated, what comes from a file and what is not available.'],
+   ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal Calendar tab lists what is calculated, what comes from a file and what is not available. The Sales History tab shows the weekly sales behind the peaks, and the Master List suggests how many units to add for a peak or promo, with the reason.'],
    ['Notes','Notes never expire. Type one note per item in the Master List. In the app, a comment keeps the alert on and an accepted risk stops it, coming back only if its gap grows past 1.5 times what was accepted.'],
    ['Carrying Work Forward','Each run starts from yesterday\'s file and the two fresh source files. Calculated columns are replaced from the new files. The green columns are copied across by SKU, so notes, peak overrides, order quantities to place and needed-by dates carry forward. An order quantity to place is flagged for review once its Needed By date passes, and an override is flagged for review after two weeks, so old fixes do not drive orders forever.'],
    ['New And Missing Items','A SKU in today\'s files that was not in yesterday\'s is marked New Today and highlighted blue on the Master List, with the green columns empty. A SKU that was in yesterday\'s file but is missing from today\'s goes to the New And Missing Items tab with the work you had typed, so you know to check the shared files for what happened.'],
-   ['Peak Override And Orders','Read the peak columns left to right on the Master List: Peak Weeks is when, Peak Lift is how big (the forecast in the peak weeks divided by a normal week), with your Override and its Reason beside it and Peak Lift Used after them, Peak Bump is the extra units that means, and Units Short Of Peak Cover is what is still missing after stock and orders on the way. If you know last year was out of stock, type your own lift on the Master List. Order Qty With Override then adds the extra units across the peak weeks to the suggested order (after using any spare stock). Order Qty To Place and Needed By are yours to type and copy into the planning system.'],
+   ['Peak Override And Orders','Read the peak columns left to right on the Master List: Peak Weeks is when, Peak Lift is how big (the forecast in the peak weeks divided by a normal week), with your Override and its Reason beside it and Peak Lift Used after them, Peak Bump is the extra units that means, and Units Short Of Peak Cover is what is still missing after stock and orders on the way. If you know last year was out of stock, type your own lift on the Master List. Suggested Order Qty covers stock-out gaps. Suggested Add For Peak And Promo says how many more units to order so stock stays above 2 weeks of peak demand, counting the confirmed promo, and Why Add It gives the reason in words. Total Suggested Qty (With Override) adds them together and recalculates with any override you typed. Order Qty To Place and Needed By are yours to type and copy into the planning system.'],
    ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
    ['How To Change It','Tell the AI in chat what you are not seeing. It updates this recipe.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
@@ -1641,9 +1695,8 @@ function planGrid(rows){
 }
 const NK=['status','sku','product','note','notedate','going'];
 let itemLine='All Lines';
-const ITK=['status','sku','product','filest','sub','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','stocklp','peakcover','peakgap','suggest','ordovr','note'];
-const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peaklift','peakcover','peakgap','going','note'];
-const SEASON_KEY='How to read this: a normal month is the middle month of the year. A month that sells 1.50x that or more is a peak, so it shows its lift and is shaded. Every other month just reads Normal. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. A line is an average, so one item can peak when its line does not: open Seasonal Items and filter Line to see every item.';
+const LFK=['status','sku','product','filest','sub','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','suggest','addqty','addwhy','ordovr','note'];
+const SEASON_KEY='How to read this: a normal month is the middle month of the year. A month that sells 1.50x that or more is a peak, so it shows its lift and is shaded. Every other month just reads Normal. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. A line is an average, so one item can peak when its line does not: open Seasonal And Promo Lifts and filter Line to see every item.';
 const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short.`;
 function seasonGrid(){
   const d=A.seasonData(),heads=[{t:'Line'},...A.MONS.map(m=>({t:m,cls:'money'})),{t:'Q4 Share',cls:'money'},{t:'Peak Months'}];
@@ -1655,9 +1708,9 @@ function accGrid(){
   const rows=accRows(),heads=['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal'].map((t,i)=>({t,cls:i>=1&&i<=4?'money':''}));
   return {html:gridHtml(heads,rows.map(x=>({c:[{t:x.line,cls:'bold'},{t:String(x.n),cls:'money'},{t:A.pctN(1-x.w),cls:'money'},{t:A.pctN(x.w),cls:'money'},{t:A.pctSN(x.b),cls:'money'},{t:tgtText(x.w,x.b),cls:({'On target':'','Watch':'warn','Off target':'bad'})[tgtText(x.w,x.b)]},{t:x.sig,cls:'wide'}]}))),n:rows.length-1};
 }
-const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['items','Seasonal Items'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['dropped','New And Missing Items'],['recipe','Recipe']];
+const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['items','Seasonal And Promo Lifts'],['hist','Sales History'],['since','Since Yesterday'],['notes','Notes'],['dropped','New And Missing Items'],['recipe','Recipe']];
 function roleHtml(){
-  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the green columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Blue rows are new in today\'s files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means, and Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right, Suggested Order Qty, Order Qty With Override and Order Qty To Place sit together: what the system suggests, what it suggests with your override, and what you decide. Type an override and the bump and order quantities update.</div>`;
+  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the green columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Blue rows are new in today\'s files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak and promo columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means. Next come the promo columns: this year\'s promo weeks, last year\'s promo weeks, the units it sold and the lift it gave, whether it lands inside the peak, and Promo Extra Units. Peak Bump plus Promo Extra Units is shown in units, never averaged. Then Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right the order columns sit together: Suggested Order Qty (stock-out gaps), Suggested Add For Peak And Promo with Why Add It (what the peak and promo need on top), Total Suggested Qty (With Override) (all of it, recalculated when you type an override), and Order Qty To Place, which is what you decide. Type an override and the bump, promo and order quantities update.</div>`;
   if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div><div class="carry-box"><b>Today\'s files:</b> ${esc(carryText())}</div>`;
   if(tab==='dropped')return `<div class="role"><b>View only.</b> Every change in which items are in the files. New means the item is in today\'s files but was not in yesterday\'s (it is also blue on the Master List). Missing Today means it was in yesterday\'s file but is not in today\'s: the run lists it here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
   if(tab==='recipe')return '';
@@ -1677,9 +1730,11 @@ function renderSheet(){
   else if(tab==='plan'){const g=planGrid(sheetRows(rowsMode));inner=g.html;count=`${g.n} items, ${E.H} weeks`}
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
   else if(tab==='season'){inner=seasonGrid();count='12 months, by line'}
-  else if(tab==='promos'){const d=A.seasonData(),g=colGrid(PPK,d.list);inner=g.html;count=`${g.n} items with a promo or a thin peak`}
-  else if(tab==='items'){const d=A.seasonData(),its=d.items.filter(r=>itemLine==='All Lines'||r.sub===itemLine),g=colGrid(ITK,its);
-    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Every item with a peak, by line (promos are on the Promos And Peaks tab). Read left to right: when the peak weeks are, how big the lift is (with your override and reason beside it), how many extra units that is (Peak Bump), whether stock covers it (Peak Cover and Units Short Of Peak Cover). Stock Last Peak shows items that were out of stock last year, when last year\'s sales understate demand. To change a lift, type an override on the Master List.</div>`+g.html;count=`${g.n} items`+(itemLine==='All Lines'?'':', '+itemLine)}
+  else if(tab==='items'){const d=A.seasonData(),its=d.items.filter(r=>itemLine==='All Lines'||r.sub===itemLine),g=colGrid(LFK,its);
+    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Every item with a peak or a promo, by line. Read left to right: the peak (when, how big, your override and reason beside it, and the Peak Bump in units), then the promo (this year\'s weeks, last year\'s weeks and units sold, the lift it gave, whether it lands inside the peak, and the Promo Extra Units it adds on top), then whether stock covers it (Peak Cover and Units Short Of Peak Cover). Peak and promo are added in units, never averaged. Stock Last Peak shows items that were out of stock last year, when last year\'s sales understate demand. To change a lift, type an override on the Master List.</div>`+g.html;count=`${g.n} items with a peak or promo`+(itemLine==='All Lines'?'':', '+itemLine)}
+  else if(tab==='hist'){const d=A.histData(itemLine),h=[{t:'Status'},{t:'SKU'},{t:'Product'},{t:'Line'},{t:'Row'},{t:'Normal Week (Units)',cls:'money'},...A.HIST_MON.map(t=>({t,cls:'money'})),...Array.from({length:52},(_,i)=>({t:'Wk '+(i+1),cls:'money'+(i>=45?' nxt':'')}))];
+    const body=d.map(x=>({id:x.id,c:[{t:A.tn(x.r.tier),cls:'st '+TCLASS[x.r.tier]},{t:x.id},{t:x.r.name,cls:'nw'},{t:x.r.sub,cls:'nw'},{t:x.label,cls:'bold nw'},{t:x.norm>0?E.fmtNum(x.norm):'',cls:'money'},...x.mo.map(v=>({t:v==null?'':E.fmtNum(v),cls:'money'})),...x.wk.map((v,i)=>({t:v==null?'':E.fmtNum(v),cls:'money'+(v!=null&&x.norm>0&&v>=1.5*x.norm?' warn':'')}))]}));
+    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${A.seasonData().lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Units sold by week for 2024, 2025 and 2026, with the 2026 forecast, so you can see where inside a peak the units land: the first week, the last weeks, or the whole month. Each SKU has four rows. Amber weeks sold at least 1.5x that row\'s Normal Week (its middle week, left blank for items that sold in fewer than half the weeks, so nothing is highlighted for them). Monthly totals are on the left, weeks 1 to 52 on the right, and Wk 46 to Wk 52 are the weeks starting now. The forecast row shows the forecast for 2026; only Wk 46 to Wk 52 of the next 12 weeks fall in 2026. This reads the same sales history the peak weeks are calculated from, from the Reporting tool.</div>`+gridHtml(h,body,{empty:'No items.'});count=`${new Set(d.map(x=>x.id)).size} items`+(itemLine==='All Lines'?'':', '+itemLine)}
   else if(tab==='dropped'){const cl=changeList();inner=gridHtml(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Yesterday','Qty To Place','Needed By','What To Check'].map((t,i)=>({t,cls:i==4||i==5||i==7?'money':''})),cl.map(x=>({id:x.chg==='New'?x.id:null,cls:x.chg==='New'?'newrow':'',c:[{t:x.chg==='New'?'New Today':'Missing Today',cls:'st '+(x.chg==='New'?'t-new':'t-drop')},{t:x.id},{t:x.name},{t:x.sub},{t:E.fmtNum(x.onHand),cls:'money'},{t:E.fmtNum(x.po),cls:'money'},{t:x.note,cls:'wide'},{t:x.plan===''?'':E.fmtNum(x.plan),cls:'money'},{t:x.by},{t:x.check,cls:'wide'}]})),{empty:'Nothing new or missing today.'});count=A.NEWIDS.length+' new, '+A.droppedList().length+' missing'}
   else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail','Note'].map(t=>({t})),it.map(r=>({id:r[2],c:[...r.map(t=>({t})),{t:val('note',A.rowOf(r[2])),cls:'wide'}]})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
   else if(tab==='notes'){const g=colGrid(NK,sheetRows('all').filter(r=>A.noteFor(r.id)),'No notes yet.');inner=g.html;count=g.n+' notes'}
@@ -1733,16 +1788,18 @@ function downloadXlsx(){
   const STATL=STAT(),D0=dashDec,S0=dashStat;
   /* ---- Master List (Work Here): every item, every column, plus two hidden helper columns that drive the dashboard ---- */
   const nf=FULLK.length,ix=k=>FULLK.indexOf(k);
-  const HELP=['Status Match','Show','Base Wk Units','Peak Weeks','Peak Headroom'];
+  const HELP=['Status Match','Show','Base Wk Units','Peak Weeks','Peak Headroom','Promo Units In Peak','Promo Units Outside Peak'];
   const dataSheet=mk(allRows,MASTER,FULLK);
   dataSheet.tab='FF2E7D32';dataSheet.freezeCols=3;
   /* the three green columns are the only place anyone types */
   INK.forEach(k=>{const c=ix(k);dataSheet.rows[0][c]={v:COLS[k].h+' (Type Here)',s:'headIn'};allRows.forEach((r,i)=>{dataSheet.rows[i+1][c]={v:val(k,r),s:'inp'}})});
-  {const cU=ix('used'),cO=ix('ordovr'),OV=C(ix('ovr')),PL=C(ix('peaklift')),SG=C(ix('suggest')),B=C(nf+2),P=C(nf+3),H=C(nf+4);
-   allRows.forEach((r,i)=>{const er=i+2,row=dataSheet.rows[i+1],ex=`(${OV}${er}-${PL}${er})*${B}${er}*${P}${er}`,need=`IF(N(${SG}${er})>0,N(${SG}${er})+${ex},${ex}-${H}${er})`;
+  {const cU=ix('used'),cO=ix('ordovr'),OV=C(ix('ovr')),PL=C(ix('peaklift')),SG=C(ix('suggest')),B=C(nf+2),P=C(nf+3),H=C(nf+4),PI=C(nf+5),PO=C(nf+6),cPE=ix('promoext'),cTL=ix('totlift');
+   allRows.forEach((r,i)=>{const er=i+2,row=dataSheet.rows[i+1],PGc=C(ix('peakgap')),PEc=C(cPE),ovrx=`IF(AND(ISNUMBER(${OV}${er}),ISNUMBER(${PL}${er}),ISNUMBER(${B}${er})),(${OV}${er}-${PL}${er})*${B}${er}*${P}${er},0)`,X=`(N(${PGc}${er})-N(${H}${er})+N(${PEc}${er})+${ovrx})`,AD=`IF(${X}-N(${SG}${er})<=0,0,CEILING(${X}-N(${SG}${er}),10))`;
     row[ix('bump')]={f:`IF(AND(ISNUMBER(${C(cU)}${er}),ISNUMBER(${B}${er}),ISNUMBER(${P}${er})),ROUND((${C(cU)}${er}-1)*${B}${er}*${P}${er},0),"")`,v:val('bump',r),s:'int'};
+    if(r.isNew){row[cPE]={v:'',s:'int'};row[cTL]={v:'',s:'int'}}else{row[cPE]={f:`IF(N(${PI}${er})+N(${PO}${er})>0,ROUND(N(${PI}${er})*IF(AND(ISNUMBER(${C(cU)}${er}),ISNUMBER(${PL}${er})),${C(cU)}${er}/${PL}${er},1)+N(${PO}${er}),0),0)`,v:val('promoext',r),s:'int'};
+    row[cTL]={f:`IF(AND(${C(cU)}${er}="",${C(cPE)}${er}=""),"",N(${C(ix('bump'))}${er})+N(${C(cPE)}${er}))`,v:val('totlift',r),s:'int'}}
     row[cU]={f:`IF(ISNUMBER(${OV}${er}),${OV}${er},IF(ISNUMBER(${PL}${er}),${PL}${er},""))`,v:val('used',r),s:'x2'};
-    row[cO]={f:`IF(AND(ISNUMBER(${OV}${er}),ISNUMBER(${PL}${er}),ISNUMBER(${B}${er})),IF(${need}<=0,"",CEILING(${need},10)),IF(N(${SG}${er})>0,${SG}${er},""))`,v:val('ordovr',r),s:'int'}});
+    row[cO]={f:`IF(N(${SG}${er})+${AD}>0,N(${SG}${er})+${AD},"")`,v:val('ordovr',r),s:'int'}});
    dataSheet.dv=[{type:'decimal',min:'1',max:'8',ref:`${OV}2:${OV}${N+1}`,title:'Peak lift override',prompt:'Type your own peak lift, like 3.0 for 3 times a normal week. Leave it blank to use the calculated lift.',errTitle:'Not a lift',err:'Type a number from 1 to 8, or clear the cell.'}];
    dataSheet.cf.push({ref:`A2:${C(nf-1)}${N+1}`,rules:[{type:'expression',dxf:3,formula:`$${C(ix('filest'))}2="New Today"`}]})}
   dataSheet.rows[0].push(...HELP.map(t=>({v:t,s:'head'})));
@@ -1751,7 +1808,7 @@ function downloadXlsx(){
   allRows.forEach((r,i)=>{const row=dataSheet.rows[i+1],er=i+2;
     const mm=r.metrics,hasPk=mm.peak&&mm.baseWk;
     row.push({f:`IF(OR(Dashboard!$F$4="All statuses",AND(Dashboard!$F$4="Needs attention",${aCol}${er}="Yes"),${sCol}${er}=Dashboard!$F$4),1,0)`,v:statOK(r)?1:0,s:'txt'},
-     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${dCol}${er}=Dashboard!$B$4),${hL(0)}${er}=1),MAX(${hL(1)}$1:${hL(1)}${er-1})+1,"")`,v:showVal[i],s:'txt'},{v:hasPk?R3(mm.baseWk):'',s:'dec1'},{v:hasPk?mm.peakWks:'',s:'int'},{v:mm.peakCover?R3(Math.max(0,mm.peakCover.minInv-mm.peakCover.safety)):0,s:'int'})});
+     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${dCol}${er}=Dashboard!$B$4),${hL(0)}${er}=1),MAX(${hL(1)}$1:${hL(1)}${er-1})+1,"")`,v:showVal[i],s:'txt'},{v:hasPk?R3(mm.baseWk):'',s:'dec1'},{v:hasPk?mm.peakWks:'',s:'int'},{v:mm.peakCover?R3(Math.max(0,mm.peakCover.minInv-mm.peakCover.safety)):0,s:'int'},{v:R3(mm.promo.extraIn||0),s:'int'},{v:R3(mm.promo.extraOut||0),s:'int'})});
   dataSheet.widths=[...dataSheet.widths,...HELP.map(()=>14)];
   dataSheet.hide=HELP.map((_,i)=>nf+i);
   const rng=k=>{const c=C(typeof k==='number'?nf+k:ix(k));return `'${MASTER}'!$${c}$2:$${c}$${N+1}`};
@@ -1791,7 +1848,7 @@ function downloadXlsx(){
   // first projected week starts from On Hand Now (column E)
   plan.cf.push({ref:`${C(wc0)}2:${C(lc)}${pl}`,rules:[{type:'expression',dxf:0,formula:`AND($D2="Projected On Hand",ISNUMBER(${C(wc0)}2),${C(wc0)}2<0)`}]});
   plan.cf.push({ref:`${C(wc0)}2:${C(wcN)}${pl}`,rules:[{type:'expression',dxf:1,formula:`AND($D2="Peak / Promo Weeks",${C(wc0)}2<>"")`}]});
-  /* ---- Seasonal Calendar and Seasonal Items ---- */
+  /* ---- Seasonal Calendar and Seasonal And Promo Lifts ---- */
   const SD=A.seasonData(),SR=SD.lines.length,sc0=5;
   const season={name:'Seasonal Calendar',fit:true,widths:[24,...Array(12).fill(8),10,16],freeze:0,rows:[],merges:[],cf:[]};
   const sput=(r,c,o)=>{while(season.rows.length<r)season.rows.push([]);season.rows[r-1][c]=o};
@@ -1802,13 +1859,20 @@ function downloadXlsx(){
     v:`${SD.n.promo} of ${SD.n.items} items have a promo this year or last year. ${SD.n.thin} items would run thin or short into a peak in the next 12 weeks.`,s:'note'});
   sspan(3,0,LC,{v:SEASON_KEY,s:'note'});
   season.rows[1].h=22;season.rows[2].h=34;
-  sput(4,0,{v:'To see the items behind a line, open the Seasonal Items tab and filter Line.',s:'note'});season.merges.push(`A4:${C(LC)}4`);for(let c=1;c<=LC;c++)sput(4,c,{v:'',s:'note'});sput(5,0,{v:'Line',s:'head'});A.MONS.forEach((m,j)=>sput(5,1+j,{v:m,s:'head'}));sput(5,13,{v:'Q4 Share',s:'head'});sput(5,14,{v:'Peak Months',s:'head'});season.rows[4].h=30;
+  sput(4,0,{v:'To see the items behind a line, open the Seasonal And Promo Lifts tab and filter Line.',s:'note'});season.merges.push(`A4:${C(LC)}4`);for(let c=1;c<=LC;c++)sput(4,c,{v:'',s:'note'});sput(5,0,{v:'Line',s:'head'});A.MONS.forEach((m,j)=>sput(5,1+j,{v:m,s:'head'}));sput(5,13,{v:'Q4 Share',s:'head'});sput(5,14,{v:'Peak Months',s:'head'});season.rows[4].h=30;
   SD.lrow.forEach((l,i)=>{const r=6+i;sput(r,0,{v:l.line,s:'bold'});l.idx.forEach((x,j)=>sput(r,1+j,{v:x,s:'xk'}));sput(r,13,{v:l.q4,s:'pct'});sput(r,14,{v:l.peak,s:'txt'})});
   season.cf.push({ref:`B6:M${5+SR}`,rules:[{type:'cellIs',op:'greaterThanOrEqual',dxf:1,formula:'1.5'}]});
   const wr=7+SR;sspan(wr,0,LC,{v:'Where This Comes From',s:'sect'});
   A.SEASON_SRC.forEach((x,i)=>{const r=wr+1+i;sspan(r,0,0,{v:x[0],s:'bold'});sspan(r,1,2,{v:x[1],s:'ctr'});sspan(r,3,LC,{v:x[2],s:'note'});season.rows[r-1].h=40});
-  const itemSheet=mkL(SD.items,'Seasonal Items',ITK);itemSheet.fit=true;itemSheet.freezeCols=3;
-  const promoSheet=mkL(SD.list,'Promos And Peaks',PPK);promoSheet.fit=true;promoSheet.freezeCols=3;
+  const itemSheet=mkL(SD.items,'Seasonal And Promo Lifts',LFK);itemSheet.fit=true;itemSheet.freezeCols=3;
+  /* ---- Sales History: static history from the Reporting tool, status/product/line read from the Master ---- */
+  const HD=A.histData('All Lines'),skuR0=rng('sku'),HK=['status','product','sub'],HN=HD.length;
+  const histSheet={name:'Sales History',widths:[13,10,30,16,14,11,...Array(12).fill(8),...Array(52).fill(7)],freeze:1,freezeCols:5,fit:true,cf:[],
+    rows:[hdr(['Status','SKU','Product','Line','Row','Normal Week (Units)',...A.HIST_MON,...Array.from({length:52},(_,i)=>'Wk '+(i+1))]),
+      ...HD.map((x,i)=>{const er=i+2,mm=`MATCH($B${er},${skuR0},0)`,pick=k=>({f:`IFERROR(IF(INDEX(${rng(k)},${mm})="","",INDEX(${rng(k)},${mm})),"")`,v:k==='status'?val('status',x.r):k==='product'?x.r.name:x.r.sub,s:k==='status'?'ctr':'txt'});
+        return [pick('status'),{v:x.id,s:'ctr'},pick('product'),pick('sub'),{v:x.label,s:'bold'},{v:x.norm>0?x.norm:'',s:'int'},...x.mo.map(v=>({v:v==null?'':v,s:'int'})),...x.wk.map(v=>({v:v==null?'':v,s:'int'}))]})],filter:HN+1};
+  histSheet.cf.push({ref:`${C(18)}2:${C(69)}${HN+1}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${C(18)}2),$${C(5)}2>0,${C(18)}2>=1.5*$${C(5)}2)`}]});
+  histSheet.cf.push({ref:`A2:A${HN+1}`,rules:TN0.map((t,j)=>({type:'cellIs',op:'equal',dxf:j,formula:`"${A.tn(t)}"`}))});
   /* ---- Dashboard ---- */
   const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
   const nd=DK.length,HC=nd; // helper column index on the dashboard
@@ -1865,15 +1929,15 @@ function downloadXlsx(){
     ...(CL.length?CL.map(x=>[{v:x.chg==='New'?'New Today':'Missing Today',s:'ctr'},{v:x.id,s:'ctr'},{v:x.name,s:'txt'},{v:x.sub,s:'txt'},{v:x.onHand,s:'int'},{v:x.po,s:'int'},{v:x.note,s:'txt'},x.plan===''?{v:'',s:'txt'}:{v:x.plan,s:'int'},{v:x.by,s:'ctr'},{v:x.check,s:'txt'}]):[[{v:'Nothing new or missing today.',s:'txt'}]])],cf:[{ref:`A2:A${DR}`,rules:[{type:'cellIs',op:'equal',dxf:3,formula:'"New Today"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Missing Today"'}]}]};
   span(3,0,nd-1,{f:`COUNTIF(${rng('filest')},"New Today")&" new items in today's files (blue on the Master List, nothing typed yet). "&SUMPRODUCT(--(((${rng('note')}<>"")+(${rng('ovr')}<>"")+(${rng('plan')}<>""))>0))&" items carry typed work from yesterday's file. "&COUNTIF('New And Missing Items'!$A$2:$A$${DR},"Missing Today")&" items from yesterday are missing from today\'s files (see New And Missing Items)."`,v:carryText(),s:'note'});R(3).h=22;
   const notesSheet=mkL(allRows.filter(r=>A.noteFor(r.id)),'Notes',NK);
-  const sheets=[dash,dataSheet,plan,accSheet,season,itemSheet,promoSheet,
+  const sheets=[dash,dataSheet,plan,accSheet,season,itemSheet,histSheet,
    {name:'Since Yesterday',fit:true,widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
    notesSheet,dropSheet,
-   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the green Master List (Work Here) tab. It is the only tab you type in: filter any column, and type in the green columns (peak override, order quantity to place, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal Items, Promos And Peaks, Since Yesterday and Notes tabs. Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
+   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the green Master List (Work Here) tab. It is the only tab you type in: filter any column, and type in the green columns (peak override, order quantity to place, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal And Promo Lifts, Since Yesterday, Notes and New And Missing Items tabs (the Sales History tab shows each item\'s status, product and line from it). Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
    [{v:'One File Per Planner',s:'bold'},{v:'Each planner has their own file, built from their own demand line, so nobody shares edits and there is no need to track who wrote a note. To set one up for someone else, give them the same recipe and point it at the files for their line.',s:'txt'}],
    [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each morning the run builds a new file. In the real setup the run opens yesterday\'s file first and copies the green columns across by SKU, so typed work carries forward.',s:'txt'}],
-   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal Items, Promos And Peaks and Notes lists update as soon as you change the Master List. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
+   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal And Promo Lifts, Notes and New And Missing Items lists update as soon as you change the Master List. Sales History keeps its weekly numbers from the Reporting tool, so they only change with the morning run. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
    [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
-  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal Items','Promos And Peaks','New And Missing Items'].includes(sh.name))});
+  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal And Promo Lifts','Sales History','New And Missing Items'].includes(sh.name))});
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
@@ -1993,8 +2057,8 @@ function renderOptions(){
 /* ---------- customize ---------- */
 const hello=()=>({w:'ai',t:'Hi. Tell me what you are not seeing in your daily sheet, and I will change it. In this demo, tap one of the examples below or type your own.'});
 let msgs=[hello()];
-const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add the ABC class.','Add the peak months and promo status.','Show the peak lift and how many extra units it means.','Show which items were out of stock last peak.','Add the order quantity I plan to place.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
-const PAT=[['stocklp',/out of stock last|stock last peak|stock.?out last (year|peak)|was there (even )?stock/],['bump',/peak bump|extra units|bump/],['peakgap',/short of peak|units short.*peak|peak (gap|shortfall)/],['ordovr',/order (qty|quantity) with override/],['ovrwhy',/override reason/],['ovr',/override|my own peak|change the peak/],['plan',/(qty|quantity|order).*(to place|i plan|planned|place)|plan to order/],['needby',/needed by|need.?by date/],['suggest',/suggested order|how much (should i|to) order|order qty|order quantity/],['peaklift',/peak lift|how (big|much).*peak/],['filest',/new items?|new today|new skus?/],['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
+const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add the ABC class.','Add the peak months and promo status.','Show the peak lift and how many extra units it means.','Show which items were out of stock last peak.','Show how many units to add for the peak and promo, and why.','Show last year\'s promo weeks and the units it sold.','Show whether the promo falls inside the peak weeks.','Add the order quantity I plan to place.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
+const PAT=[['stocklp',/out of stock last|stock last peak|stock.?out last (year|peak)|was there (even )?stock/],['totlift',/peak (\+|and|plus) promo|total (extra |lift )?units|promo and peak units/],['promoext',/promo extra|extra units.*promo|promo.*extra|units.*promo (add|brings)|promo.*units.*add/],['overlap',/overlap|(inside|during|in) (the )?peak.*promo|promo.*(inside|during|falls? in|in) (the )?peak|promo.*peak weeks/],['lypromo',/last (year'?s? )?promo|promo.*last year|previous promo|promo weeks? (from )?last/],['lyunits',/promo units|units sold.*promo|promo.*units sold/],['bump',/peak bump|extra units|bump/],['peakgap',/short of peak|units short.*peak|peak (gap|shortfall)/],['addwhy',/why.*(add|order)|reason.*(add|suggest|order)|explain.*(add|suggest)/],['addqty',/(add|order) (more )?(for|to cover) (the )?(peak|promo)|suggested add|units to add|how many (more )?units.*(peak|promo)|ai (suggest|recommend)/],['ordovr',/total (suggested )?(qty|quantity)|order (qty|quantity) with override|with override/],['ovrwhy',/override reason/],['ovr',/override|my own peak|change the peak/],['plan',/(qty|quantity|order).*(to place|i plan|planned|place)|plan to order/],['needby',/needed by|need.?by date/],['suggest',/suggested order|how much (should i|to) order|order qty|order quantity/],['peaklift',/peak lift|how (big|much).*peak/],['filest',/new items?|new today|new skus?/],['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();
