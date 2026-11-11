@@ -44,7 +44,7 @@ function addWhy0(r,m,pc,q){
   const pk=m.peak?(m.peak.start===m.peak.end?m.peak.start:m.peak.start+' to '+m.peak.end):'';
   if(!q.add)return pc?'Stock and orders on the way cover the peak'+(q.pe?' and the promo':'')+'. No extra order needed.':'No peak in the next 12 weeks. Promo is covered.';
   const bits=[];if(q.raw>0)bits.push('stock dips '+fmt(q.raw)+' below 2 weeks of peak cover'+(pk?' ('+pk+')':''));
-  if(q.pe)bits.push('the confirmed promo adds about '+fmt(q.pe)+' units'+(q.raw<0?', which uses up '+fmt(-q.raw)+' of spare stock':''));if(q.sg)bits.push(fmt(q.sg)+' is already covered by the AI stock gap order');
+  if(q.pe)bits.push('the confirmed promo adds about '+fmt(q.pe)+' units'+(q.raw<0?', which uses up '+fmt(-q.raw)+' of spare stock':''));if(q.sg)bits.push(fmt(q.sg)+' is already in the AI stock gap qty');
   return 'Add '+fmt(q.add)+': '+bits.join(', ')+'.'}
 const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
 function pv(k,r){const m=r.metrics,nw=r.isNew;
@@ -78,7 +78,7 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'addwhy':{if(nw)return '';return addWhy(r)}
    case 'aifcst':{if(nw)return '';const pr=m.promo||{};return Math.round(m.fcstWk+((pr.extraIn||0)+(pr.extraOut||0))/12)}
    case 'cmpai':{const pl=pv('plan',r),ai=pv('ordovr',r);return pl===''?'':pl-(ai===''?0:ai)}
-   case 'cmptxt':{const pl=pv('plan',r),ai=pv('ordovr',r),a=ai===''?0:ai;if(pl==='')return a>0?'Nothing typed yet':'';const d=pl-a;return Math.abs(d)<=Math.max(10,0.1*a)?'Close to AI':d<0?'Below AI by '+fmt(-d):'Above AI by '+fmt(d)}
+   case 'cmptxt':{const pl=pv('plan',r),ai=pv('ordovr',r),a=ai===''?0:ai;if(pl==='')return a>0?'No qty typed yet':'';const d=pl-a;return Math.abs(d)<=Math.max(10,0.1*a)?'Near AI Qty':d<0?'Below AI Qty by '+fmt(-d):'Above AI Qty by '+fmt(d)}
    case 'peaklift':return nw||m.peakLift==null?'':r3(m.peakLift);
    case 'stocklp':return nw?'n/a':!m.peak?'No peak':m.stockLP;
    case 'promo':return m.promo.status;
@@ -96,7 +96,7 @@ function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!==
   return String(v)}
 const AIK=new Set(['suggest','addqty','addwhy','ordovr','aifcst']);
 function pcls(k,v){if(AIK.has(k))return 'ai';if(v===''||v==null)return '';
-  if(k==='cmptxt')return String(v).startsWith('Close')?'ok':String(v).startsWith('Below')?'bad':String(v).startsWith('Above')?'warn':'';
+  if(k==='cmptxt')return String(v).startsWith('Near')?'ok':String(v).startsWith('Below')?'bad':String(v).startsWith('Above')?'warn':'';
   if(k==='wos'&&typeof v==='number')return v<4?'bad':v>st.settings.overstockWOS?'ovr':'';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
@@ -109,10 +109,10 @@ function pcls(k,v){if(AIK.has(k))return 'ai';if(v===''||v==null)return '';
 const pctN=(v,d=1)=>(v*100).toFixed(d)+'%',pctSN=(v,d=1)=>(v>0?'+':'')+(v*100).toFixed(d)+'%';
 
 function aiTiles(){const rows=st.res.rows,n=f=>rows.filter(f).length,so=r=>{const x=pv('stockout',r);return x!=='None'&&x!=='n/a'},oo=r=>r.metrics.transit+r.metrics.openPO,
-    ai=rows.map(r=>pv('ordovr',r)).filter(x=>x!==''&&x>0),pl=n(r=>{const x=pv('plan',r);return x!==''&&x>0}),cl=n(r=>pv('cmptxt',r)==='Close to AI'),away=n(r=>/^(Below|Above)/.test(pv('cmptxt',r)));
-  return [['AI Suggests An Order',fmt(ai.length),fmt(ai.reduce((a,b)=>a+b,0))+' units in total'],['Not Ordered Yet',fmt(n(r=>oo(r)===0&&so(r))),'no order placed, and stock runs out'],
+    ai=rows.map(r=>pv('ordovr',r)).filter(x=>x!==''&&x>0),pl=n(r=>{const x=pv('plan',r);return x!==''&&x>0}),cl=n(r=>pv('cmptxt',r)==='Near AI Qty'),away=n(r=>/^(Below|Above)/.test(pv('cmptxt',r)));
+  return [['AI Recommends An Order',fmt(ai.length),fmt(ai.reduce((a,b)=>a+b,0))+' units in total'],['Not Ordered Yet',fmt(n(r=>oo(r)===0&&so(r))),'no order placed, and stock runs out'],
     ['Runs Out Before Delivery',fmt(n(r=>oo(r)>0&&so(r))),'an order is placed, but stock runs out first'],['Thin Or Short Into Peak',fmt(n(r=>r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short')),'under 2 weeks of peak cover'],
-    ['You Typed An Order',fmt(pl),cl+' close to the AI suggestion'],['Away From The AI',fmt(away),'typed qty differs from the AI by more than 10%']]}
+    ['You Typed An Order',fmt(pl),cl+' near the AI Qty'],['Away From AI Qty',fmt(away),'your qty is 10% or more off the AI Qty']]}
 function snapTiles(){const r=st.res,K=r.kpi,AC=E.accuracyTotal(snap()),attn=r.rows.filter(x=>x.headline).length;
   return [['Items Tracked',fmt(K.items),attn+' need attention today'],['Units On Hand',fmt(K.onHand),money(K.onHandValue)+' at unit price'],
     ['On Order',fmt(K.transit+K.openPO),fmt(K.transit)+' transit + '+fmt(K.openPO)+' PO'],

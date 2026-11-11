@@ -28,7 +28,7 @@ with sync_playwright() as p:
     for i,lab in enumerate(['Order more or expedite','Too much stock','Forecast looks off','Check the data']):
         n=int(pg.locator('.dbn').nth(i).inner_text());pg.select_option('#dd',lab);ok('box "'+lab+'" matches list',pg.locator('.dtab tbody tr').count()==n)
     pg.select_option('#dd','All decisions')
-    ok('dashboard has planner headers',all(h in pg.locator('.dtab thead').inner_text() for h in ['On Hand','In Transit','Open PO','Wks Of Supply','Stock-Out','System Fcst / Wk','AI Fcst / Wk','AI Total Qty','Order Qty To Place','Compared To AI']))
+    ok('dashboard has planner headers',all(h in pg.locator('.dtab thead').inner_text() for h in ['On Hand','In Transit','Open PO','Wks Of Supply','Stock-Out','System Forecast Per Week','AI Forecast Per Week','AI Recommended Qty (Total)','Order Qty To Place','Your Qty Vs AI']))
     pg.click('[data-xt=plan]');ok('plan tab shows negative weeks',pg.locator('.xt td.bad').count()>0)
     pg.click('[data-xt=acc]');ok('accuracy tab has All Lines','All Lines' in pg.locator('.xt').inner_text())
     pg.click('[data-xt=dash]')
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     ok('Seasonal Calendar and Since Yesterday tabs are gone',pg.locator('[data-xt=season]').count()==0 and pg.locator('[data-xt=since]').count()==0)
     pg.click('[data-xt=items]');pg.select_option('#il','Collector');ok('line filter on Seasonal And Promo Lifts',pg.locator('#il').input_value()=='Collector' and pg.locator('.xt').first.locator('tbody tr').count()==18 and 'Where This Comes From' in pg.locator('#v-sheet').inner_text())
     wd=wb['New And Missing Items'];ok('xlsx new and dropped sheet has 5 rows',wd.max_row==6)
-    hm=[c.value for c in wm[1]];ok('xlsx master has file status and order columns',all(h in hm for h in ['File Status','Peak Lift (x)','Stock Last Peak','AI Suggested Order Qty (Stock Gap)','AI Suggested Add For Peak And Promo (Units)','AI Why (Peak And Promo)','AI Total Suggested Qty (Includes Your Override)']))
+    hm=[c.value for c in wm[1]];ok('xlsx master has file status and order columns',all(h in hm for h in ['File Status','Peak Lift (x)','Stock Last Peak','AI Recommended Qty (Stock Gap)','AI Recommended Add (Peak + Promo)','AI Recommendation Why','AI Recommended Qty (Total)']))
     fs=hm.index('File Status')+1;ok('xlsx 3 New Today cells',sum(1 for r in range(2,125) if wm.cell(r,fs).value=='New Today')==3)
     ok('override has number validation',any(d.type=='decimal' for d in wm.data_validations.dataValidation))
     ok('dashboard carry-over line',wb['Dashboard']['A3'].value is not None)

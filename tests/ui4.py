@@ -52,7 +52,7 @@ with sync_playwright() as p:
     # 7. peak, promo and order chain: columns adjacent, history tab present, a typed override reaches the order total
     mh=[c.value for c in wb['Master List (Work Here)'][1]]
     ok('promo columns sit together',mh.index('Last Promo Lift (x)')==mh.index('Last Year Promo (Weeks Starting)')+2 and mh.index('Promo Extra Units')==mh.index('Promo And Peak Overlap')+1)
-    ok('order columns sit together',[mh.index(h) for h in ['AI Suggested Order Qty (Stock Gap)','AI Suggested Add For Peak And Promo (Units)','AI Why (Peak And Promo)','AI Total Suggested Qty (Includes Your Override)','Order Qty To Place (Type Here)','Your Qty Minus AI (Units)','Compared To AI']]==list(range(mh.index('AI Suggested Order Qty (Stock Gap)'),mh.index('AI Suggested Order Qty (Stock Gap)')+7)))
+    ok('order columns sit together',[mh.index(h) for h in ['AI Recommended Qty (Stock Gap)','AI Recommended Add (Peak + Promo)','AI Recommendation Why','AI Recommended Qty (Total)','Order Qty To Place (Type Here)','Variance Vs AI Qty','Your Qty Vs AI']]==list(range(mh.index('AI Recommended Qty (Stock Gap)'),mh.index('AI Recommended Qty (Stock Gap)')+7)))
     hs=wb['Sales History'];ok('Sales History has 4 rows per SKU',(hs.max_row-1)%4==0 and hs.max_row>100 and hs['E2'].value=='2026 Forecast' and hs['E5'].value=='2024 Sold')
     pg.click('nav [data-nav=sheet]');pg.click('[data-xt=hist]');ok('Sales History tab shows on the site',pg.locator('.xt tbody tr').count()>100)
     ok('console clean',not errs)
