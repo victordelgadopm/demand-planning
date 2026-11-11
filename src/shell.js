@@ -105,7 +105,7 @@ function sheetRows(mode){
 }
 /* ---------- dashboard ---------- */
 const ALLD='All decisions',DECKEYS=Object.keys(A.DEC),DECL=DECKEYS.map(k=>A.DEC[k][0]);
-const STAT=()=>['Needs attention',...A.TIERS.map(t=>A.tn(t)),'All statuses'];
+const CONSTAT=()=>['Needs attention',...A.TIERS.map(t=>A.tn(t)),'All statuses'];
 const dName=r=>r.decision?A.DEC[r.decision][0]:'';
 let dashDec=ALLD,dashStat='Needs attention';
 const statOK=r=>dashStat==='All statuses'||(dashStat==='Needs attention'&&!!r.headline)||A.tn(r.tier)===dashStat;
@@ -125,7 +125,7 @@ function dashHtml(){
    <p class="dnote">Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. To act on what you see, go to the Master List (Work Here) and filter to the same choices. This is the same dashboard that opens first in the downloaded sheet.</p>
    ${colorKey()}
    <div class="dpick"><label>Decision <select id="dd">${[ALLD,...DECL].map(o=>`<option ${o===dashDec?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
-   <label>Status <select id="ds">${STAT().map(o=>`<option ${o===dashStat?'selected':''}>${esc(o)}</option>`).join('')}</select></label></div>
+   <label>Status <select id="ds">${CONSTAT().map(o=>`<option ${o===dashStat?'selected':''}>${esc(o)}</option>`).join('')}</select></label></div>
    <div class="dboxes">${boxes}</div>
    <div class="dsec">Portfolio Snapshot <span>All items, not filtered by the picks above</span></div>
    <div class="snap dsnap">${A.snapTiles().map(([t,n,sub])=>`<div class="snapt"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>
@@ -303,7 +303,7 @@ function downloadXlsx(){
   };
   const rec=recipeItems(),DK=cols.slice();
   const allRows=sheetRows('all'),N=allRows.length;
-  const STATL=STAT(),D0=dashDec,S0=dashStat;
+  const STATL=CONSTAT(),D0=dashDec,S0=dashStat;
   /* ---- Master List (Work Here): every item, every column, plus two hidden helper columns that drive the dashboard ---- */
   const nf=FULLK.length,ix=k=>FULLK.indexOf(k);
   const HELP=['Status Match','Show','Base Wk Units','Peak Weeks','Peak Headroom','Promo Units In Peak','Promo Units Outside Peak'];
@@ -469,7 +469,7 @@ const ROUTES={
  copilot:['Copilot Connection','Direct connection, if your company allows it.','Microsoft Copilot can reach some sources directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','Copilot access to each source, and a quick test to see what it can actually read. Turn it on yourself if you can. If it is blocked, ask IT.'],
  chatgpt:['ChatGPT Connection','Direct connection, if your company allows it.','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','A connector for each source: Tableau\'s already exists, Anaplan needs a custom connector or an outside bridge. ChatGPT scheduled tasks cannot take file uploads, so a scheduled unattended run is not confirmed. Set it up yourself if allowed. If it is blocked, ask IT.'],
 };
-let route='manual';
+window.__route=()=>route;let route='manual';
 function miniSheet(){
   const rows=sheetRows('attn').slice(0,3);
   return `<div class="mini-sheet" aria-hidden="true">${rows.map(r=>`<div class="ms-r"><span class="ms-st ${({'At risk':'t-risk','Watch':'t-watch','Overstocked':'t-much'})[r.tier]||'t-ok'}">${esc(val('status',r))}</span><span class="ms-n">${esc(val('product',r))}</span><span class="ms-d">${esc(r.id)}</span></div>`).join('')}</div>`;
@@ -492,7 +492,23 @@ function flowSvg(stages,label){
      <text x="${x+bw/2}" y="${y+56}" text-anchor="middle" font-size="${n>4?12.5:14}" fill="currentColor" opacity=".78">${esc(st_[1])}</text></g>`});
   return sv+'</svg>'}
 
-const ROUTEX={
+/* one source for every view of how each route connects: the matrix, the route box, the map and the Setup Options table */
+const SYSN=['Anaplan','Tableau'],RSTAT={yes:['✔ Yes','yes'],part:['▲ Partly','part'],no:['✕ No direct connection','no']};
+const RD={
+ manual:{name:'Manual Export',group:'folder',small:'You put the files in the shared folder',limit:'Manual every run. Also how history is loaded.',
+  lead:['ok','Works for both systems.'],extra:['<b>History:</b> Export three years of weekly sales once and save it as the reference file.'],needs:'Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.',
+  sys:[{s:'yes',t:'You export the file by hand, if your login has export access.',node:['You Export','By hand, to the folder'],via:'folder'},{s:'yes',t:'You export the view data by hand, if your login has export permission.',node:['You Export','By hand, to the folder'],via:'folder'}]},
+ folder:{name:'Automated Export',group:'folder',small:'Sources put the files in the shared folder',limit:'One step per source to move the file. You or IT sets it up.',
+  lead:['warn','Partly works for both systems. Each needs one extra step to reach the shared folder.'],extra:[],needs:'You or IT to set up each scheduled export and the step that moves the file.',
+  sys:[{s:'part',t:'Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step is needed to move the file.',node:['Scheduled Export','Plus a step to move it'],via:'folder'},{s:'part',t:'Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. A step is needed to move the file.',node:['Scheduled Export','Plus a step to move it'],via:'folder'}]},
+ copilot:{name:'Copilot',group:'direct',small:'Direct, no folder needed',limit:'Full Tableau numbers not stated. Licensing for Anaplan not stated.',
+  lead:['warn','Connects directly to Anaplan. Tableau only partly connects, so add a manual or automated export for the full Tableau numbers.'],extra:['<b>So you may need two routes:</b> Copilot for Anaplan, and a manual or automated export for Tableau so its file lands in the shared folder.'],needs:'A Copilot license, a Microsoft 365 AI admin and a Tableau site admin for the connector, plus an export route for Tableau.',
+  sys:[{s:'yes',t:'Anaplan\'s AI Gateway names Microsoft Copilot. Licensing is not stated.',node:['Copilot Connection','Works directly'],via:'direct'},{s:'part',t:'Microsoft\'s connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.',node:['Copilot Connection','Partly, not full numbers'],via:'direct'}]},
+ chatgpt:{name:'ChatGPT',group:'direct',small:'Direct, no folder needed',limit:'Scheduled tasks cannot take file uploads.',
+  lead:['warn','Connects directly to Tableau only. Anaplan has no direct connection, so it needs a manual or automated export to the shared folder.'],extra:['<b>So you need two routes:</b> ChatGPT for Tableau, and a manual or automated export for Anaplan so its file lands in the shared folder.'],needs:'ChatGPT with connectors turned on, plus an export route for Anaplan.',
+  sys:[{s:'no',t:'Needs a custom connector or an outside bridge built first.',node:['No Direct Connection','Use an export instead'],via:'folder'},{s:'yes',t:'Tableau lists ChatGPT as a supported client. Read-only, with a sign-in per person.',node:['ChatGPT Connection','Works directly'],via:'direct'}]}};
+const mxCell=x=>`<td class="${RSTAT[x.s][1]}"><b>${RSTAT[x.s][0]}</b><span>${x.t}</span></td>`;
+const ROUTEX_OLD={
  manual:{lead:'Works for both systems.',leadCls:'ok',bullets:['<b>What you do:</b> Export the files from Anaplan and Tableau and put them in the shared folder.','<b>History:</b> Export three years of weekly sales once and save it as the reference file.'],needs:'Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.'},
  folder:{lead:'Partly works for both systems. Each needs one extra step.',leadCls:'warn',bullets:['<b>Anaplan:</b> Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step moves the file to the shared folder.','<b>Tableau:</b> Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API, and a step moves it to the shared folder.'],needs:'You or IT to set up each scheduled export and the step that moves the file.'},
  copilot:{lead:'Connects directly to Anaplan only. Tableau needs a manual or automated export to the shared folder.',leadCls:'warn',bullets:['<b>Anaplan:</b> Yes. Anaplan\'s AI Gateway names Microsoft Copilot. Licensing is not stated.','<b>Tableau:</b> Partly. Microsoft\'s connector finds and answers questions about dashboards, but it does not say the full numbers are included (Tableau Cloud only). Use an export for the data.','<b>So you need two routes:</b> Copilot for Anaplan, and a manual or automated export for Tableau.'],needs:'A Copilot license, a Microsoft 365 AI admin and a Tableau site admin for the connector, plus an export route for Tableau.'},
@@ -513,28 +529,27 @@ const ROUTEROWS={
  copilot:[['direct','Copilot Connection','Works directly'],['export','Export Needed','Manual or automated']],
  chatgpt:[['export','Export Needed','Manual or automated'],['direct','ChatGPT Connection','Works directly']]};
 function flowRich(route){
-  const rows=ROUTEROWS[route],anyFolder=rows.some(r=>r[0]==='export'),B='#2b4cc7',T='#00838F',G='#1f7a34',O='#b45309',col=k=>k==='direct'?G:(route==='manual'||route==='folder'?B:O);
+  const rows=RD[route].sys,anyFolder=rows.some(r=>r.via==='folder'),B='#2b4cc7',T='#00838F',G='#1f7a34',O='#b45309',R_='#b3261e',col=st=>st==='yes'?G:st==='part'?O:R_;
   const N=(id,x,y,w,h,t,sub,stroke)=>`<g class="flow-node" tabindex="0" role="button" data-node="${id}" aria-label="${esc(t)}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="var(--card)" stroke="${stroke}" stroke-width="2.5"/><text x="${x+w/2}" y="${y+h/2-3}" text-anchor="middle" font-size="18" font-weight="800" fill="currentColor">${esc(t)}</text><text x="${x+w/2}" y="${y+h/2+19}" text-anchor="middle" font-size="13" fill="currentColor" opacity=".82">${esc(sub)}</text></g>`;
   const P=(id,d,c,n)=>{let o=`<path id="${id}" d="${d}" fill="none" stroke="${c}" stroke-width="3" opacity=".4"/>`;for(let k=0;k<n;k++)o+=`<circle class="flow-dot" r="6" fill="${c}" opacity="0"><animateMotion dur="3.2s" begin="${(k*3.2/n).toFixed(2)}s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" begin="${(k*3.2/n).toFixed(2)}s" repeatCount="indefinite"/></circle>`;return o};
   const ys=[40,215],fx=455,hx=640;
   let sv=`<svg class="flowmap rich" viewBox="0 0 1000 340" role="group" aria-label="Animated data flow for ${esc(route)}">`;
   rows.forEach((r,k)=>{const y=ys[k],my=y+40;
-    sv+=P('rs'+k,`M180 ${my} L225 ${my}`,col(r[0]),1);
-    if(r[0]==='export'){sv+=P('rc'+k,`M425 ${my} C 445 ${my}, 440 170, ${fx} 170`,col(r[0]),2)}
-    else{sv+=P('rc'+k,`M425 ${my} C 520 ${my}, 560 170, ${hx} 170`,G,2)}});
+    sv+=P('rs'+k,`M180 ${my} L225 ${my}`,col(r.s),1);
+    if(r.via==='folder'){sv+=P('rc'+k,`M425 ${my} C 445 ${my}, 440 170, ${fx} 170`,col(r.s),2)}
+    else{sv+=P('rc'+k,`M425 ${my} C 520 ${my}, 560 170, ${hx} 170`,col(r.s),2)}});
   if(anyFolder)sv+=P('rf',`M${fx+140} 170 L${hx} 170`,B,2);
   sv+=P('ro1','M800 170 C 830 170, 830 80, 845 80',T,2)+P('ro2','M800 170 C 830 170, 830 255, 845 255',T,2);
-  rows.forEach((r,k)=>{const y=ys[k];sv+=N(k?'tableau':'anaplan',10,y,170,80,k?'Tableau':'Anaplan',k?'Sales, shipments':'Forecast, POs, ETAs',B)+N(r[0],225,y,200,80,r[1],r[2],col(r[0]))});
+  rows.forEach((r,k)=>{const y=ys[k];sv+=N(k?'tableau':'anaplan',10,y,170,80,k?'Tableau':'Anaplan',k?'Sales, shipments':'Forecast, POs, ETAs',B)+N('conn'+k+r.s,225,y,200,80,r.node[0],r.node[1],col(r.s))});
   if(anyFolder)sv+=N('folder',fx-10,130,140,80,'Shared Folder','Files land here',B);
   sv+=N('hub',hx,60,170,220,'AI Agent','Checks and combines',T)+N('sheet',845,40,145,80,'Spreadsheet','Shared folder',T)+N('email',845,215,145,80,'Email','Optional, attached',T);
   sv+=`<text x="${hx+85}" y="235" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">Match, hold back, keep</text><text x="${hx+85}" y="253" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">Carry typed work forward</text></svg>`;
-  const mixed=rows.some(r=>r[0]==='direct');
-  const legend=`<div class="flowlegend"><span><i style="background:${G}"></i>Works directly</span><span><i style="background:${route==='manual'||route==='folder'?B:O}"></i>${mixed?'Needs an export to the folder':'Files land in the shared folder'}</span></div>`;
+  const legend=`<div class="flowlegend"><span><i style="background:${G}"></i>Yes</span><span><i style="background:${O}"></i>Partly</span><span><i style="background:${R_}"></i>No direct connection</span><span class="conf">Same ratings as the table below.</span></div>`;
   return `<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px"><span class="conf">Click any box to see what it does.</span><button class="btn sm" id="fl-pause" aria-pressed="false">Pause</button></div><div class="flowscroll">${sv}</div>${legend}<div class="flowinfo" id="flowinfo" aria-live="polite"><b>${NODEINFO.hub[0]}.</b> ${NODEINFO.hub[1]}</div>`}
-function wireFlow(root){const svg=root.querySelector('.flowmap.rich'),pb=root.querySelector('#fl-pause'),info=root.querySelector('#flowinfo');if(!svg)return;let paused=false;
+function wireFlow(root){const route=window.__route();const svg=root.querySelector('.flowmap.rich'),pb=root.querySelector('#fl-pause'),info=root.querySelector('#flowinfo');if(!svg)return;let paused=false;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches){svg.pauseAnimations();paused=true;pb.textContent='Play'}
   pb.onclick=()=>{paused=!paused;paused?svg.pauseAnimations():svg.unpauseAnimations();pb.textContent=paused?'Play':'Pause';pb.setAttribute('aria-pressed',String(paused))};
-  root.querySelectorAll('.flow-node').forEach(g=>{const go=()=>{const n=NODEINFO[g.dataset.node];info.innerHTML=`<b>${esc(n[0])}.</b> ${esc(n[1])}`};g.onclick=go;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}})}
+  root.querySelectorAll('.flow-node').forEach(g=>{const go=()=>{const id=g.dataset.node,m=/^conn(\d)(yes|part|no)$/.exec(id),x=m?RD[route].sys[+m[1]]:null,n=x?[SYSN[+m[1]]+': '+RSTAT[x.s][0].replace(/^\S+ /,''),x.t]:NODEINFO[id];info.innerHTML=`<b>${esc(n[0])}.</b> ${esc(n[1])}`};g.onclick=go;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}})}
 function renderHome(){
   const r=ROUTES[route];
   $('#v-home').innerHTML=`<div class="page">
@@ -543,7 +558,7 @@ function renderHome(){
   <div class="steps">
    <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach your AI agent. The map below follows your choice.</p>
     <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
-    <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="route-lead ${ROUTEX[route].leadCls}">${ROUTEX[route].lead}</div><ul class="mini">${ROUTEX[route].bullets.map(b=>`<li>${b}</li>`).join('')}<li><b>What it needs:</b> ${ROUTEX[route].needs}</li></ul></div></div>
+    <div class="routebox" id="routebox"><h3>${RD[route].name}</h3><div class="route-lead ${RD[route].lead[0]}">${RD[route].lead[1]}</div><ul class="mini">${RD[route].sys.map((x,k)=>`<li><b>${SYSN[k]}:</b> ${RSTAT[x.s][0].replace(/^\S+ /,'')}. ${x.t}</li>`).join('')}${RD[route].extra.map(e=>`<li>${e}</li>`).join('')}<li><b>What it needs:</b> ${RD[route].needs}</li></ul></div></div>
     <div class="flowwrap"><h3 class="flowh">Data Flow: ${esc(r[0])}</h3>${flowRich(route)}</div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Customize With Your AI Agent</h2></div><p>Prepare your custom spreadsheet. Describe it, show examples of sheets you like, and explain how to combine your data.</p>
     <button class="btn pri go" data-nav="custom">See Customize</button></div>
@@ -557,10 +572,7 @@ function renderHome(){
   </div>
   <h2 class="sec-h">What Connects To What</h2>
   <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026. Shown for Anaplan and Tableau, the two sources in this example. Any other source that can export a file can go in the shared folder.</p>
-  <div class="card mx-wrap"><table class="mx"><thead><tr class="grp"><th></th><th colspan="2">Files Land In The Shared Folder</th><th colspan="2">Direct Connection To The AI</th></tr><tr><th></th><th>Manual Export</th><th>Automated Export</th><th>Copilot</th><th>ChatGPT</th></tr></thead><tbody>
-   <tr><th>Anaplan</th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="part"><b>▲ Partly</b><span>Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step is needed to move the file.</span></td><td class="yes"><b>✔ Yes</b><span>Anaplan's AI Gateway names Microsoft Copilot. Licensing is not stated.</span></td><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or an outside bridge built first.</span></td></tr>
-   <tr><th>Tableau</th><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td class="part"><b>▲ Partly</b><span>Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API. A step is needed to move the file.</span></td><td class="part"><b>▲ Partly</b><span>Microsoft's connector finds and answers questions about dashboards. It does not say the full numbers are included. Tableau Cloud only.</span></td><td class="yes"><b>✔ Yes</b><span>Tableau lists ChatGPT as a supported client. Read-only, with a sign-in per person.</span></td></tr>
-  </tbody></table></div>
+  <div class="card mx-wrap"><table class="mx"><thead><tr class="grp"><th></th><th colspan="2">Files Land In The Shared Folder</th><th colspan="2">Direct Connection To The AI</th></tr><tr><th></th>${Object.keys(RD).map(k=>`<th>${RD[k].name}</th>`).join('')}</tr></thead><tbody>${SYSN.map((n,i)=>`<tr><th>${n}</th>${Object.keys(RD).map(k=>mxCell(RD[k].sys[i])).join('')}</tr>`).join('')}</tbody></table></div>
   <div class="card rule" style="margin-top:16px"><b>Which One To Pick?</b><span>Use whichever one works for you today. Manual export needs no setup. Automated export or a direct connection removes the manual step. Try setting it up yourself first, and ask IT only if something is blocked.</span></div>
   <p style="margin-top:18px"><button class="btn pri" data-nav="options">See Setup Options And Limits</button></p>
   </div>`;
@@ -573,10 +585,7 @@ function renderOptions(){
   <p class="pg-sub">This is the detail behind Step 1. It lists every way to connect, how to run it on your schedule, how to bring Anaplan and Tableau together, and why history matters. Checked against each company's own pages in November 2026.</p>
   <h2 class="sec-h" style="margin-top:8px">Ways To Connect</h2>
   <div class="card mx-wrap"><table class="mx"><thead><tr><th>Option</th><th>Anaplan</th><th>Tableau</th><th>Main Limit</th></tr></thead><tbody>
-   <tr><th>Manual Export<small>You put the files in the shared folder</small></th><td class="yes"><b>✔ Yes</b><span>You export the file by hand, if your login has export access.</span></td><td class="yes"><b>✔ Yes</b><span>You export the view data by hand, if your login has export permission.</span></td><td>Manual every run. Also how history is loaded.</td></tr>
-   <tr><th>Automated Export<small>Sources put the files in the shared folder</small></th><td class="part"><b>▲ Partly</b><span>Exports to S3, Azure Blob or BigQuery. A step moves them to the folder.</span></td><td class="part"><b>▲ Partly</b><span>Prep file output or REST API. A step moves them to the folder.</span></td><td>One step per source to move the file. You or IT sets it up.</td></tr>
-   <tr><th>Copilot<small>Direct, no folder needed</small></th><td class="yes"><b>✔ Yes</b><span>Named by Anaplan.</span></td><td class="part"><b>▲ Partly</b><span>Finds and answers about dashboards.</span></td><td>Full Tableau numbers not stated. Licensing for Anaplan not stated.</td></tr>
-   <tr><th>ChatGPT<small>Direct, no folder needed</small></th><td class="no"><b>✕ No direct connection</b><span>Needs a custom connector or bridge.</span></td><td class="yes"><b>✔ Yes</b><span>Listed by Tableau.</span></td><td>Scheduled tasks cannot take file uploads.</td></tr>
+   ${Object.keys(RD).map(k=>`<tr><th>${RD[k].name}<small>${RD[k].small}</small></th>${mxCell(RD[k].sys[0])}${mxCell(RD[k].sys[1])}<td>${RD[k].limit}</td></tr>`).join('')}
    <tr><th>Split: ChatGPT And Copilot<small>Both save to the folder, Copilot merges</small></th><td class="no"><b>✕ Not until built</b><span>Anaplan connector must be built first.</span></td><td class="yes"><b>✔ Yes</b><span>Through ChatGPT.</span></td><td>Two tools to approve. Saving files from ChatGPT to the folder is not confirmed.</td></tr>
    <tr><th>Keep Separate<small>One sheet per system</small></th><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td class="yes"><b>✔ Yes</b><span>Its own sheet.</span></td><td>No flags that need both systems.</td></tr>
   </tbody></table></div>

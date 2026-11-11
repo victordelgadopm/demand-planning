@@ -7,8 +7,18 @@ with sync_playwright() as p:
     errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
     pg.goto('file:///home/claude/mattel-demo/dist/index.html')
     ok('home shows 5 steps',pg.locator('.step').count()==5 and 'Connect' in pg.locator('.step h2').first.inner_text())
-    pg.click('[data-route=chatgpt]');ok('ChatGPT route says only Tableau connects directly and Anaplan needs an export','Tableau only' in pg.inner_text('#routebox') and 'Anaplan needs a manual or automated export' in pg.inner_text('#routebox') and pg.locator('[data-node=export]').count()==1 and pg.locator('[data-node=direct]').count()==1)
-    pg.click('[data-route=copilot]');ok('Copilot route says only Anaplan connects directly','Anaplan only' in pg.inner_text('#routebox') and pg.locator('[data-node=export]').count()==1);pg.click('[data-route=chatgpt]');ok('route panel changes','ChatGPT' in pg.locator('#routebox h3').inner_text())
+    # one source of truth: for every route and system the map, the route box, the matrix and the Setup Options table agree
+    RDJ=pg.evaluate("(()=>{const o={};for(const k of ['manual','folder','copilot','chatgpt']){}return null})()")
+    mt={'yes':'Yes','part':'Partly','no':'No direct connection'}
+    exp={'manual':['yes','yes'],'folder':['part','part'],'copilot':['yes','part'],'chatgpt':['no','yes']}
+    cols_={'yes':'#1f7a34','part':'#b45309','no':'#b3261e'}
+    for ri,(rk,sts) in enumerate(exp.items()):
+        pg.click('[data-route=%s]'%rk);pg.wait_for_timeout(100)
+        box=pg.inner_text('#routebox');ok('route box matches table for '+rk,all(('%s: %s.'%(n,mt[s])) in box for n,s in zip(['Anaplan','Tableau'],sts)))
+        ok('map colors match table for '+rk,all(pg.locator('[data-node^=conn%d%s] rect'%(i,s)).get_attribute('stroke')==cols_[s] for i,s in enumerate(sts)))
+        cells=pg.locator('.mx >> nth=0').locator('tbody tr').nth(0).locator('td').all();cells2=pg.locator('.mx >> nth=0').locator('tbody tr').nth(1).locator('td').all()
+        ok('matrix matches for '+rk,mt[sts[0]] in cells[ri].inner_text() and mt[sts[1]] in cells2[ri].inner_text())
+    pg.click('[data-route=chatgpt]');ok('ChatGPT route says only Tableau connects directly and Anaplan needs an export','Tableau only' in pg.inner_text('#routebox') and 'Anaplan has no direct connection' in pg.inner_text('#routebox') and 'manual or automated export' in pg.inner_text('#routebox'))
     pg.click('nav [data-nav=sheet]');ok('sheet opens on Dashboard with 22 rows',pg.locator('.dtab tbody tr').count()==22 and pg.locator('.dbox').count()==4)
     pg.select_option('#dd','Order more or expedite');pg.select_option('#ds','All statuses');ok('dashboard pickers filter to 15',pg.locator('.dtab tbody tr').count()==15 and 'Items matching your choices: 15' in pg.locator('.dcount').inner_text())
     pg.select_option('#dd','All decisions');pg.select_option('#ds','At risk');ok('dashboard status picker filters to 2',pg.locator('.dtab tbody tr').count()==2)
