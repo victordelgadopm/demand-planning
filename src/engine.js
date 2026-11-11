@@ -25,6 +25,7 @@
   function parseDay(s) { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
   function addDays(d, n) { return new Date(d.getTime() + n * MS); }
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function isoD(d) { return d.toISOString().slice(0, 10); }
   function fmtDate(d) { return MON[d.getUTCMonth()] + ' ' + d.getUTCDate(); }
   function fmtNum(n) { return Math.round(n).toLocaleString('en-US'); }
   function fmtMoney(n) { const a = Math.abs(n); if (a >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M'; if (a >= 1e3) return '$' + Math.round(n / 1e3) + 'K'; return '$' + Math.round(n); }
@@ -144,14 +145,15 @@
         acc13: a13 > 0 ? Math.max(0, 1 - err / a13) : null, bias13: a13 > 0 ? (f13 - a13) / a13 : null, fcstValue: needPlan * price });
       const arr = [].concat((inv.transit || []).map(t => ({ h: t.etaH, qty: t.qty })), (inv.pos || []).map(p => ({ h: p.etaH, qty: p.qty })));
       arr.sort((a, b) => a.h - b.h);
-      metrics.nextArr = arr.length ? { h: arr[0].h, qty: arr[0].qty, date: fmtDate(weekStart(snap, arr[0].h)) } : null;
+      metrics.nextArr = arr.length ? { h: arr[0].h, qty: arr[0].qty, date: fmtDate(weekStart(snap, arr[0].h)), iso: isoD(weekStart(snap, arr[0].h)) } : null;
+      metrics.nextArr2 = arr.length > 1 ? { h: arr[1].h, qty: arr[1].qty, date: fmtDate(weekStart(snap, arr[1].h)), iso: isoD(weekStart(snap, arr[1].h)) } : null;
       metrics.stockOutH = null; metrics.orderBy = null; metrics.shortUnits = 0;
       if (inv.onHand >= 0 && !sku.isNew) {
         const pj = project(sku, snap, { demand: F, slip: 0 });
         metrics.shortUnits = pj.short;
         if (pj.first !== null) {
-          metrics.stockOutH = pj.first; metrics.stockOutDate = fmtDate(weekStart(snap, pj.first));
-          if (lt) { const d = addDays(weekStart(snap, pj.first), -Math.round(lt.use * 7)); metrics.orderBy = d <= parseDay(snap.meta.today) ? 'Now' : fmtDate(d); }
+          metrics.stockOutH = pj.first; metrics.stockOutDate = fmtDate(weekStart(snap, pj.first)); metrics.stockOutISO = isoD(weekStart(snap, pj.first));
+          if (lt) { const d = addDays(weekStart(snap, pj.first), -Math.round(lt.use * 7)); metrics.orderBy = d <= parseDay(snap.meta.today) ? 'Now' : fmtDate(d); metrics.orderByISO = d <= parseDay(snap.meta.today) ? null : isoD(d); }
         }
       } }
 

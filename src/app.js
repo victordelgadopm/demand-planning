@@ -30,7 +30,7 @@ const RULES={
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'x2',lyunits:'int',promoext:'int',totlift:'int',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int',addqty:'int',aifcst:'int',cmpai:'intS'};
+const PNUM={nextarrq:'int',arr2q:'int',aifdiff:'intS',onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'x2',lyunits:'int',promoext:'int',totlift:'int',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int',addqty:'int',aifcst:'int',cmpai:'intS'};
 const r3=x=>Math.round(x*10000)/10000;
 /* one chain for the peak and promo order: units short of 2 weeks of peak cover (after stock and orders on the way),
    plus the units a confirmed promo adds, plus what a typed peak override adds, less what Suggested Order Qty already covers */
@@ -55,7 +55,11 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'wos':return nw||m.wos==null?'':Math.round(m.wos*10)/10;
    case 'stockout':return nw||m.onHand<0?'n/a':(m.stockOutDate||'None');
    case 'orderby':return nw||m.onHand<0?'n/a':(m.orderBy||'None');
-   case 'nextarr':return m.nextArr?m.nextArr.date+' ('+fmt(m.nextArr.qty)+')':'None';
+   case 'nextarr':return m.nextArr?m.nextArr.date:'None';
+   case 'nextarrq':return m.nextArr?m.nextArr.qty:'';
+   case 'arr2':return m.nextArr2?m.nextArr2.date:'None';
+   case 'arr2q':return m.nextArr2?m.nextArr2.qty:'';
+   case 'aifdiff':{if(nw)return '';return pv('aifcst',r)-Math.round(m.fcstWk)}
    case 'gap':return r.headline?r.gapUnits:'';case 'gaptype':return r.decision?GAPT[r.decision]:'';
    case 'dollars':return r.dollars>0?Math.round(r.dollars):0;case 'price':return r.price;
    case 'acc':return m.acc13==null?'':r3(m.acc13);case 'bias':return m.bias13==null?'':r3(m.bias13);
@@ -95,6 +99,7 @@ function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!==
    case 'money':return v>0?money(v):'—';case 'money2':return '$'+v.toFixed(2);case 'x2':return v.toFixed(2)+'x';}
   return String(v)}
 const AIK=new Set(['suggest','addqty','addwhy','ordovr','aifcst']);
+function isoOf(k,r){const m=r.metrics;if(r.isNew||m.onHand<0&&(k==='stockout'||k==='orderby'))return null;return k==='nextarr'?(m.nextArr&&m.nextArr.iso):k==='arr2'?(m.nextArr2&&m.nextArr2.iso):k==='stockout'?m.stockOutISO:k==='orderby'?m.orderByISO:null}
 function pcls(k,v){if(AIK.has(k))return 'ai';if(v===''||v==null)return '';
   if(k==='cmptxt')return String(v).startsWith('Near')?'ok':String(v).startsWith('Below')?'bad':String(v).startsWith('Above')?'warn':'';
   if(k==='wos'&&typeof v==='number')return v<4?'bad':v>st.settings.overstockWOS?'ovr':'';
@@ -226,7 +231,7 @@ function chipsHtml(){const r=st.res,attn=r.rows.filter(x=>x.headline).length;
 function renderList(){
   const rows=filtered(),c=st.settings.cols;$('#cnt').textContent=rows.length+' items, '+money(sumD(rows))+' at stake'+(st.dec?'':', '+rows.filter(x=>!x.decision).length+' with no decision needed');
   const cap=(!st.more&&!st.q&&rows.length>8)?8:rows.length,shown=rows.slice(0,cap);
-  $('#listbody').innerHTML=rows.length?`<div class="lscroll tall"><table class="list"><thead><tr><th>Status</th><th class="icol">Item</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst (3 wk)</th><th>Stock-out week</th><th>Next arrival</th><th>Peak cover</th><th>Next promo</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}<th class="gcol">What is going on</th><th class="ncol">Note</th>${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
+  $('#listbody').innerHTML=rows.length?`<div class="lscroll tall"><table class="list"><thead><tr><th>Status</th><th class="icol">Item</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst (3 wk)</th><th>Stock-out week</th><th>Next arrival date</th><th class="num">Next arrival qty</th><th>Peak cover</th><th>Next promo</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}<th class="gcol">What is going on</th><th class="ncol">Note</th>${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
    :'<div class="empty">Nothing here with these filters.</div>';
   bindRows($('#listbody'));const sm=$('#showmore');if(sm)sm.onclick=()=>{st.more=true;renderList()};
 }
@@ -235,7 +240,7 @@ function rowHtml(r){const c=st.settings.cols,nt=noteFor(r.id);
   const cell=k=>{const v=pv(k,r);return `<td class="${pcls(k,v)}">${esc(v)}</td>`};
   return `<tr class="r" tabindex="0" data-open="${r.id}"><td>${tierB(r.tier)}${r.reAlert?'<div style="margin-top:4px"><span class="re" style="margin:0">RE-ALERT</span></div>':''}</td>
    <td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id}${c.sub?' · '+esc(r.sub):''}${newToday(r.id)?' · new in today\'s files':r.isNew?' · new item':''}${r.lumpy?' · lumpy demand':''}</div></td>
-   ${['onhand','onorder','wos','fcstwk','salesvs'].map(k=>{const v=pv(k,r);return `<td class="num ${pcls(k,v)}">${v===''?'—':fv(k,v)}</td>`}).join('')}${cell('stockout')}${cell('nextarr')}${cell('peakcover')}${cell('nextpromo')}<td class="num">${r.headline?fmt(r.gapUnits):'—'}</td>
+   ${['onhand','onorder','wos','fcstwk','salesvs'].map(k=>{const v=pv(k,r);return `<td class="num ${pcls(k,v)}">${v===''?'—':fv(k,v)}</td>`}).join('')}${cell('stockout')}${cell('nextarr')}<td class="num">${fv('nextarrq',pv('nextarrq',r))||'—'}</td>${cell('peakcover')}${cell('nextpromo')}<td class="num">${r.headline?fmt(r.gapUnits):'—'}</td>
    ${c.dollars?`<td class="num">${r.dollars>0?money(r.dollars):'—'}</td>`:''}
    <td class="gcol">${r.headline?`<span class="tag">${esc(E.FLAG_LABEL[r.headlineType])}</span>`:''}${esc(hl)}${r.metrics.spike&&!r.headline?'<div class="conf">One-time spike noticed in the last 8 weeks, treated as a one-off.</div>':''}</td>
    <td class="conf ncol">${nt?esc(nt.line):''}</td>${c.conf?`<td class="conf">${r.headline?r.confidence:''}</td>`:''}</tr>`}
@@ -623,7 +628,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={aiTiles,AIK,histData,HIST_MON,newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={isoOf,aiTiles,AIK,histData,HIST_MON,newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();

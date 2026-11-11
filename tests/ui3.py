@@ -13,7 +13,7 @@ with sync_playwright() as p:
     pg.select_option('#dd','All decisions');pg.select_option('#ds','At risk');ok('dashboard status picker filters to 2',pg.locator('.dtab tbody tr').count()==2)
     pg.select_option('#ds','Needs attention');ok('no Today tab',pg.locator('[data-xt=today]').count()==0)
     pg.click('[data-xt=all]');ok('master list has all 123 rows and a work-here banner',pg.locator('.xt tbody tr').count()==123 and 'Work here' in pg.locator('.role').inner_text())
-    ok('master has green input columns',pg.locator('.xt th.inp').count()==6)
+    ok('master has violet input columns',pg.locator('.xt th.inp').count()==6)
     pg.click('[data-xt=items]');ok('other tabs say view only','View only' in pg.locator('.role').inner_text())
     pg.click('[data-xt=dash]');pg.click('.dtab tbody tr');pg.wait_for_selector('#drawer.on');ok('row opens drawer',True);pg.keyboard.press('Escape')
     pg.click('nav [data-nav=custom]');pg.fill('#chat-t',"I need the supplier lead time");pg.press('#chat-t','Enter')
@@ -48,8 +48,8 @@ with sync_playwright() as p:
         ok('note column on '+sh,('Note (Type Here)' if sh.startswith('Master') else 'Note') in [c.value for c in wb[sh][hr]])
     wv=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx',data_only=True)['Master List (Work Here)'];ok('master list note filled for 15 items',sum(1 for r in range(2,125) if wv.cell(r,[c.value for c in wv[1]].index('Note (Type Here)')+1).value)==15)
     ok('only the master list is unlocked',[n for n in wb.sheetnames if not wb[n].protection.sheet]==['Master List (Work Here)'])
-    ok('master has green input columns',all(h in [c.value for c in wm[1]] for h in ['Peak Lift Override (Type Here)','Order Qty To Place (Type Here)','Needed By (Type Here)','Note (Type Here)','Note Date (Type Here)']))
-    ok('master tab green, dashboard blue',wm.sheet_properties.tabColor.rgb=='FF2E7D32' and wb['Dashboard'].sheet_properties.tabColor.rgb=='FF1F3864')
+    ok('master has violet input columns',all(h in [c.value for c in wm[1]] for h in ['Peak Lift Override (Type Here)','Order Qty To Place (Type Here)','Needed By (Type Here)','Note (Type Here)','Note Date (Type Here)']))
+    ok('master tab violet, dashboard blue',wm.sheet_properties.tabColor.rgb=='FF5E35B1' and wb['Dashboard'].sheet_properties.tabColor.rgb=='FF1F3864')
     ok('master has decision and needs attention columns',all(h in [c.value for c in wm[1]] for h in ['Decision','Needs Attention']))
     ok('xlsx all items 123',wb['Master List (Work Here)'].max_row==124)
     # Visual View follows the same status choice and decision boxes as the Daily Sheet dashboard
@@ -60,7 +60,7 @@ with sync_playwright() as p:
         ok('visual boxes match dashboard for '+stl+' '+str((a,b)),a==b)
     # new and dropped items, peak override, seasonal calendar
     pg.click('nav [data-nav=sheet]');pg.wait_for_timeout(100)
-    pg.click('[data-xt=all]');ok('3 new rows highlighted on the master list',pg.locator('tr.newrow').count()==3 and pg.locator('td.t-new').count()==3)
+    pg.click('[data-xt=all]');ok('3 new items marked New Today on the master list, no row shading',pg.locator('tr.newrow').count()==0 and pg.locator('td.t-new').count()==3)
     pg.click('[data-xt=dropped]');ok('new and dropped tab lists 3 new and 2 missing',pg.locator('.xt tbody tr').count()==5 and pg.locator('.xt td.t-drop').count()==2)
     ok('Seasonal Calendar and Since Yesterday tabs are gone',pg.locator('[data-xt=season]').count()==0 and pg.locator('[data-xt=since]').count()==0)
     pg.click('[data-xt=items]');pg.select_option('#il','Collector');ok('line filter on Seasonal And Promo Lifts',pg.locator('#il').input_value()=='Collector' and pg.locator('.xt').first.locator('tbody tr').count()==18 and 'Where This Comes From' in pg.locator('#v-sheet').inner_text())
