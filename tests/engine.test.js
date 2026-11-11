@@ -39,3 +39,5 @@ console.log(pass+' passed');
   console.log(c.headline===b.headline&&!c.isAccepted&&a.acceptedFlags.length===1?'ok comment note keeps alert, accepted note stops it':'FAIL comment note');
   const seeds=E2.compute(dd.today,{},dd.seedNotes);console.log(seeds.rows.filter(r=>r.headline).length===base.rows.filter(r=>r.headline).length-1||true?'ok seed notes counted':'');
 }
+T('peak months use a typical month, not the average',()=>{const u=[100,100,100,100,100,100,100,100,100,100,100,400];const p=E.peakMonthsOf(u);assert.equal(p.text,'Dec');assert(Math.abs(E.monthIdx(u)[0]-1)<1e-9);assert.equal(E.peakMonthsOf(new Array(12).fill(100)),null)});
+T('peak lift and stock last peak present on peak items',()=>{const r=row('FD-1070');assert(r.metrics.peakLift>1.5);assert(/^Out 3 wks/.test(r.metrics.stockLP));assert(R.rows.filter(x=>x.metrics.stockLPn>0).length>=4)});

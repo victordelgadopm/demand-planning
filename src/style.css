@@ -309,3 +309,11 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .xt th.inp{background:#2e7d32;color:#fff}.xt td.inp{background:#e3f2e1}
 .xl-tabs button.work{color:#2e7d32;font-weight:800;border-top:3px solid #2e7d32}
 .xl-tabs button.front{font-weight:800;border-top:3px solid #1f3864}
+.xt td.t-new{background:#d6eaf8;color:#0b4f7c;font-weight:700}
+.xt tr.newrow td{background-image:linear-gradient(rgba(70,140,220,.12),rgba(70,140,220,.12))}
+.line-pick select{margin:0 8px 0 4px}
+.xt tr[data-line]{cursor:pointer}.xt tr[data-line]:hover td{background-image:linear-gradient(rgba(120,120,120,.12),rgba(120,120,120,.12))}
+.lscroll.tall{max-height:68vh;overflow:auto}.lscroll.tall .list th{position:sticky;top:0;z-index:2;background:var(--card);box-shadow:0 1px 0 var(--line)}
+.carry-box{border-left:4px solid var(--brand);padding:10px 14px;border-radius:0 9px 9px 0;margin-bottom:10px}
+#v-sheet .carry-box{background:#eef1fb;color:#1b2430}
+.xt td.prodcol{min-width:230px}

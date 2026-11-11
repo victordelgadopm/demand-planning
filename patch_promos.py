@@ -31,5 +31,28 @@ NOTES=[
 nid=max([n['id'] for n in d['seedNotes']]+[0])
 for sku,flag,reason,text,who,date in NOTES:
     nid+=1; d['seedNotes'].append({'t':'create','id':nid,'sku':sku,'flag':flag,'reason':reason,'text':text,'who':who,'date':date,'kind':'comment'})
+# more last-year stock-outs inside last year's peak, so the Stock Last Peak check has some variety
+for sid,(a,b,lv) in {'FD-1110':(47,49,.6),'FD-1070':(49,51,.7),'CD-1042':(48,50,.55),'SM-1049':(47,48,.6)}.items():
+    for snap in ('today','yesterday'):
+        for s in d[snap]['skus']:
+            if s['id']==sid:
+                for w in range(a,b+1): s['oos25'][w-1]=lv
+# files change day to day: the new launches are not in yesterday's files, and two items that were there yesterday are gone today
+import copy
+newids=[s['id'] for s in d['today']['skus'] if s['isNew']]
+d['yesterday']['skus']=[s for s in d['yesterday']['skus'] if s['id'] not in newids]
+yb={s['id']:s for s in d['yesterday']['skus']}
+DROP=[('FD-1135','FD-1996','Starlight Spring Picnic Doll'),('AC-1026','AC-1992','Fashion Accessory Pack, Spring Colors')]
+for src,nid_,nm in DROP:
+    c=copy.deepcopy(yb[src]); c['id']=nid_; c['name']=nm; d['yesterday']['skus'].append(c)
+    c['inv']={'onHand':0 if nid_=='FD-1996' else 240,'transit':[],'pos':[] if nid_=='FD-1996' else [{'qty':600,'etaH':5}],'otherDC':0}
+# typed work carried in from yesterday's file, matched by SKU (the green columns)
+d['dropped']=[
+ {'id':'FD-1996','note':'Spring item, ran out on purpose. Supplier will not rebuy.','date':'Nov 5','plan':0,'by':''},
+ {'id':'AC-1992','note':'Replaced by AC-1031 color refresh. Confirm with the buyer before closing.','date':'Nov 4','plan':600,'by':'Dec 1'}]
+d['seedInputs']={
+ 'FD-1070':{'ovr':3.2,'why':'Out of stock 3 weeks last peak, so last year understates demand','plan':900,'by':'Nov 20'},
+ 'CD-1042':{'ovr':3.4,'why':'Out of stock 3 weeks last peak. Collector fans buy ahead of Dec','plan':700,'by':'Nov 25'},
+ 'PH-1011':{'plan':2000,'by':'Nov 16'},'FD-1026':{'plan':7000,'by':'Nov 20'},'AC-1010':{'plan':4400,'by':'Nov 22'}}
 json.dump(d,open('data/data.json','w'),separators=(',',':'))
 print('tagged',len(PLAN))

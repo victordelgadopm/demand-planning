@@ -109,11 +109,14 @@
     [[sku.pos.y2025, -364], [sku.pos.y2024, -728]].forEach(([y, off]) => { if (!y || sum(y) <= 0) return; y.forEach((v, i) => { out[addDays(w1, off + 7 * i + 3).getUTCMonth()] += v; }); });
     return out;
   }
+  // a "normal" month is the middle month of the year (the median), so a few big months do not drag the baseline up
+  function typical(units) { const a = units.slice().sort((x, y) => x - y); return (a[5] + a[6]) / 2; }
+  function monthIdx(units) { const m = typical(units); return units.map(x => m > 0 ? x / m : 0); }
   function peakMonthsOf(units) {
-    const t = sum(units); if (t <= 0) return null; const sh = units.map(x => x / t), pm = sh.map((x, i) => x >= 1.5 / 12 ? i : -1).filter(i => i >= 0);
+    const t = sum(units), m = typical(units); if (t <= 0 || m <= 0) return null; const sh = units.map(x => x / t), pm = units.map((x, i) => Math.round(x / m * 100) / 100 >= 1.5 ? i : -1).filter(i => i >= 0);
     if (!pm.length) return null;
-    const contiguous = pm.every((m, i) => i === 0 || m === pm[i - 1] + 1);
-    return { months: pm, share: sum(pm.map(i => sh[i])), text: contiguous && pm.length > 1 ? MON[pm[0]] + ' to ' + MON[pm[pm.length - 1]] : pm.map(i => MON[i]).join(', ') };
+    const contiguous = pm.every((x, i) => i === 0 || x === pm[i - 1] + 1);
+    return { months: pm, share: sum(pm.map(i => sh[i])), lift: mean(pm.map(i => units[i] / m)), text: contiguous && pm.length > 1 ? MON[pm[0]] + ' to ' + MON[pm[pm.length - 1]] : pm.map(i => MON[i]).join(', ') };
   }
   function seasonality(snap) {
     const lines = {}, all = new Array(12).fill(0);
@@ -154,13 +157,17 @@
 
     // seasonality and promos (shown in every view; one flag, thin cover into peak, depends on them)
     metrics.peak = null; metrics.peakCover = null; metrics.peakStatus = sku.isNew || inv.onHand < 0 ? 'n/a' : '—';
-    metrics.peakMonths = null; metrics.peakShare = null;
+    metrics.peakMonths = null; metrics.peakShare = null; metrics.peakLift = null; metrics.baseWk = null; metrics.peakWks = 0; metrics.stockLP = 'n/a'; metrics.stockLPn = 0;
     if (!sku.isNew) {
       const pmo = peakMonthsOf(monthUnits(sku, snap)); if (pmo) { metrics.peakMonths = pmo.text; metrics.peakShare = pmo.share; }
       const srt = sku.pos.y2025.slice().sort((a, b) => a - b), md = srt[Math.floor(srt.length / 2)] || 1;
       const pk = []; for (let h = 0; h < H; h++) { const w = 46 + h; const v = (w <= 52 ? sku.pos.y2025[w - 1] : sku.pos.y2026[w - 53]) / md; if (v >= 1.5) pk.push(h); }
       if (pk.length && !metrics.peakMonths) { const u = monthUnits(sku, snap); metrics.peakMonths = MON[u.indexOf(Math.max(...u))] + ' (mild)'; }
       if (pk.length) {
+        const npk = F.filter((x, h) => !pk.includes(h)), srtF = (npk.length ? npk : F).slice().sort((a, b) => a - b), baseWk = srtF[Math.floor(srtF.length / 2)] || 0, pAvg = mean(pk.map(h => F[h]));
+        metrics.baseWk = baseWk; metrics.peakWks = pk.length; metrics.peakLift = baseWk > 0 ? pAvg / baseWk : null;
+        const lyW = pk.filter(h => 46 + h <= 52).map(h => sku.oos25[45 + h]), outN = lyW.filter(x => x < 0.9).length;
+        metrics.stockLPn = outN; metrics.stockLP = !lyW.length ? 'n/a' : outN ? 'Out ' + outN + ' wk' + (outN > 1 ? 's' : '') + ' last peak' : 'In stock';
         metrics.peak = { startH: pk[0], endH: pk[pk.length - 1], n: pk.length, weeks: pk, start: fmtDate(weekStart(snap, pk[0])), end: fmtDate(weekStart(snap, pk[pk.length - 1])) };
         if (inv.onHand >= 0) {
           const pj = project(sku, snap, { demand: F, slip: 0 }).rows, avg = mean(pk.map(h => F[h])), safety = 2 * avg;
@@ -380,6 +387,6 @@
   }
 
   const NOTE_LABEL = Object.assign({}, FLAG_LABEL, { promo: 'Promo or season', general: 'General' });
-  return { NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthUnits, analogsFor, activeNotes, leadWeeks, options,
+  return { NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthIdx, typical, monthUnits, analogsFor, activeNotes, leadWeeks, options,
     weekStart, weekNum, fmtDate, fmtNum, fmtMoney, parseDay, addDays, sum, mean, sd };
 });

@@ -7,7 +7,18 @@ const CK='dpa.cols.v4';
 const TODO={order_more:'Place or expedite an order',too_much:'Pause new orders and review promos',forecast_off:'Review the forecast',check_data:'Fix the source data first'};
 const TS={'At risk':'t_risk','Medium':'t_med','Watch':'t_watch','Overstocked':'t_much','No risk':'t_ok'};
 const TCLASS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
+const IN=D.seedInputs||{},R3=x=>Math.round(x*1000)/1000;
 const COLS={
+ filest:{h:'File Status',w:13,src:'calculated by the morning run: New Today when the item is in today\'s files but was not in yesterday\'s'},
+ peaklift:{h:'Peak Lift (x)',w:10,num:'x2',src:'calculated: forecast per week in the peak weeks divided by a normal week (the middle week of the next 12)'},
+ stocklp:{h:'Stock Last Peak',w:20,src:'calculated from last year\'s weekly stock: In stock, or how many weeks of last year\'s peak the item was out of stock (so last year\'s sales understate demand)'},
+ suggest:{h:'Suggested Order Qty',w:12,num:'int',src:'calculated: the units to add when the check says order more, rounded up to 10'},
+ ovr:{h:'Peak Lift Override',w:11,num:'x2',src:'typed in the Master List: your own peak lift, for example when the item was out of stock last year. Leave blank to use the calculated lift'},
+ ovrwhy:{h:'Override Reason',w:34,wide:1,src:'typed in the Master List, next to the override'},
+ used:{h:'Peak Lift Used',w:10,num:'x2',src:'formula: your override when you typed one, otherwise the calculated lift'},
+ ordovr:{h:'Order Qty With Override',w:13,num:'int',src:'formula: the suggested order plus or minus the units your override adds across the peak weeks (after using any spare stock), rounded up to 10'},
+ plan:{h:'Planned Order Qty',w:12,num:'int',src:'typed in the Master List: the quantity you plan to order, ready to copy into the planning system'},
+ needby:{h:'Needed By',w:11,src:'typed in the Master List: the date the units are needed'},
  status:{h:'Status',w:13,core:1},sku:{h:'SKU',w:11,core:1},product:{h:'Product',w:32,core:1},sub:{h:'Line',w:17},abc:{h:'ABC Class',w:9,src:'from the Planning system: A items make up the first 80% of 12-week forecast sales value, B the next 15%, C the last 5%'},
  supplier:{h:'Supplier',w:18,src:'from the Shared file'},
  onhand:{h:'On Hand (Units)',w:11,num:'int',src:'from the Planning system: units in the warehouse today'},
@@ -31,7 +42,7 @@ const COLS={
  acc:{h:'Forecast Accuracy (13 Wks)',w:13,num:'pct',src:'calculated: one minus the forecast miss over the last 13 weeks'},
  bias:{h:'Forecast Bias (13 Wks)',w:13,num:'pctS',src:'calculated: whether the forecast ran high (+) or low (-) over the last 13 weeks'},
  ship:{h:'Shipped ÷ Sold (8 Wks)',w:12,num:'x2',src:'from the Reporting tool: shipments to retailers divided by retailer sales over 8 weeks'},
- peak:{h:'Peak Months',w:14,src:'calculated from the last two years of sales: months that sell at least 1.5x an average month'},
+ peak:{h:'Peak Months',w:14,src:'calculated from the last two years of sales: months that sell at least 1.5x a normal month (the middle month of the year)'},
  peakwk:{h:'Peak Weeks (Next 12)',w:20,src:'calculated: the weeks in the next 12 that sold at least 1.5x a normal week last year'},
  peakcover:{h:'Peak Cover',w:11,src:'calculated: whether projected stock stays above 2 weeks of peak demand through the peak weeks (OK, Thin or Short)'},
  promo:{h:'Promo Status',w:18,src:'from the Shared file (the promo calendar) and last year\'s tagged promo weeks'},
@@ -43,18 +54,30 @@ const COLS={
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
  note:{h:'Note',w:48,wide:1,src:'typed in the Master List, one note per item'}};
 const DEFAULT=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','note','conf'];
-const MASTER='Master List (Work Here)',INK=['note','notedate'],MINCOLS=12;
-const FULLK=['status','sku','product','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note','notedate'];
+const MASTER='Master List (Work Here)',INK=['ovr','ovrwhy','plan','needby','note','notedate'],MINCOLS=12;
+const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','peaklift','stocklp','suggest','ovr','ovrwhy','used','ordovr','plan','needby','note','notedate'];
 const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
 const saveCols=()=>{try{localStorage.setItem(CK,JSON.stringify(cols))}catch(e){}};
 let rowsMode='attn',tab='dash';
-const PLK=new Set(['onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lift']);
+const PLK=new Set(['peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lift']);
+function ordQty(r){const m=r.metrics,o=val('ovr',r),s=val('suggest',r),p=val('peaklift',r);
+  if(o===''||p===''||!m.baseWk)return s;
+  const sg=s===''?0:s,ex=(o-p)*R3(m.baseWk)*m.peakWks,H=m.peakCover?R3(Math.max(0,m.peakCover.minInv-m.peakCover.safety)):0,need=sg>0?sg+ex:ex-H;
+  return need<=0?'':Math.ceil(need/10)*10}
 function val(k,r){
   if(PLK.has(k))return A.pv(k,r);
   const m=r.metrics,sk=A.skuOf(r.id),n=A.noteFor(r.id);
   switch(k){
+   case 'filest':return A.newToday(r.id)?'New Today':'';
+   case 'suggest':return r.decision==='order_more'&&r.gapUnits>0?Math.ceil(r.gapUnits/10)*10:'';
+   case 'ovr':{const x=IN[r.id];return x&&x.ovr!=null?x.ovr:''}
+   case 'ovrwhy':return (IN[r.id]||{}).why||'';
+   case 'plan':{const x=IN[r.id];return x&&x.plan!=null?x.plan:''}
+   case 'needby':return (IN[r.id]||{}).by||'';
+   case 'used':{const o=val('ovr',r);return o!==''?o:val('peaklift',r)}
+   case 'ordovr':return ordQty(r);
    case 'status':return A.tn(r.tier);case 'sku':return r.id;case 'product':return r.name;case 'sub':return r.sub;
    case 'going':return r.headline||(r.isAccepted?'Accepted risk (see note)':'No flags. Supply covers the forecast.');
    case 'todo':return r.decision?TODO[r.decision]:(r.headline?'Take a look':'');
@@ -130,6 +153,9 @@ function recipeItems(){
    ['Checks Run',Object.keys(E.FLAG_LABEL).filter(k=>st.settings.flags[k]).map(k=>E.FLAG_LABEL[k]).join(', ')],
    ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal Calendar tab lists what is calculated, what comes from a file and what is not available.'],
    ['Notes','Notes never expire. Type one note per item in the Master List. In the app, a comment keeps the alert on and an accepted risk stops it, coming back only if its gap grows past 1.5 times what was accepted.'],
+   ['Carrying Work Forward','Each run starts from yesterday\'s file and the two fresh source files. Calculated columns are replaced from the new files. The green columns are copied across by SKU, so notes, peak overrides, planned order quantities and needed-by dates carry forward. A planned quantity is flagged for review once its Needed By date passes, and an override is flagged for review after two weeks, so old fixes do not drive orders forever.'],
+   ['New And Dropped Items','A SKU in today\'s files that was not in yesterday\'s is marked New Today and highlighted blue on the Master List, with the green columns empty. A SKU that was in yesterday\'s file but not today\'s goes to the Dropped Items tab with the work you had typed, so you know to check the shared files for what happened.'],
+   ['Peak Override And Orders','Peak Lift is the forecast in the peak weeks divided by a normal week. If you know last year was out of stock, type your own lift on the Master List. Order Qty With Override then adds the extra units across the peak weeks to the suggested order (after using any spare stock). Planned Order Qty and Needed By are yours to type and copy into the planning system.'],
    ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
    ['How To Change It','Tell the AI in chat what you are not seeing. It updates this recipe.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
@@ -152,12 +178,14 @@ function gridHtml(heads,rows,o){
   o=o||{};const L=letters(heads.length);
   return `<div class="xl-scroll"><table class="xt"><thead><tr class="letters"><th class="rn"></th>${L.map(x=>`<th>${x}</th>`).join('')}</tr>
    <tr class="heads"><th class="rn">1</th>${heads.map(h=>`<th class="${h.cls||''}">${esc(h.t)}</th>`).join('')}</tr></thead>
-   <tbody>${rows.length?rows.map((r,i)=>`<tr ${r.id?`data-open="${r.id}" tabindex="0"`:''}><td class="rn">${i+2}</td>${r.c.map(c=>`<td class="${c.cls||''}">${esc(c.t)}</td>`).join('')}</tr>`).join(''):`<tr><td class="rn">2</td><td colspan="${heads.length}">${esc(o.empty||'Nothing here.')}</td></tr>`}</tbody></table></div>`;
+   <tbody>${rows.length?rows.map((r,i)=>`<tr class="${r.cls||''}" ${r.id?`data-open="${r.id}" tabindex="0"`:r.line?`data-line="${esc(r.line)}" tabindex="0"`:''}><td class="rn">${i+2}</td>${r.c.map(c=>`<td class="${c.cls||''}">${esc(c.t)}</td>`).join('')}</tr>`).join(''):`<tr><td class="rn">2</td><td colspan="${heads.length}">${esc(o.empty||'Nothing here.')}</td></tr>`}</tbody></table></div>`;
 }
 function colGrid(keys,rows,empty,inp){
   inp=inp||[];const heads=keys.map(k=>({t:inp.includes(k)?COLS[k].h+' (Type Here)':COLS[k].h,cls:(COLS[k].num?'money':'')+(inp.includes(k)?' inp':'')}));
-  const body=rows.map(r=>({id:r.id,c:keys.map(k=>{const v=val(k,r),C=COLS[k];
+  const body=rows.map(r=>({id:r.id,cls:A.newToday(r.id)?'newrow':'',c:keys.map(k=>{const v=val(k,r),C=COLS[k];
     if(k==='status')return {t:v,cls:'st '+TCLASS[r.tier]};
+    if(k==='filest')return {t:v,cls:v?'st t-new':''};
+    if(k==='product')return {t:v,cls:'prodcol'};
     if(C.num)return {t:A.fv(k,v),cls:'money '+A.pcls(k,v)};
     return {t:String(v),cls:(C.wide?'wide ':'')+(inp.includes(k)?'inp ':'')+A.pcls(k,v)}})}));
   return {html:gridHtml(heads,body,{empty}),n:rows.length};
@@ -174,26 +202,31 @@ function planGrid(rows){
   return {html:gridHtml(heads,body,{empty:'Nothing needs attention.'}),n:rows.length};
 }
 const NK=['status','sku','product','note','notedate','going'];
-const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peakcover','going','note'];
-const SEASON_KEY='How to read this: 1.00x is a normal month. 1.50x or more is a peak and is shaded. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak.';
+let itemLine='All Lines';
+const PPK=['status','sku','product','filest','sub','peak','peakwk','peaklift','stocklp','peakcover','ovr','used','ordovr','promo','nextpromo','lift','note'];
+const SEASON_KEY='How to read this: a normal month is the middle month of the year. A month that sells 1.50x that or more is a peak, so it shows its lift and is shaded. Every other month just reads Normal. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. A line is an average, so one item can peak when its line does not: open Seasonal Items and filter Line to see every item.';
 const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short.`;
 function seasonGrid(){
   const d=A.seasonData(),heads=[{t:'Line'},...A.MONS.map(m=>({t:m,cls:'money'})),{t:'Q4 Share',cls:'money'},{t:'Peak Months'}];
-  const body=d.lrow.map(l=>({c:[{t:l.line,cls:'bold'},...l.idx.map(x=>({t:x.toFixed(2)+'x',cls:'money'+(x>=1.5?' warn':'')})),{t:A.pctN(l.q4,0),cls:'money'},{t:l.peak}]}));
+  const body=d.lrow.map(l=>({line:l.line,c:[{t:l.line,cls:'bold'},...l.idx.map(x=>({t:x>=1.5?x.toFixed(2)+'x':'Normal',cls:'money'+(x>=1.5?' warn':'')})),{t:A.pctN(l.q4,0),cls:'money'},{t:l.peak}]}));
   const srcs=gridHtml(['Topic','Where It Comes From','How'].map(t=>({t})),A.SEASON_SRC.map(x=>({c:[{t:x[0],cls:'bold'},{t:x[1],cls:'st'},{t:x[2],cls:'wide'}]})));
-  return `<div class="note-box">${esc(seasonSummary(d))}</div><div class="note-box">${esc(SEASON_KEY)}</div>`+gridHtml(heads,body)+`<h3 class="sub-h">Where This Comes From</h3>`+srcs;
+  return `<div class="note-box">${esc(seasonSummary(d))}</div><div class="note-box">${esc(SEASON_KEY)}</div><div class="note-box">Click a line to see the items behind it.</div>`+gridHtml(heads,body)+`<h3 class="sub-h">Where This Comes From</h3>`+srcs;
 }
 function accGrid(){
   const rows=accRows(),heads=['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal'].map((t,i)=>({t,cls:i>=1&&i<=4?'money':''}));
   return {html:gridHtml(heads,rows.map(x=>({c:[{t:x.line,cls:'bold'},{t:String(x.n),cls:'money'},{t:A.pctN(1-x.w),cls:'money'},{t:A.pctN(x.w),cls:'money'},{t:A.pctSN(x.b),cls:'money'},{t:tgtText(x.w,x.b),cls:({'On target':'','Watch':'warn','Off target':'bad'})[tgtText(x.w,x.b)]},{t:x.sig,cls:'wide'}]}))),n:rows.length-1};
 }
-const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
+const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Seasonal Items'],['since','Since Yesterday'],['notes','Notes'],['dropped','Dropped Items'],['recipe','Recipe']];
 function roleHtml(){
-  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type notes in the green columns. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div>`;
-  if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div>`;
+  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the green columns (peak override, planned order quantity, needed by and notes). Blue rows are new in today\'s files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div>`;
+  if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div><div class="carry-box"><b>Today\'s files:</b> ${esc(carryText())}</div>`;
+  if(tab==='dropped')return `<div class="role"><b>View only.</b> Items that were in yesterday\'s file but are not in today\'s. The run lists them here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
   if(tab==='recipe')return '';
   return `<div class="role"><b>View only.</b> This tab reads from the Master List, so make changes there. It is locked so typing here does not get lost (in Excel: Review, then Unprotect Sheet, no password).</div>`;
 }
+const dropCheck=x=>'Not in today\'s files. Check the shared files for a discontinue, a rename or a missing row.'+(x.po>0?' It still has '+E.fmtNum(x.po)+' units on order, so confirm with the supplier.':'')+(x.plan?' You had planned '+E.fmtNum(x.plan)+' units, so confirm that order.':'');
+function carryCounts(){const rows=sheetRows('all');return {nw:A.NEWIDS.length,carried:rows.filter(r=>val('note',r)!==''||val('ovr',r)!==''||val('plan',r)!=='').length,dropped:A.droppedList().length}}
+function carryText(){const c=carryCounts();return c.nw+' new items in today\'s files (blue on the Master List, nothing typed yet). '+c.carried+' items carry typed work from yesterday\'s file. '+c.dropped+' items from yesterday are no longer in the files (see Dropped Items).'}
 function renderSheet(){
   const v=$('#v-sheet'),total=st.res.total;
   let inner,count='';
@@ -202,7 +235,9 @@ function renderSheet(){
   else if(tab==='plan'){const g=planGrid(sheetRows(rowsMode));inner=g.html;count=`${g.n} items, ${E.H} weeks`}
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
   else if(tab==='season'){inner=seasonGrid();count='12 months, by line'}
-  else if(tab==='promos'){const d=A.seasonData(),g=colGrid(PPK,d.list);inner=g.html;count=`${g.n} items with a promo or a thin peak`}
+  else if(tab==='promos'){const d=A.seasonData(),its=d.items.filter(r=>itemLine==='All Lines'||r.sub===itemLine),g=colGrid(PPK,its);
+    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Every item with a peak or a promo, by line. Peak Lift is how many times a normal week the peak weeks run. Stock Last Peak shows items that were out of stock last year, when last year\'s sales understate demand. To change a lift, type an override on the Master List.</div>`+g.html;count=`${g.n} items`+(itemLine==='All Lines'?'':', '+itemLine)}
+  else if(tab==='dropped'){const dl=A.droppedList();inner=gridHtml(['SKU','Product','Line','Last On Hand','Units On Order','Typed Note From Yesterday','Planned Qty','Needed By','What To Check'].map((t,i)=>({t,cls:i==3||i==4||i==6?'money':''})),dl.length?dl.map(x=>({c:[{t:x.id},{t:x.name},{t:x.sub},{t:E.fmtNum(x.onHand),cls:'money'},{t:E.fmtNum(x.po),cls:'money'},{t:x.note,cls:'wide'},{t:x.plan===''?'':E.fmtNum(x.plan),cls:'money'},{t:x.by},{t:dropCheck(x),cls:'wide'}]})):[],{empty:'Nothing dropped out of the files today.'});count=dl.length+' items'}
   else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail','Note'].map(t=>({t})),it.map(r=>({id:r[2],c:[...r.map(t=>({t})),{t:val('note',A.rowOf(r[2])),cls:'wide'}]})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
   else if(tab==='notes'){const g=colGrid(NK,sheetRows('all').filter(r=>A.noteFor(r.id)),'No notes yet.');inner=g.html;count=g.n+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
@@ -215,6 +250,8 @@ function renderSheet(){
    ${roleHtml()}${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" class="${k==='all'?'work':k==='dash'?'front':''}" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
    <p class="sec-sub" style="margin:10px 0 0"><b>How the tabs fit together:</b> You work in one place, the green Master List (Work Here) tab. Filter it and type your notes there. Every other tab only reads from it, so they update when it does, and they are locked so nothing typed in them gets lost. The Dashboard is where you look things over first: it is the same list, easier to see.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+  const il=$('#il',v);if(il)il.onchange=()=>{itemLine=il.value;renderSheet()};
+  $$('[data-line]',v).forEach(e=>{const go2=()=>{itemLine=e.dataset.line;tab='promos';renderSheet()};e.onclick=go2;e.onkeydown=ev=>{if(ev.key==='Enter')go2()}});
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
@@ -236,6 +273,9 @@ function downloadXlsx(){
     if(sl)out.push({ref:`${sl}${first}:${sl}${last}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${sl}${first}),ABS(${sl}${first})>=0.15)`}]});
     [ol,ob].forEach(c=>{if(c)out.push({ref:`${c}${first}:${c}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(${c}${first}<>"",${c}${first}<>"None",${c}${first}<>"n/a")`}]})});
     if(hl)out.push({ref:`${hl}${first}:${hl}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(ISNUMBER(${hl}${first}),${hl}${first}<0)`}]});
+    const slp=L('stocklp'),usd=L('used'),ov=L('ovr');
+    if(slp)out.push({ref:`${slp}${first}:${slp}${last}`,rules:[{type:'expression',dxf:1,formula:`LEFT(${slp}${first},3)="Out"`}]});
+    if(usd&&ov)out.push({ref:`${usd}${first}:${usd}${last}`,rules:[{type:'expression',dxf:1,formula:`ISNUMBER($${ov}${first})`}]});
     const pcv=L('peakcover'),prm=L('promo');
     if(pcv)out.push({ref:`${pcv}${first}:${pcv}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Short"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Thin"'}]});
     if(prm)out.push({ref:`${prm}${first}:${prm}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Confirmed, short"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Not confirmed"'}]});
@@ -249,17 +289,24 @@ function downloadXlsx(){
   const STATL=STAT(),D0=dashDec,S0=dashStat;
   /* ---- Master List (Work Here): every item, every column, plus two hidden helper columns that drive the dashboard ---- */
   const nf=FULLK.length,ix=k=>FULLK.indexOf(k);
-  const HELP=['Status Match','Show'];
+  const HELP=['Status Match','Show','Base Wk Units','Peak Weeks','Peak Headroom'];
   const dataSheet=mk(allRows,MASTER,FULLK);
   dataSheet.tab='FF2E7D32';dataSheet.freezeCols=3;
   /* the three green columns are the only place anyone types */
   INK.forEach(k=>{const c=ix(k);dataSheet.rows[0][c]={v:COLS[k].h+' (Type Here)',s:'headIn'};allRows.forEach((r,i)=>{dataSheet.rows[i+1][c]={v:val(k,r),s:'inp'}})});
+  {const cU=ix('used'),cO=ix('ordovr'),OV=C(ix('ovr')),PL=C(ix('peaklift')),SG=C(ix('suggest')),B=C(nf+2),P=C(nf+3),H=C(nf+4);
+   allRows.forEach((r,i)=>{const er=i+2,row=dataSheet.rows[i+1],ex=`(${OV}${er}-${PL}${er})*${B}${er}*${P}${er}`,need=`IF(N(${SG}${er})>0,N(${SG}${er})+${ex},${ex}-${H}${er})`;
+    row[cU]={f:`IF(ISNUMBER(${OV}${er}),${OV}${er},IF(ISNUMBER(${PL}${er}),${PL}${er},""))`,v:val('used',r),s:'x2'};
+    row[cO]={f:`IF(AND(ISNUMBER(${OV}${er}),ISNUMBER(${PL}${er}),ISNUMBER(${B}${er})),IF(${need}<=0,"",CEILING(${need},10)),IF(N(${SG}${er})>0,${SG}${er},""))`,v:val('ordovr',r),s:'int'}});
+   dataSheet.dv=[{type:'decimal',min:'1',max:'8',ref:`${OV}2:${OV}${N+1}`,title:'Peak lift override',prompt:'Type your own peak lift, like 3.0 for 3 times a normal week. Leave it blank to use the calculated lift.',errTitle:'Not a lift',err:'Type a number from 1 to 8, or clear the cell.'}];
+   dataSheet.cf.push({ref:`A2:${C(nf-1)}${N+1}`,rules:[{type:'expression',dxf:3,formula:`$${C(ix('filest'))}2="New Today"`}]})}
   dataSheet.rows[0].push(...HELP.map(t=>({v:t,s:'head'})));
   const hL=i=>C(nf+i),sCol=C(ix('status')),aCol=C(ix('attn')),dCol=C(ix('decision'));
   let run=0;const showVal=allRows.map(r=>dashMatch(r)?++run:'');
   allRows.forEach((r,i)=>{const row=dataSheet.rows[i+1],er=i+2;
+    const mm=r.metrics,hasPk=mm.peak&&mm.baseWk;
     row.push({f:`IF(OR(Dashboard!$F$4="All statuses",AND(Dashboard!$F$4="Needs attention",${aCol}${er}="Yes"),${sCol}${er}=Dashboard!$F$4),1,0)`,v:statOK(r)?1:0,s:'txt'},
-     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${dCol}${er}=Dashboard!$B$4),${hL(0)}${er}=1),MAX(${hL(1)}$1:${hL(1)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
+     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${dCol}${er}=Dashboard!$B$4),${hL(0)}${er}=1),MAX(${hL(1)}$1:${hL(1)}${er-1})+1,"")`,v:showVal[i],s:'txt'},{v:hasPk?R3(mm.baseWk):'',s:'dec1'},{v:hasPk?mm.peakWks:'',s:'int'},{v:mm.peakCover?R3(Math.max(0,mm.peakCover.minInv-mm.peakCover.safety)):0,s:'int'})});
   dataSheet.widths=[...dataSheet.widths,...HELP.map(()=>14)];
   dataSheet.hide=HELP.map((_,i)=>nf+i);
   const rng=k=>{const c=C(typeof k==='number'?nf+k:ix(k));return `'${MASTER}'!$${c}$2:$${c}$${N+1}`};
@@ -299,7 +346,7 @@ function downloadXlsx(){
   // first projected week starts from On Hand Now (column E)
   plan.cf.push({ref:`${C(wc0)}2:${C(lc)}${pl}`,rules:[{type:'expression',dxf:0,formula:`AND($D2="Projected On Hand",ISNUMBER(${C(wc0)}2),${C(wc0)}2<0)`}]});
   plan.cf.push({ref:`${C(wc0)}2:${C(wcN)}${pl}`,rules:[{type:'expression',dxf:1,formula:`AND($D2="Peak / Promo Weeks",${C(wc0)}2<>"")`}]});
-  /* ---- Seasonal Calendar and Promos And Peaks ---- */
+  /* ---- Seasonal Calendar and Seasonal Items ---- */
   const SD=A.seasonData(),SR=SD.lines.length,sc0=5;
   const season={name:'Seasonal Calendar',fit:true,widths:[24,...Array(12).fill(8),10,16],freeze:0,rows:[],merges:[],cf:[]};
   const sput=(r,c,o)=>{while(season.rows.length<r)season.rows.push([]);season.rows[r-1][c]=o};
@@ -310,12 +357,12 @@ function downloadXlsx(){
     v:`${SD.n.promo} of ${SD.n.items} items have a promo this year or last year. ${SD.n.thin} items would run thin or short into a peak in the next 12 weeks.`,s:'note'});
   sspan(3,0,LC,{v:SEASON_KEY,s:'note'});
   season.rows[1].h=22;season.rows[2].h=34;
-  sput(5,0,{v:'Line (Compared With A Normal Month)',s:'head'});A.MONS.forEach((m,j)=>sput(5,1+j,{v:m,s:'head'}));sput(5,13,{v:'Q4 Share',s:'head'});sput(5,14,{v:'Peak Months',s:'head'});season.rows[4].h=30;
-  SD.lrow.forEach((l,i)=>{const r=6+i;sput(r,0,{v:l.line,s:'bold'});l.idx.forEach((x,j)=>sput(r,1+j,{v:x,s:'x2'}));sput(r,13,{f:`SUM(K${r}:M${r})/12`,v:l.q4,s:'pct'});sput(r,14,{v:l.peak,s:'txt'})});
+  sput(4,0,{v:'To see the items behind a line, open the Seasonal Items tab and filter Line.',s:'note'});season.merges.push(`A4:${C(LC)}4`);for(let c=1;c<=LC;c++)sput(4,c,{v:'',s:'note'});sput(5,0,{v:'Line',s:'head'});A.MONS.forEach((m,j)=>sput(5,1+j,{v:m,s:'head'}));sput(5,13,{v:'Q4 Share',s:'head'});sput(5,14,{v:'Peak Months',s:'head'});season.rows[4].h=30;
+  SD.lrow.forEach((l,i)=>{const r=6+i;sput(r,0,{v:l.line,s:'bold'});l.idx.forEach((x,j)=>sput(r,1+j,{v:x,s:'xk'}));sput(r,13,{v:l.q4,s:'pct'});sput(r,14,{v:l.peak,s:'txt'})});
   season.cf.push({ref:`B6:M${5+SR}`,rules:[{type:'cellIs',op:'greaterThanOrEqual',dxf:1,formula:'1.5'}]});
   const wr=7+SR;sspan(wr,0,LC,{v:'Where This Comes From',s:'sect'});
   A.SEASON_SRC.forEach((x,i)=>{const r=wr+1+i;sspan(r,0,0,{v:x[0],s:'bold'});sspan(r,1,2,{v:x[1],s:'ctr'});sspan(r,3,LC,{v:x[2],s:'note'});season.rows[r-1].h=40});
-  const promoSheet=mkL(SD.list,'Promos And Peaks',PPK);promoSheet.fit=true;promoSheet.freezeCols=3;
+  const promoSheet=mkL(SD.items,'Seasonal Items',PPK);promoSheet.fit=true;promoSheet.freezeCols=3;
   /* ---- Dashboard ---- */
   const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
   const nd=DK.length,HC=nd; // helper column index on the dashboard
@@ -367,16 +414,20 @@ function downloadXlsx(){
   dash.cf.push({ref:`A${first}:A${last}`,rules:TN.map((t,i)=>({type:'cellIs',op:'equal',dxf:i,formula:`"${A.tn(t)}"`}))});
   dash.cf.push(...cfList(DK,first,last));
   dash.freeze=4;
+  const DL=A.droppedList(),DR=Math.max(DL.length,1)+1;
+  const dropSheet={name:'Dropped Items',fit:true,widths:[11,34,17,12,13,46,13,11,58],freeze:1,rows:[hdr(['SKU','Product','Line','Last On Hand','Units On Order','Typed Note From Yesterday','Planned Qty','Needed By','What To Check']),
+    ...(DL.length?DL.map(x=>[{v:x.id,s:'ctr'},{v:x.name,s:'txt'},{v:x.sub,s:'txt'},{v:x.onHand,s:'int'},{v:x.po,s:'int'},{v:x.note,s:'txt'},x.plan===''?{v:'',s:'txt'}:{v:x.plan,s:'int'},{v:x.by,s:'ctr'},{v:dropCheck(x),s:'txt'}]):[[{v:'Nothing dropped out of the files today.',s:'txt'}]])]};
+  span(3,0,nd-1,{f:`COUNTIF(${rng('filest')},"New Today")&" new items in today's files (blue on the Master List, nothing typed yet). "&SUMPRODUCT(--(((${rng('note')}<>"")+(${rng('ovr')}<>"")+(${rng('plan')}<>""))>0))&" items carry typed work from yesterday's file. "&${DL.length?`COUNTA('Dropped Items'!$A$2:$A$${DR})`:'0'}&" items from yesterday are no longer in the files (see Dropped Items)."`,v:carryText(),s:'note'});R(3).h=22;
   const notesSheet=mkL(allRows.filter(r=>A.noteFor(r.id)),'Notes',NK);
   const sheets=[dash,dataSheet,plan,accSheet,season,promoSheet,
    {name:'Since Yesterday',fit:true,widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
-   notesSheet,
-   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the green Master List (Work Here) tab. It is the only tab you type in: filter any column, and type notes in the three green columns. Every other tab reads from it, so a note typed there shows on the Dashboard, 12-Week Plan, Promos And Peaks, Since Yesterday and Notes tabs. Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
+   notesSheet,dropSheet,
+   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the green Master List (Work Here) tab. It is the only tab you type in: filter any column, and type in the green columns (peak override, planned order quantity, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal Items, Since Yesterday and Notes tabs. Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
    [{v:'One File Per Planner',s:'bold'},{v:'Each planner has their own file, built from their own demand line, so nobody shares edits and there is no need to track who wrote a note. To set one up for someone else, give them the same recipe and point it at the files for their line.',s:'txt'}],
-   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each morning the run builds a new file. In the real setup the run reads the Note columns back from yesterday\'s file first, so notes carry forward.',s:'txt'}],
-   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Promos And Peaks and Notes lists update as soon as you change the Master List. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
+   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each morning the run builds a new file. In the real setup the run opens yesterday\'s file first and copies the green columns across by SKU, so typed work carries forward.',s:'txt'}],
+   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal Items and Notes lists update as soon as you change the Master List. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
    [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
-  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Promos And Peaks'].includes(sh.name))});
+  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal Items','Dropped Items'].includes(sh.name))});
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);

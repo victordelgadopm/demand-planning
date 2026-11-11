@@ -1,6 +1,9 @@
 (function(){
 'use strict';
 const D=window.__DATA__, E=window.Engine;
+const YID=new Set(D.yesterday.skus.map(x=>x.id)),NEWIDS=D.today.skus.filter(x=>!YID.has(x.id)).map(x=>x.id),TID=new Set(D.today.skus.map(x=>x.id));
+const newToday=id=>NEWIDS.includes(id);
+const droppedList=()=>D.yesterday.skus.filter(x=>!TID.has(x.id)).map(x=>{const t=(D.dropped||[]).find(d=>d.id===x.id)||{};return {id:x.id,name:x.name,sub:x.sub,onHand:x.inv.onHand,po:(x.inv.pos||[]).reduce((a,p)=>a+p.qty,0)+(x.inv.transit||[]).reduce((a,p)=>a+p.qty,0),note:t.note||'',plan:t.plan||'',by:t.by||''}});
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=E.fmtNum, money=E.fmtMoney, KEY='dpa.v1';
@@ -26,7 +29,7 @@ const RULES={
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS'};
+const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int'};
 const r3=x=>Math.round(x*10000)/10000;
 const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
 function pv(k,r){const m=r.metrics,nw=r.isNew;
@@ -46,6 +49,8 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'peak':return nw?'n/a':(m.peakMonths||'None');
    case 'peakwk':return nw?'n/a':!m.peak?'None in window':(m.peak.start===m.peak.end?m.peak.start:m.peak.start+' to '+m.peak.end);
    case 'peakcover':return m.peakStatus==='—'?'No peak':m.peakStatus;
+   case 'peaklift':return nw||m.peakLift==null?'':r3(m.peakLift);
+   case 'stocklp':return nw?'n/a':!m.peak?'No peak':m.stockLP;
    case 'promo':return m.promo.status;
    case 'nextpromo':return m.promo.next?m.promo.next+(m.promo.confirmed?'':' (not confirmed)'):'None';
    case 'lift':return m.promo.lift==null||!isFinite(m.promo.lift)?'':r3(m.promo.lift);}
@@ -59,6 +64,7 @@ function pcls(k,v){if(v===''||v==null)return '';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
   if(k==='onhand'&&v<0)return 'bad';
+  if(k==='stocklp')return String(v).startsWith('Out')?'warn':'';
   if(k==='peakcover')return v==='Short'?'bad':v==='Thin'?'warn':'';
   if(k==='promo')return v==='Confirmed, short'?'bad':v==='Not confirmed'?'warn':'';
   return ''}
@@ -177,7 +183,7 @@ function chipsHtml(){const r=st.res,attn=r.rows.filter(x=>x.headline).length;
 function renderList(){
   const rows=filtered(),c=st.settings.cols;$('#cnt').textContent=rows.length+' items, '+money(sumD(rows))+' at stake'+(st.dec?'':', '+rows.filter(x=>!x.decision).length+' with no decision needed');
   const cap=(!st.more&&!st.q&&rows.length>8)?8:rows.length,shown=rows.slice(0,cap);
-  $('#listbody').innerHTML=rows.length?`<div class="lscroll"><table class="list"><thead><tr><th>Status</th><th class="icol">Item</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst (3 wk)</th><th>Stock-out week</th><th>Next arrival</th><th>Peak cover</th><th>Next promo</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}<th class="gcol">What is going on</th><th class="ncol">Note</th>${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
+  $('#listbody').innerHTML=rows.length?`<div class="lscroll tall"><table class="list"><thead><tr><th>Status</th><th class="icol">Item</th><th class="num">On hand</th><th class="num">On order</th><th class="num">Wks supply</th><th class="num">Fcst / wk</th><th class="num">Sales vs fcst (3 wk)</th><th>Stock-out week</th><th>Next arrival</th><th>Peak cover</th><th>Next promo</th><th class="num">Unit gap</th>${c.dollars?'<th class="num">$ at stake</th>':''}<th class="gcol">What is going on</th><th class="ncol">Note</th>${c.conf?'<th>Confidence</th>':''}</tr></thead><tbody>${shown.map(rowHtml).join('')}</tbody></table></div>${cap<rows.length?`<div class="morebar"><button class="btn" id="showmore">Show all ${rows.length}</button></div>`:''}`
    :'<div class="empty">Nothing here with these filters.</div>';
   bindRows($('#listbody'));const sm=$('#showmore');if(sm)sm.onclick=()=>{st.more=true;renderList()};
 }
@@ -185,7 +191,7 @@ function rowHtml(r){const c=st.settings.cols,nt=noteFor(r.id);
   const hl=r.headline||(r.isAccepted?'Accepted risk (see note)':'No flags. Supply covers the forecast and last year\'s pattern.');
   const cell=k=>{const v=pv(k,r);return `<td class="${pcls(k,v)}">${esc(v)}</td>`};
   return `<tr class="r" tabindex="0" data-open="${r.id}"><td>${tierB(r.tier)}${r.reAlert?'<div style="margin-top:4px"><span class="re" style="margin:0">RE-ALERT</span></div>':''}</td>
-   <td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id}${c.sub?' · '+esc(r.sub):''}${r.isNew?' · new item':''}${r.lumpy?' · lumpy demand':''}</div></td>
+   <td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id}${c.sub?' · '+esc(r.sub):''}${newToday(r.id)?' · new in today\'s files':r.isNew?' · new item':''}${r.lumpy?' · lumpy demand':''}</div></td>
    ${['onhand','onorder','wos','fcstwk','salesvs'].map(k=>{const v=pv(k,r);return `<td class="num ${pcls(k,v)}">${v===''?'—':fv(k,v)}</td>`}).join('')}${cell('stockout')}${cell('nextarr')}${cell('peakcover')}${cell('nextpromo')}<td class="num">${r.headline?fmt(r.gapUnits):'—'}</td>
    ${c.dollars?`<td class="num">${r.dollars>0?money(r.dollars):'—'}</td>`:''}
    <td class="gcol">${r.headline?`<span class="tag">${esc(E.FLAG_LABEL[r.headlineType])}</span>`:''}${esc(hl)}${r.metrics.spike&&!r.headline?'<div class="conf">One-time spike noticed in the last 8 weeks, treated as a one-off.</div>':''}</td>
@@ -208,25 +214,26 @@ function seasonData(){
     .sort((a,b)=>{const ra=a.metrics.peakStatus==='Short'?0:a.metrics.peakStatus==='Thin'?2:9,rb=b.metrics.peakStatus==='Short'?0:b.metrics.peakStatus==='Thin'?2:9;
       return Math.min(PRANK[a.metrics.promo.status]??9,ra)-Math.min(PRANK[b.metrics.promo.status]??9,rb)||b.dollars-a.dollars||(a.id<b.id?-1:1)});
   const lines=['All Lines',...Object.keys(sz.lines).sort()],sh=l=>l==='All Lines'?sz.all:sz.lines[l];
-  const lrow=lines.map(l=>{const a=sh(l),pm=E.peakMonthsOf(a);return {line:l,idx:a.map(x=>x*12),q4:a[9]+a[10]+a[11],peak:pm?pm.text:'None'}});
-  return {sz,lines,lrow,list,
+  const lrow=lines.map(l=>{const a=sh(l),pm=E.peakMonthsOf(a);return {line:l,idx:E.monthIdx(a).map(x=>Math.round(x*100)/100),q4:a[9]+a[10]+a[11],peak:pm?pm.text:'None'}});
+  const items=rows.filter(r=>r.metrics.peak||r.metrics.promo.status!=='None').sort((a,b)=>(a.sub<b.sub?-1:a.sub>b.sub?1:0)||(b.metrics.peakLift||0)-(a.metrics.peakLift||0)||(a.id<b.id?-1:1));
+  return {sz,lines,lrow,list,items,
     n:{items:rows.length,promo:pr.length,ty:rows.filter(r=>r.metrics.promo.next).length,unconf:rows.filter(r=>r.metrics.promo.status==='Not confirmed').length,peak:pk.length,thin:rows.filter(r=>r.metrics.peakStatus==='Thin'||r.metrics.peakStatus==='Short').length}};
 }
 const SEASON_SRC=[
- ['Peak months','Calculated','Counted from the last two years of weekly sales in the Reporting tool, by calendar month. A month is a peak when it sells at least 1.5x an average month.'],
+ ['Peak months','Calculated','Counted from the last two years of weekly sales in the Reporting tool, by calendar month. A month is a peak when it sells at least 1.5x a normal month, which is the middle month of the year.'],
  ['This year\'s promos','From a file','Read from the promo calendar in the Shared file, with a confirmed or not confirmed mark. If a promo is missing from the file, it will not show here, so "None" means none on file, not none planned.'],
  ['Last year\'s promo lift','Calculated','Measured by comparing last year\'s promo weeks with the normal weeks around them. It only shows when last year\'s promo weeks are tagged in the history.'],
  ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
 function seasonHtml(){
   const d=seasonData(),n=d.n;
   const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Q4 share</th><th>Peak months</th></tr></thead><tbody>${d.lrow.map(l=>
-    `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x.toFixed(2)}x</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
+    `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x>=1.5?x.toFixed(2)+'x':'Normal'}</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
   const lst=`<div class="lscroll"><table class="list"><thead><tr><th>Item</th><th>Promo status</th><th>Next promo</th><th class="num">Last year lift</th><th>Peak weeks (next 12)</th><th>Peak cover</th></tr></thead><tbody>${d.list.map(r=>{
     const g=k=>pv(k,r),c=k=>pcls(k,g(k));
     return `<tr class="r" tabindex="0" data-open="${r.id}"><td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}</div></td><td class="${c('promo')}">${esc(g('promo'))}</td><td>${esc(g('nextpromo'))}</td><td class="num">${g('lift')===''?'—':fv('lift',g('lift'))}</td><td>${esc(g('peakwk'))}</td><td class="${c('peakcover')}">${esc(g('peakcover'))}</td></tr>`}).join('')}</tbody></table></div>`;
   return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
   <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
-  <h4 class="sub-h">How Busy Each Month Is Compared With A Normal Month</h4><p class="mute">1.00x is a normal month. Shaded means 1.5x or more, which is a peak. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
+  <h4 class="sub-h">Which Months Are A Peak</h4><p class="mute">A normal month is the middle month of the year. A month that sells 1.5x that or more is a peak and shows its lift, shaded. Every other month is Normal. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
   <h4 class="sub-h">Items With A Promo Or A Thin Peak</h4><p class="mute">Click a row for the numbers behind it.</p>${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
@@ -557,7 +564,7 @@ function gkey(e){if(gi<0)return;if(e.key==='ArrowRight')tour(gi+1);else if(e.key
 /* ---------- boot ---------- */
 $('#scrim').onclick=closeAll;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&gi<0)closeAll()});
-window.__app={noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
+window.__app={newToday,NEWIDS,droppedList,noteFor,seasonData,SEASON_SRC,MONS,PEAKSH,snapTiles,pv,fv,pcls,PNUM,pctN,pctSN,TODAY_LONG,TODAY_SHORT,TODAY_ISO,esc,E,D,DEC,TIERS,TCLS,TICON,tn,skuOf,rowOf,snap,money,save,closeAll,openModal,st,recompute,renderApp,openSku,tour,openFlow,flowPanel,openSettings,openEmail,openLoad,downloadCsv,reset:()=>{try{localStorage.removeItem(KEY)}catch(e){}st.settings=merge(DEFSET,{});st.notes=JSON.parse(JSON.stringify(D.seedNotes));st.snap='today';st.tier='attn';st.dec=null;st.sub='';st.q='';st.tab='attn';closeAll();recompute();renderApp()}};
 const setHH=()=>{const h=$('header.top');if(h)document.documentElement.style.setProperty('--hh',h.offsetHeight+'px')};
 addEventListener('resize',setHH);recompute();renderApp();setHH();
 })();
