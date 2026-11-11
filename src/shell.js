@@ -24,11 +24,18 @@ const COLS={
  plan:{h:'Order Qty To Place',w:12,num:'int',src:'typed in the Master List: the new order you decide to place now, ready to copy into the planning system. It is not the orders already placed (those are In Transit and Open PO)'},
  cmpai:{h:'Variance Vs AI Qty',w:12,num:'intS',src:'formula: Order Qty To Place minus the AI Recommended Qty (Total). Blank until you type a quantity. Negative means you are ordering less than the AI suggests'},
  cmptxt:{h:'Your Qty Vs AI',w:17,src:'formula: Near AI Qty when your Order Qty To Place is within 10% of the AI total (or 10 units), otherwise Below AI or Above AI Qty by how many units. No qty typed yet shows when the AI suggests an order and you have not typed one'},
- needby:{h:'Needed By',w:11,src:'typed in the Master List: the date the units are needed'},
+ needby:{h:'Needed By',w:11,src:'typed in the Master List: The date the units are needed'},
  status:{h:'Status',w:13,core:1},sku:{h:'SKU',w:11,core:1},product:{h:'Product',w:32,core:1},sub:{h:'Line',w:17},abc:{h:'ABC Class',w:9,src:'from the Planning system: A items make up the first 80% of 12-week forecast sales value, B the next 15%, C the last 5%'},
  supplier:{h:'Supplier',w:18,src:'from the Shared file'},
  onhand:{h:'On Hand (Units)',w:11,num:'int',src:'from the Planning system: units in the warehouse today'},
  transit:{h:'In Transit (Units)',w:11,num:'int',src:'from the Planning system: units on the way, with a delivery date'},
+ prodq:{h:'In Production (Units)',w:12,num:'int',src:'from the Planning system: units ordered that the supplier is still making'},
+ orgq:{h:'At Origin (Units)',w:11,num:'int',src:'from the Planning system: units finished and waiting at the origin warehouse to ship'},
+ readyd:{h:'Next Ready Date',w:12,src:'from the Planning system: the supplier\'s updated date when the soonest in-production order is ready'},
+ etachg:{h:'ETA Change (Days)',w:11,num:'intS',src:'calculated: how many days later (+) or earlier (-) the soonest arrival is than first promised'},
+ ptime:{h:'Production Time (Days)',w:12,num:'dec1',src:'calculated from the supplier\'s past orders: typical days to make an order'},
+ ttq:{h:'Transit Quoted (Days)',w:11,num:'int',src:'from the Shared file: the supplier\'s or forwarder\'s quoted transit days'},
+ tta:{h:'Transit Actual (Days)',w:11,num:'dec1',src:'calculated from past shipments: typical transit days actually taken'},
  openpo:{h:'Open PO (Units)',w:11,num:'int',src:'from the Planning system: units ordered from the supplier that have not shipped yet'},
  onorder:{h:'On Order (Units)',w:11,num:'int',src:'from the Planning system: in transit plus open orders'},
  supply:{h:'Total Supply (Units)',w:12,num:'int',src:'from the Planning system: on hand, in transit and open orders added together'},
@@ -39,7 +46,7 @@ const COLS={
  ly:{h:'Same Weeks Last Year (Units)',w:16,num:'int',src:'from the Reporting tool: units sold in the same weeks last year'},
  wos:{h:'Weeks Of Supply',w:11,num:'dec1',src:'from the Planning system: stock on hand plus in transit, divided by the average weekly forecast'},
  lt:{h:'Lead Time (Weeks)',w:11,num:'dec1',src:'from the Shared file: the supplier\'s quoted lead time'},
- stockout:{h:'Stock-Out Week',w:13,src:'calculated: the first week stock goes below zero, using quoted delivery dates'},
+ stockout:{h:'Stock-Out Week',w:13,src:'calculated: The first week stock goes below zero, using quoted delivery dates'},
  orderby:{h:'Order By',w:11,src:'calculated: the stock-out week minus the supplier lead time'},
  nextarr:{h:'Next Arrival Date',w:13,src:'from the Planning system: the date of the soonest delivery (in transit or on a PO). Real dates, so you can filter and sort them'},
  nextarrq:{h:'Next Arrival Qty',w:12,num:'int',src:'from the Planning system: the units in that soonest delivery'},
@@ -69,15 +76,15 @@ const COLS={
  notedate:{h:'Note Date',w:11,src:'typed in the Master List next to the note'},
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
  note:{h:'Note',w:48,wide:1,src:'typed in the Master List, one note per item'}};
-const DEFAULT=['status','sku','product','decision','going','onhand','transit','openpo','nextarr','nextarrq','wos','stockout','orderby','fcstwk','aifcst','aifdiff','salesvs','peakcover','nextpromo','gap','dollars','suggest','addqty','ordovr','plan','cmptxt','note','conf'];
+const DEFAULT=['status','sku','product','decision','going','onhand','prodq','orgq','transit','nextarr','nextarrq','etachg','wos','stockout','orderby','fcstwk','aifcst','aifdiff','salesvs','peakcover','nextpromo','gap','dollars','suggest','addqty','ordovr','plan','cmptxt','note','conf'];
 const MASTER='Master List (Work Here)',INK=['ovr','ovrwhy','plan','needby','note','notedate'],MINCOLS=12;
-const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','transit','openpo','onorder','supply','fcstwk','aifcst','aifdiff','sales4','salesvs','ly','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','wos','lt','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','suggest','addqty','addwhy','ordovr','plan','cmpai','cmptxt','needby','note','notedate'];
-const DH={onhand:'On Hand',transit:'In Transit',openpo:'Open PO',orderby:'Order By',onorder:'On Order',wos:'Wks Of Supply',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival Date',nextarrq:'Next Arrival Qty',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
+const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','prodq','orgq','transit','openpo','onorder','supply','fcstwk','aifcst','aifdiff','sales4','salesvs','ly','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','wos','lt','ptime','ttq','tta','stockout','orderby','readyd','nextarr','nextarrq','etachg','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','suggest','addqty','addwhy','ordovr','plan','cmpai','cmptxt','needby','note','notedate'];
+const DH={onhand:'On Hand',prodq:'In Production',orgq:'At Origin',etachg:'ETA Change',readyd:'Next Ready Date',transit:'In Transit',openpo:'Open PO',orderby:'Order By',onorder:'On Order',wos:'Wks Of Supply',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival Date',nextarrq:'Next Arrival Qty',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=DEFAULT.slice();
 const saveCols=()=>{};
 let rowsMode='attn',tab='dash';
-const PLK=new Set(['nextarrq','arr2','arr2q','aifdiff','filest','suggest','addqty','addwhy','aifcst','aifdiff','cmpai','cmptxt','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift']);
+const PLK=new Set(['prodq','orgq','readyd','etachg','ptime','ttq','tta','nextarrq','arr2','arr2q','aifdiff','filest','suggest','addqty','addwhy','aifcst','aifdiff','cmpai','cmptxt','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift']);
 function val(k,r){
   if(PLK.has(k))return A.pv(k,r);
   const m=r.metrics,sk=A.skuOf(r.id),n=A.noteFor(r.id);
@@ -104,7 +111,7 @@ let dashDec=ALLD,dashStat='Needs attention';
 const statOK=r=>dashStat==='All statuses'||(dashStat==='Needs attention'&&!!r.headline)||A.tn(r.tier)===dashStat;
 const dashMatch=r=>(dashDec===ALLD||dName(r)===dashDec)&&statOK(r);
 const sumD=it=>it.reduce((t,r)=>t+(r.dollars>0?Math.round(r.dollars):0),0);
-const colorKey=()=>`<div class="ckey"><b>Color key:</b> <span class="k ok">Green is good (No risk)</span> <span class="k warn">Orange is Watch: the planner should check it</span> <span class="k bad">Red is a problem or needs action</span> <span class="k nw">Blue is Overstocked, or too many weeks of supply</span> <span class="k ai">Teal is the AI\'s recommendation</span> <span class="k inp">Light yellow is where you type</span></div>`;
+const colorKey=()=>`<div class="ckey"><b>Color key:</b> <span class="k ok">Green is good (No risk)</span> <span class="k warn">Orange is Watch: The planner should check it</span> <span class="k bad">Red is a problem or needs action</span> <span class="k nw">Blue is Overstocked, or too many weeks of supply</span> <span class="k ai">Teal is the AI\'s recommendation</span> <span class="k inp">Light yellow is where you type</span></div>`;
 function dashHtml(){
   const all=sheetRows('all'),rows=all.filter(dashMatch);
   const boxes=DECKEYS.map((k,i)=>{const lab=DECL[i],it=all.filter(r=>dName(r)===lab&&statOK(r));
@@ -150,7 +157,7 @@ const DEFS=[
  ['Promo Status','None, Last year only, Not confirmed (this year\'s promo is on the calendar but not confirmed), Confirmed covered or short (supply against the base forecast plus last year\'s lift), or New this year.'],
  ['Last Promo Lift And Units','Last year\'s promo weeks compared with the normal weeks around them, after taking out the season. 1.50x means the promo weeks sold 50% more. Last Promo Units Sold is the total sold in those weeks, so you can see the real number behind the lift. Both are measured from the weeks last year\'s promo ran, moved to the same calendar weeks this year.'],
  ['Promo And Peak Overlap','Says whether this year\'s promo weeks fall inside the peak weeks. When they do, the promo lands on top of an already busy season.'],
- ['Promo Extra Units And Peak + Promo Units','Peak Bump is the units the peak weeks sell above a normal week. Promo Extra Units is what the confirmed promo adds on top of the forecast in its weeks (forecast times the last promo lift). For a promo inside the peak it scales with the Peak Lift Used, so a peak override moves it. Peak + Promo Units adds the two in units. It is 0 for a promo with no last-year history (New this year), because there is no lift to measure. Nothing is averaged, and a week is never counted twice: the promo sits on top of the peak level, and the peak bump is measured against a normal week.'],
+ ['Promo Extra Units And Peak + Promo Units','Peak Bump is the units the peak weeks sell above a normal week. Promo Extra Units is what the confirmed promo adds on top of the forecast in its weeks (forecast times the last promo lift). For a promo inside the peak it scales with the Peak Lift Used, so a peak override moves it. Peak + Promo Units adds the two in units. It is 0 for a promo with no last-year history (New this year), because there is no lift to measure. Nothing is averaged, and a week is never counted twice: The promo sits on top of the peak level, and the peak bump is measured against a normal week.'],
  ['12-Week Plan','Projected On Hand each week is last week plus receipts minus forecast demand. Red means below zero. Lowest Point is the lowest projected week. The Peak / Promo Weeks row marks PEAK weeks, PROMO weeks (PROMO? if not confirmed) and BOTH.']];
 function recipeItems(){
   return [['Rows Shown','The Master List holds every item, with the ones that need attention first, ranked by status then dollars. The Dashboard starts on the items that need attention.'],
@@ -163,7 +170,7 @@ function recipeItems(){
    ['Carrying Work Forward','Each run starts from the previous file and the two fresh source files. Calculated columns are replaced from the new files. The light yellow columns are copied across by SKU, so notes, peak overrides, order quantities to place and needed-by dates carry forward. An order quantity to place is flagged for review once its Needed By date passes, and an override is flagged for review after two weeks, so old fixes do not drive orders forever.'],
    ['New And Missing Items','A SKU in the latest files that was not in the previous run\'s is marked New Today in the File Status column on the Master List, with the light yellow columns empty. A SKU that was in the previous file but is missing from today\'s goes to the New And Missing Items tab with the work you had typed, so you know to check the shared files for what happened.'],
    ['Peak Override And Orders','Read the peak columns left to right on the Master List: Peak Weeks is when, Peak Lift is how big (the forecast in the peak weeks divided by a normal week), with your Override and its Reason beside it and Peak Lift Used after them, Peak Bump is the extra units that means, and Units Short Of Peak Cover is what is still missing after stock and orders on the way. If you know last year was out of stock, type your own lift on the Master List. AI Recommended Qty (Stock Gap) covers stock-out gaps. AI Recommended Add (Peak + Promo) says how many more units to order so stock stays above 2 weeks of peak demand, counting the confirmed promo, and AI Recommendation Why gives the reason in words. AI Recommended Qty (Total) adds them together and recalculates with any override you typed. Order Qty To Place and Needed By are yours to type and copy into the planning system.'],
-   ['Schedule','On your schedule: daily, weekly or on request (sample: 6:05 AM)'],
+   ['Schedule','On your schedule: Daily, weekly or on request (sample: 6:05 AM)'],
    ['How To Change It','Ask your AI agent. Columns, colors and rules are changed in conversation with the agent, which updates this saved recipe so every future run uses it. They are not edited on this site or in the downloaded file.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
 }
@@ -177,7 +184,7 @@ const weekLabels=()=>Array.from({length:E.H},(_,h)=>E.fmtDate(E.weekStart(A.snap
 const tgtText=(w,b)=>w>0.35||Math.abs(b)>0.10?'Off target':w>0.25||Math.abs(b)>0.05?'Watch':'On target';
 function accRows(){
   const T=E.accuracyTotal(A.snap()),a=E.accuracy(A.snap());
-  return [{line:'All Lines',n:T.n,w:T.wmape,b:T.bias,sig:''},...Object.entries(a).sort((x,y)=>y[1].wmape-x[1].wmape).map(([k,v])=>({line:k,n:v.n,w:v.wmape,b:v.bias,sig:v.possible?'Possible bias: forecast runs '+(v.direction==='under'?'low':'high'):'No consistent bias'}))];
+  return [{line:'All Lines',n:T.n,w:T.wmape,b:T.bias,sig:''},...Object.entries(a).sort((x,y)=>y[1].wmape-x[1].wmape).map(([k,v])=>({line:k,n:v.n,w:v.wmape,b:v.bias,sig:v.possible?'Possible bias: Forecast runs '+(v.direction==='under'?'low':'high'):'No consistent bias'}))];
 }
 /* ---------- grid ---------- */
 function letters(n){return Array.from({length:n},(_,i)=>MiniXlsx.col(i))}
@@ -218,9 +225,9 @@ function accGrid(){
 }
 const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['items','Seasonal And Promo Lifts'],['hist','Sales History'],['notes','Notes'],['dropped','New And Missing Items'],['recipe','Recipe']];
 function roleHtml(){
-  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Items marked New Today in the File Status column are new in the latest files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak and promo columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means. Next come the promo columns: this year\'s promo weeks, last year\'s promo weeks, the units it sold and the lift it gave, whether it lands inside the peak, and Promo Extra Units. Peak Bump plus Promo Extra Units is shown in units, never averaged. Then Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right the teal AI columns sit together: AI Recommended Qty (Stock Gap), AI Recommended Add (Peak + Promo) with AI Recommendation Why, and AI Recommended Qty (Total), recalculated when you type an override. Then come Order Qty To Place, which is what you decide, Variance Vs AI Qty and Your Qty Vs AI (Near AI Qty, Below AI Qty or Above AI Qty). Type an override and the bump, promo and order quantities update.</div>${colorKey()}`;
+  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Items marked New Today in the File Status column are new in the latest files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak and promo columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means. Next come the promo columns: This year\'s promo weeks, last year\'s promo weeks, the units it sold and the lift it gave, whether it lands inside the peak, and Promo Extra Units. Peak Bump plus Promo Extra Units is shown in units, never averaged. Then Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right the teal AI columns sit together: AI Recommended Qty (Stock Gap), AI Recommended Add (Peak + Promo) with AI Recommendation Why, and AI Recommended Qty (Total), recalculated when you type an override. Then come Order Qty To Place, which is what you decide, Variance Vs AI Qty and Your Qty Vs AI (Near AI Qty, Below AI Qty or Above AI Qty). Type an override and the bump, promo and order quantities update.</div>${colorKey()}`;
   if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div><div class="carry-box"><b>Today\'s files:</b> ${esc(carryText())}</div>`;
-  if(tab==='dropped')return `<div class="role"><b>View only.</b> Every change in which items are in the files. New means the item is in the latest files but was not in the previous run\'s (it is also marked New Today on the Master List). Missing Today means it was in the previous file but is not in today\'s: the run lists it here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
+  if(tab==='dropped')return `<div class="role"><b>View only.</b> Every change in which items are in the files. New means the item is in the latest files but was not in the previous run\'s (it is also marked New Today on the Master List). Missing Today means it was in the previous file but is not in today\'s: The run lists it here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
   if(tab==='recipe')return '';
   return `<div class="role"><b>View only.</b> This tab reads from the Master List, so make changes there. It is locked so typing here does not get lost (in Excel: Review, then Unprotect Sheet, no password).</div>`;
 }
@@ -238,10 +245,10 @@ function renderSheet(){
   else if(tab==='plan'){const g=planGrid(sheetRows(rowsMode));inner=g.html;count=`${g.n} items, ${E.H} weeks`}
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
   else if(tab==='items'){const d=A.seasonData(),its=d.items.filter(r=>itemLine==='All Lines'||r.sub===itemLine),g=colGrid(LFK,its);
-    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Every item with a peak or a promo, by line. Read left to right: the peak (when, how big, your override and reason beside it, and the Peak Bump in units), then the promo (this year\'s weeks, last year\'s weeks and units sold, the lift it gave, whether it lands inside the peak, and the Promo Extra Units it adds on top), then whether stock covers it (Peak Cover and Units Short Of Peak Cover). Peak and promo are added in units, never averaged. Stock Last Peak shows items that were out of stock last year, when last year\'s sales understate demand. To change a lift, type an override on the Master List.</div>`+`<div class="note-box">${esc(seasonSummary(d))}</div>`+g.html+`<h3 class="sub-h">Where This Comes From</h3>`+gridHtml(['Topic','Where It Comes From','How'].map(t=>({t})),A.SEASON_SRC.map(x=>({c:[{t:x[0],cls:'bold'},{t:x[1],cls:'st'},{t:x[2],cls:'wide'}]})));count=`${g.n} items with a peak or promo`+(itemLine==='All Lines'?'':', '+itemLine)}
+    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Every item with a peak or a promo, by line. Read left to right: The peak (when, how big, your override and reason beside it, and the Peak Bump in units), then the promo (this year\'s weeks, last year\'s weeks and units sold, the lift it gave, whether it lands inside the peak, and the Promo Extra Units it adds on top), then whether stock covers it (Peak Cover and Units Short Of Peak Cover). Peak and promo are added in units, never averaged. Stock Last Peak shows items that were out of stock last year, when last year\'s sales understate demand. To change a lift, type an override on the Master List.</div>`+`<div class="note-box">${esc(seasonSummary(d))}</div>`+g.html+`<h3 class="sub-h">Where This Comes From</h3>`+gridHtml(['Topic','Where It Comes From','How'].map(t=>({t})),A.SEASON_SRC.map(x=>({c:[{t:x[0],cls:'bold'},{t:x[1],cls:'st'},{t:x[2],cls:'wide'}]})));count=`${g.n} items with a peak or promo`+(itemLine==='All Lines'?'':', '+itemLine)}
   else if(tab==='hist'){const d=A.histData(itemLine),h=[{t:'Status'},{t:'SKU'},{t:'Product'},{t:'Line'},{t:'Row'},{t:'Normal Week (Units)',cls:'money'},...A.HIST_MON.map(t=>({t,cls:'money'})),...Array.from({length:52},(_,i)=>({t:'Wk '+(i+1),cls:'money'+(i>=45?' nxt':'')}))];
     const body=d.map(x=>({id:x.id,c:[{t:A.tn(x.r.tier),cls:'st '+TCLASS[x.r.tier]},{t:x.id},{t:x.r.name,cls:'nw'},{t:x.r.sub,cls:'nw'},{t:x.label,cls:'bold nw'},{t:x.norm>0?E.fmtNum(x.norm):'',cls:'money'},...x.mo.map(v=>({t:v==null?'':E.fmtNum(v),cls:'money'})),...x.wk.map((v,i)=>({t:v==null?'':E.fmtNum(v),cls:'money'+(v!=null&&x.norm>0&&v>=1.5*x.norm?' warn':'')}))]}));
-    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${A.seasonData().lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Units sold by week for 2024, 2025 and 2026, with the 2026 forecast, so you can see where inside a peak the units land: the first week, the last weeks, or the whole month. Each SKU has four rows. Orange weeks sold at least 1.5x that row\'s Normal Week (its middle week, left blank for items that sold in fewer than half the weeks, so nothing is highlighted for them). Monthly totals are on the left, weeks 1 to 52 on the right, and Wk 46 to Wk 52 are the weeks starting now. The forecast row shows the forecast for 2026; only Wk 46 to Wk 52 of the next 12 weeks fall in 2026. This reads the same sales history the peak weeks are calculated from, from the Reporting tool.</div>`+gridHtml(h,body,{empty:'No items.'});count=`${new Set(d.map(x=>x.id)).size} items`+(itemLine==='All Lines'?'':', '+itemLine)}
+    inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${A.seasonData().lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Units sold by week for 2024, 2025 and 2026, with the 2026 forecast, so you can see where inside a peak the units land: The first week, the last weeks, or the whole month. Each SKU has four rows. Orange weeks sold at least 1.5x that row\'s Normal Week (its middle week, left blank for items that sold in fewer than half the weeks, so nothing is highlighted for them). Monthly totals are on the left, weeks 1 to 52 on the right, and Wk 46 to Wk 52 are the weeks starting now. The forecast row shows the forecast for 2026; only Wk 46 to Wk 52 of the next 12 weeks fall in 2026. This reads the same sales history the peak weeks are calculated from, from the Reporting tool.</div>`+gridHtml(h,body,{empty:'No items.'});count=`${new Set(d.map(x=>x.id)).size} items`+(itemLine==='All Lines'?'':', '+itemLine)}
   else if(tab==='dropped'){const cl=changeList();inner=gridHtml(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Previous Run','Qty To Place','Needed By','What To Check'].map((t,i)=>({t,cls:i==4||i==5||i==7?'money':''})),cl.map(x=>({id:x.chg==='New'?x.id:null,cls:x.chg==='New'?'newrow':'',c:[{t:x.chg==='New'?'New Today':'Missing Today',cls:'st '+(x.chg==='New'?'t-new':'t-drop')},{t:x.id},{t:x.name},{t:x.sub},{t:E.fmtNum(x.onHand),cls:'money'},{t:E.fmtNum(x.po),cls:'money'},{t:x.note,cls:'wide'},{t:x.plan===''?'':E.fmtNum(x.plan),cls:'money'},{t:x.by},{t:x.check,cls:'wide'}]})),{empty:'Nothing new or missing today.'});count=A.NEWIDS.length+' new, '+A.droppedList().length+' missing'}
   else if(tab==='notes'){const g=colGrid(NK,sheetRows('all').filter(r=>A.noteFor(r.id)),'No notes yet.');inner=g.html;count=g.n+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
@@ -254,7 +261,7 @@ function renderSheet(){
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${roleHtml()}${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" class="${k==='all'?'work':k==='dash'?'front':''}" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <ul class="mini sec-sub" style="margin:10px 0 0"><li><b>Work in one place:</b> the light yellow Master List (Work Here) tab. Filter it and type notes, a peak lift override or the order quantity to place.</li><li><b>Everything else reads from it,</b> so it updates when the Master List does. Those tabs are locked so nothing typed there gets lost.</li><li><b>New And Missing Items</b> lists what is new or missing from the latest files.</li><li><b>The Dashboard</b> is the same list, easier to scan. Look there first.</li></ul><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <ul class="mini sec-sub" style="margin:10px 0 0"><li><b>Work in one place:</b> The light yellow Master List (Work Here) tab. Filter it and type notes, a peak lift override or the order quantity to place.</li><li><b>Everything else reads from it,</b> so it updates when the Master List does. Those tabs are locked so nothing typed there gets lost.</li><li><b>New And Missing Items</b> lists what is new or missing from the latest files.</li><li><b>The Dashboard</b> is the same list, easier to scan. Look there first.</li></ul><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   const il=$('#il',v);if(il)il.onchange=()=>{itemLine=il.value;renderSheet()};
   $$('[data-line]',v).forEach(e=>{const go2=()=>{itemLine=e.dataset.line;tab='items';renderSheet()};e.onclick=go2;e.onkeydown=ev=>{if(ev.key==='Enter')go2()}});
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
@@ -266,7 +273,7 @@ function renderSheet(){
 /* ---------- xlsx ---------- */
 function downloadXlsx(){
   const C=MiniXlsx.col,AIS=A.AIK,hdr=ks=>Object.assign(ks.map(t=>({v:t,s:'head'})),{h:42}),hdrK=ks=>Object.assign(ks.map(k=>({v:COLS[k].h,s:AIS.has(k)?'headAI':'head'})),{h:42}),sty=k=>AIS.has(k)?(COLS[k].num?'aiInt':'ai'):COLS[k].num||'txt';
-  const DATEK=new Set(['nextarr','arr2','stockout','orderby']),serial=iso=>Math.round((Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))-Date.UTC(1899,11,30))/864e5),wval=(k,r)=>{if(DATEK.has(k)){const i=A.isoOf(k,r);if(i)return serial(i)}return val(k,r)};
+  const DATEK=new Set(['nextarr','arr2','readyd','stockout','orderby']),serial=iso=>Math.round((Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1,+iso.slice(8,10))-Date.UTC(1899,11,30))/864e5),wval=(k,r)=>{if(DATEK.has(k)){const i=A.isoOf(k,r);if(i)return serial(i)}return val(k,r)};
   const cellOf=(k,r)=>{const v=wval(k,r),Cc=COLS[k];
     if(DATEK.has(k)&&typeof v==='number')return {v,s:'dt'};
     if(k==='status')return {v,s:TS[r.tier]};
@@ -276,8 +283,9 @@ function downloadXlsx(){
   /* conditional formats shared by the list sheets: weeks of supply, sales vs forecast, stock-out, negative stock */
   const ovr=st.settings.overstockWOS;
   const cfList=(keys,first,last)=>{if(last<first)return [];const out=[],L=k=>{const i=keys.indexOf(k);return i<0?null:C(i)};
-    const wl=L('wos'),sl=L('salesvs'),ol=L('stockout'),hl=L('onhand'),ob=L('orderby');
+    const wl=L('wos'),sl=L('salesvs'),ec=L('etachg'),ol=L('stockout'),hl=L('onhand'),ob=L('orderby');
     if(wl)out.push({ref:`${wl}${first}:${wl}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(ISNUMBER(${wl}${first}),${wl}${first}<4)`},{type:'expression',dxf:3,formula:`AND(ISNUMBER(${wl}${first}),${wl}${first}>${ovr})`}]});
+    if(ec)out.push({ref:`${ec}${first}:${ec}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(ISNUMBER(${ec}${first}),${ec}${first}>=14)`},{type:'expression',dxf:1,formula:`AND(ISNUMBER(${ec}${first}),${ec}${first}>=${st.settings.etaSlipDays})`}]});
     if(sl)out.push({ref:`${sl}${first}:${sl}${last}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${sl}${first}),ABS(${sl}${first})>=0.15)`}]});
     [ol,ob].forEach(c=>{if(c)out.push({ref:`${c}${first}:${c}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(${c}${first}<>"",${c}${first}<>"None",${c}${first}<>"n/a")`}]})});
     if(hl)out.push({ref:`${hl}${first}:${hl}${last}`,rules:[{type:'expression',dxf:0,formula:`AND(ISNUMBER(${hl}${first}),${hl}${first}<0)`}]});
@@ -341,7 +349,7 @@ function downloadXlsx(){
     ...ac.map((x,i)=>{const er=i+2;return [{v:x.line,s:'bold'},{v:x.n,s:'int'},{f:`1-D${er}`,v:1-x.w,s:'pct'},{v:x.w,s:'pct'},{v:x.b,s:'pctS'},
       {f:`IF(OR(D${er}>0.35,ABS(E${er})>0.1),"Off target",IF(OR(D${er}>0.25,ABS(E${er})>0.05),"Watch","On target"))`,v:tgtText(x.w,x.b),s:'ctr'},{v:x.sig,s:'txt'}]}),
     [],[{v:'How to read this',s:'bold'}],
-    [{v:'Miss (WMAPE) adds up |actual - forecast| for every SKU and week over the last 13 weeks, then divides by total actual sales. Bias is (forecast - actual) divided by actual: negative means the forecast runs low. Common targets: miss under 25%, bias within 5% either way. Over 35% miss or 10% bias is off target.',s:'note'}]],
+    [{v:'Miss (WMAPE) adds up |actual - forecast| for every SKU and week over the last 13 weeks, then divides by total actual sales. Bias is (forecast - actual) divided by actual: Negative means the forecast runs low. Common targets: Miss under 25%, bias within 5% either way. Over 35% miss or 10% bias is off target.',s:'note'}]],
     cf:[{ref:`F2:F${AR}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Off target"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Watch"'},{type:'cellIs',op:'equal',dxf:4,formula:'"On target"'}]}],merges:[`A${AR+3}:G${AR+3}`]};
   accSheet.rows[AR+2].h=48;
   /* ---- 12-Week Plan: forecast, receipts and projected on hand for every item ---- */
@@ -373,7 +381,7 @@ function downloadXlsx(){
   histSheet.cf.push({ref:`${C(18)}2:${C(69)}${HN+1}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${C(18)}2),$${C(5)}2>0,${C(18)}2>=1.5*$${C(5)}2)`}]});
   histSheet.cf.push({ref:`A2:A${HN+1}`,rules:TN0.map((t,j)=>({type:'cellIs',op:'equal',dxf:[0,1,3,4][j],formula:`"${A.tn(t)}"`}))});
   /* ---- Dashboard ---- */
-  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:13,nextarrq:11,arr2:13,arr2q:11,aifdiff:11,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
+  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:13,nextarrq:11,readyd:12,prodq:12,orgq:11,etachg:11,arr2:13,arr2q:11,aifdiff:11,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
   const nd=DK.length,HC=nd; // helper column index on the dashboard
   const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:[...DK.map(k=>DW[k]||COLS[k].w),6],hide:[HC],rows:[],merges:[],cf:[],dv:[]};
   const R=n=>{while(dash.rows.length<n)dash.rows.push([]);return dash.rows[n-1]};
@@ -381,7 +389,7 @@ function downloadXlsx(){
   const fill=(r,c0,c1,sty)=>{for(let c=c0;c<=c1;c++)if(!R(r)[c])put(r,c,{v:'',s:sty})};
   const span=(r,c0,c1,o)=>{put(r,c0,o);fill(r,c0+1,c1,o.s);if(c1>c0)dash.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
   span(1,0,nd-1,{v:'Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
-  span(2,0,nd-1,{v:'VIEW ONLY. Look things over here, then do the work on the light yellow Master List (Work Here) tab and filter it to the same Decision and Status. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first. Color key: teal is the AI\'s recommendation, light yellow is where you type, red is a problem or needs action, orange is Watch (the planner should check it), blue is Overstocked or too many weeks of supply, green is No risk.',s:'note'});R(2).h=48;
+  span(2,0,nd-1,{v:'VIEW ONLY. Look things over here, then do the work on the light yellow Master List (Work Here) tab and filter it to the same Decision and Status. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first. Color key: Teal is the AI\'s recommendation, light yellow is where you type, red is a problem or needs action, orange is Watch (the planner should check it), blue is Overstocked or too many weeks of supply, green is No risk.',s:'note'});R(2).h=48;
   put(4,0,{v:'Decision',s:'label'});span(4,1,2,{v:D0,s:'pick'});
   span(4,3,4,{v:'Status',s:'label'});span(4,5,7,{v:S0,s:'pick'});R(4).h=24;
   dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[ALLD,...DECL].join(',')+'"'},{ref:'F4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STATL.join(',')+'"'});
@@ -423,7 +431,7 @@ function downloadXlsx(){
   span(20,0,2,{v:'Items matching your choices:',s:'label'});put(20,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
   span(20,4,6,{v:'Total $ at stake:',s:'label'});put(20,7,{f:`SUMIFS(${rng('dollars')},${rShow},">0")`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(20,8,10,{v:'No decision needed:',s:'label'});put(20,11,{f:`IF($B$4="All decisions",D20-${BOX.map(b=>C(b[0])+'7').join('-')},0)`,v:matched0.filter(r=>!r.decision).length,s:'int'});R(20).h=24;
   DK.forEach((k,c)=>put(21,c,{v:dh(k),s:AIS.has(k)?'headAI':'head'}));R(21).h=34;
-  const CTRK=new Set(['status','sku','stockout','orderby','nextarr','arr2','peakcover','promo','nextpromo','peak','peakwk','abc','attn','gaptype','conf','notedate']),STY=new Proxy({dollars:'money0',nextarr:'dt',arr2:'dt',stockout:'dt',orderby:'dt'},{get:(o,k)=>o[k]||(AIS.has(k)?sty(k):CTRK.has(k)?'ctr':COLS[k]&&COLS[k].num||'txt')});
+  const CTRK=new Set(['status','sku','stockout','orderby','readyd','nextarr','arr2','peakcover','promo','nextpromo','peak','peakwk','abc','attn','gaptype','conf','notedate']),STY=new Proxy({dollars:'money0',nextarr:'dt',arr2:'dt',stockout:'dt',orderby:'dt'},{get:(o,k)=>o[k]||(AIS.has(k)?sty(k):CTRK.has(k)?'ctr':COLS[k]&&COLS[k].num||'txt')});
   const matched=allRows.filter(dashMatch);
   for(let i=0;i<N;i++){const row=first+i,src=matched[i],hc=`$${C(HC)}${row}`;
     put(row,HC,{f:`IFERROR(MATCH(${i+1},${rShow},0),"")`,v:src?i+1+0:'',s:'txt'});
@@ -443,9 +451,9 @@ function downloadXlsx(){
   const notesSheet=mkL(allRows.filter(r=>A.noteFor(r.id)),'Notes',NK);
   const sheets=[dash,dataSheet,plan,accSheet,itemSheet,histSheet,
    notesSheet,dropSheet,
-   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the light yellow Master List (Work Here) tab. It is the only tab you type in: filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal And Promo Lifts, Notes and New And Missing Items tabs (the Sales History tab shows each item\'s status, product and line from it). Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
+   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the light yellow Master List (Work Here) tab. It is the only tab you type in: Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal And Promo Lifts, Notes and New And Missing Items tabs (the Sales History tab shows each item\'s status, product and line from it). Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
    [{v:'One File Per Planner',s:'bold'},{v:'Each planner has their own file, built from their own demand line, so nobody shares edits and there is no need to track who wrote a note. To set one up for someone else, give them the same recipe and point it at the files for their line.',s:'txt'}],
-   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each run the run builds a new file. In the real setup the run opens the previous file first and copies the light yellow columns across by SKU, so typed work carries forward.',s:'txt'}],
+   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: Each run the run builds a new file. In the real setup the run opens the previous file first and copies the light yellow columns across by SKU, so typed work carries forward.',s:'txt'}],
    [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal And Promo Lifts, Notes and New And Missing Items lists update as soon as you change the Master List. Sales History keeps its weekly numbers from the Reporting tool, so they only change with the scheduled run. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the scheduled run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
    [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
   sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal And Promo Lifts','Sales History','New And Missing Items'].includes(sh.name))});
@@ -456,7 +464,7 @@ function downloadXlsx(){
 }
 /* ---------- home ---------- */
 const ROUTES={
- manual:['Manual Export','You export the files yourself. No connection needed.','You export the files from your sources (Anaplan and Tableau here) and put them in the shared folder. History works the same way: export three years of weekly sales once and save it as the reference file.','Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.'],
+ manual:['Manual Export','You export the files yourself. No connection needed.','You export the files from your sources (Anaplan and Tableau here) and put them in the shared folder. History works the same way: Export three years of weekly sales once and save it as the reference file.','Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.'],
  folder:['Automated Export','Your sources export on a schedule.','Each source exports on a schedule instead of by hand and saves the file into the shared folder. The AI reads the newest files, checks them and saves the finished sheet back there. It works with any approved AI tool and any source that can export a file. Anaplan and Tableau do not save straight into SharePoint on their own, so one small step is needed to move each export into the folder.','A scheduled export in each source, and a way to save it to the shared folder. Set it up yourself if you have the access. If it is blocked on your side, ask IT to set it up.'],
  copilot:['Copilot Connection','Direct connection, if your company allows it.','Microsoft Copilot can reach some sources directly, without a folder. Anaplan names Copilot as a supported client. For Tableau, Microsoft offers a Tableau Cloud connector, but it is built to find and ask about dashboards, and Microsoft does not say it exposes the full numbers. This needs a test on one real dashboard.','Copilot access to each source, and a quick test to see what it can actually read. Turn it on yourself if you can. If it is blocked, ask IT.'],
  chatgpt:['ChatGPT Connection','Direct connection, if your company allows it.','ChatGPT can connect straight to Tableau, because Tableau lists ChatGPT as a supported client. Anaplan does not list ChatGPT, so it needs a custom connector built for it or an outside bridge before ChatGPT can pull from it. Each person signs in with their own account, and a pasted API key does not work.','A connector for each source: Tableau\'s already exists, Anaplan needs a custom connector or an outside bridge. ChatGPT scheduled tasks cannot take file uploads, so a scheduled unattended run is not confirmed. Set it up yourself if allowed. If it is blocked, ask IT.'],
@@ -483,16 +491,38 @@ function flowSvg(stages,label){
      <text x="${x+bw/2}" y="${y+33}" text-anchor="middle" font-size="${n>4?15:17}" font-weight="700" fill="currentColor">${esc(st_[0])}</text>
      <text x="${x+bw/2}" y="${y+56}" text-anchor="middle" font-size="${n>4?12.5:14}" fill="currentColor" opacity=".78">${esc(st_[1])}</text></g>`});
   return sv+'</svg>'}
+
+const NODEINFO={
+ anaplan:['Anaplan','The forecast, open orders and ETAs come from here. The AI agent reads the file or connection and never writes back.'],
+ tableau:['Tableau','Weekly sales and shipments come from here. Three years of history is loaded once and reused on every run.'],
+ route:['How the files arrive','The route you picked in the list above. Which routes are allowed is up to your company IT.'],
+ hub:['AI agent','Matches renamed columns, holds back files with odd values, keeps new fields, and carries your typed notes forward by SKU.'],
+ sheet:['Custom Spreadsheet','Saved to the shared folder on your schedule. This is the file you open and work in.'],
+ email:['Custom Email','Optional. The agent opens the finished spreadsheet and sends a written summary in your format.']};
+function flowRich(route){
+  const rt=ROUTES[route],RL={manual:['Manual Export','You drop the files'],folder:['Automated Export','Runs on its own'],copilot:['Copilot Connection','Direct, no folder'],chatgpt:['ChatGPT Connection','Direct, no folder']}[route];
+  const N=(id,x,y,w,h,t,sub,stroke)=>`<g class="flow-node" tabindex="0" role="button" data-node="${id}" aria-label="${esc(t)}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="var(--card)" stroke="${stroke}" stroke-width="2.5"/><text x="${x+w/2}" y="${y+h/2-4}" text-anchor="middle" font-size="19" font-weight="800" fill="currentColor">${esc(t)}</text><text x="${x+w/2}" y="${y+h/2+20}" text-anchor="middle" font-size="14" fill="currentColor" opacity=".8">${esc(sub)}</text></g>`;
+  const P=(id,d,c,n)=>{let o=`<path id="${id}" d="${d}" fill="none" stroke="${c}" stroke-width="3" opacity=".4"/>`;for(let k=0;k<n;k++)o+=`<circle class="flow-dot" r="6" fill="${c}" opacity="0"><animateMotion dur="3.2s" begin="${(k*3.2/n).toFixed(2)}s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" begin="${(k*3.2/n).toFixed(2)}s" repeatCount="indefinite"/></circle>`;return o};
+  const B='#2b4cc7',T='#00838F';
+  let sv=`<svg class="flowmap rich" viewBox="0 0 1000 300" role="group" aria-label="Animated data flow for ${esc(rt[0])}">`;
+  sv+=P('rf1','M215 85 C 255 85, 255 165, 290 165',B,2)+P('rf2','M215 245 C 255 245, 255 165, 290 165',B,2)+P('rf3','M480 165 L 545 165',B,2)+P('rf4','M765 165 C 800 165, 800 85, 825 85',T,2)+P('rf5','M765 165 C 800 165, 800 245, 825 245',T,2);
+  sv+=N('anaplan',15,45,200,80,'Anaplan','Forecast, POs, ETAs',B)+N('tableau',15,205,200,80,'Tableau','Sales, shipments',B)+N('route',290,125,190,80,RL[0],RL[1],B)+N('hub',545,70,220,190,'AI Agent','Checks and combines',T)+N('sheet',825,45,160,80,'Spreadsheet','Shared folder',T)+N('email',825,205,160,80,'Email','Optional',T);
+  sv+=`<text x="655" y="205" text-anchor="middle" font-size="13" fill="currentColor" opacity=".8">Match, hold back, keep</text><text x="655" y="226" text-anchor="middle" font-size="13" fill="currentColor" opacity=".8">Carry typed work forward</text></svg>`;
+  return `<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px"><span class="conf">Click any box to see what it does.</span><button class="btn sm" id="fl-pause" aria-pressed="false">Pause</button></div><div class="flowscroll">${sv}</div><div class="flowinfo" id="flowinfo" aria-live="polite"><b>${NODEINFO.hub[0]}.</b> ${NODEINFO.hub[1]}</div>`}
+function wireFlow(root){const svg=root.querySelector('.flowmap.rich'),pb=root.querySelector('#fl-pause'),info=root.querySelector('#flowinfo');if(!svg)return;let paused=false;
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){svg.pauseAnimations();paused=true;pb.textContent='Play'}
+  pb.onclick=()=>{paused=!paused;paused?svg.pauseAnimations():svg.unpauseAnimations();pb.textContent=paused?'Play':'Pause';pb.setAttribute('aria-pressed',String(paused))};
+  root.querySelectorAll('.flow-node').forEach(g=>{const go=()=>{const n=NODEINFO[g.dataset.node];info.innerHTML=`<b>${esc(n[0])}.</b> ${esc(n[1])}`};g.onclick=go;g.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}})}
 function renderHome(){
   const r=ROUTES[route];
   $('#v-home').innerHTML=`<div class="page">
   <div class="hero"><h1>Your Custom Planning Spreadsheet, Built By AI From The Data You Already Have</h1>
-  <p>Five steps. No code. You explain what you want to your AI agent in plain words, and your custom spreadsheet is built on your schedule: daily, weekly, or whenever you ask.</p></div>
+  <p>Five steps. No code. You explain what you want to your AI agent in plain words, and your custom spreadsheet is built on your schedule: Daily, weekly, or whenever you ask.</p></div>
   <div class="steps">
    <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach your AI agent. The map below follows your choice.</p>
     <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
     <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="conf" style="margin-bottom:6px">${r[1]}</div><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div></div>
-    <div class="flowwrap"><div class="flowcap">Data flow: ${esc(r[0])}</div>${flowSvg(FLOWS[route],'Data flow for '+r[0])}</div></div>
+    <div class="flowwrap"><h3 class="flowh">Data Flow: ${esc(r[0])}</h3>${flowRich(route)}</div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Customize With Your AI Agent</h2></div><p>Prepare your custom spreadsheet. Describe it, show examples of sheets you like, and explain how to combine your data.</p>
     <button class="btn pri go" data-nav="custom">See Customize</button></div>
    <div class="card step"><div class="shead"><div class="num">3</div><h2>Access Your Custom Spreadsheet</h2></div>
@@ -513,7 +543,7 @@ function renderHome(){
   <p style="margin-top:18px"><button class="btn pri" data-nav="options">See Setup Options And Limits</button></p>
   </div>`;
   const h=$('#v-home');
-  $$('[data-route]',h).forEach(b=>b.onclick=()=>{route=b.dataset.route;renderHome()});
+  $$('[data-route]',h).forEach(b=>b.onclick=()=>{route=b.dataset.route;renderHome()});wireFlow(h);
   $$('[data-nav]',h).forEach(b=>b.onclick=()=>{go(b.dataset.nav);if(b.dataset.hash)setTimeout(()=>{const e=document.getElementById(b.dataset.hash);if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},60)});
 }
 function renderOptions(){
@@ -554,7 +584,7 @@ function renderOptions(){
   </div>
   <div class="card hist"><h3>Why History Is Needed For Accurate Reports</h3>
    <p>Several flags only work with past sales by week. Without history, the sheet can show today but cannot judge it.</p>
-   <ul><li><b>Short vs last year:</b> compares supply to what the same weeks needed last year.</li><li><b>Promo repeat:</b> measures how much last year's promo lifted sales.</li><li><b>New item forecast:</b> compares to how similar past launches sold.</li><li><b>Stock-outs:</b> removes weeks last year when sales were capped by empty shelves.</li></ul>
+   <ul><li><b>Short vs last year:</b> Compares supply to what the same weeks needed last year.</li><li><b>Promo repeat:</b> Measures how much last year's promo lifted sales.</li><li><b>New item forecast:</b> Compares to how similar past launches sold.</li><li><b>Stock-outs:</b> Removes weeks last year when sales were capped by empty shelves.</li></ul>
    <p class="conf">The demo uses three years of weekly history. With no connection, export it by hand once, save it as the reference file in the shared folder, and refresh it when needed. Every scheduled run reads it.</p></div>
   <h2 class="sec-h">Who Does What</h2><p class="pg-sub" style="margin-top:0">Three roles, each with a clear job.</p>
   <div class="who"><div class="card"><h3>You</h3><p>Say what you need and what you are not seeing. Decide what to do about each flagged item.</p></div>
@@ -588,98 +618,100 @@ const PAT=[['aifdiff',/ai.*(vs|versus|minus|differ).*(system )?forecast|forecast
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();
-  if(/show all|all items|every (item|sku)|not just/.test(t))return 'I would set the Planning Dashboard to start on all statuses, not only the items that need attention. <b>Next run:</b> your planning spreadsheet opens that way.';
-  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t))return 'I would set the Planning Dashboard to start on the items that need attention. <b>Next run:</b> your planning spreadsheet opens that way.';
+  if(/show all|all items|every (item|sku)|not just/.test(t))return 'I would set the Planning Dashboard to start on all statuses, not only the items that need attention. <b>Next run:</b> Your planning spreadsheet opens that way.';
+  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t))return 'I would set the Planning Dashboard to start on the items that need attention. <b>Next run:</b> Your planning spreadsheet opens that way.';
   const hit=PAT.find(p=>p[1].test(t));
   if(hit){const k=hit[0],C=COLS[k],has=cols.includes(k);
     if(RM.test(t)){if(C.core)return `I would keep "${C.h}" because the spreadsheet is hard to read without it. I can hide any of the other columns.`;
       if(!has)return `"${C.h}" is not on the Planning Dashboard right now.`;
-      return `I would remove "${C.h}" from the Planning Dashboard and from your saved recipe. It stays on the Master List. <b>Next run:</b> your planning spreadsheet no longer shows it there.`}
+      return `I would remove "${C.h}" from the Planning Dashboard and from your saved recipe. It stays on the Master List. <b>Next run:</b> Your planning spreadsheet no longer shows it there.`}
     if(has)return `"${C.h}" is already on your Planning Dashboard. This example does not change anything.`;
-    return `I can add "${C.h}" to the Planning Dashboard (${C.src||'it is on the Master List'}).${INK.includes(k)?' You would type it on the Master List and it shows on the dashboard. It carries over to the next run by SKU.':''} <b>Next run:</b> your planning spreadsheet includes it.`}
+    return `I can add "${C.h}" to the Planning Dashboard (${C.src||'it is on the Master List'}).${INK.includes(k)?' You would type it on the Master List and it shows on the dashboard. It carries over to the next run by SKU.':''} <b>Next run:</b> Your planning spreadsheet includes it.`}
   return 'I only know a few requests in this practice chat. With your real AI agent you explain it in your own words, and it works out which data to use. If the data is not in your files, it asks where to find it or what file to add.';
 }
 /* demo video: a looping scripted conversation */
 let demoId=0,demoPaused=false;
 const SCENES=[
- {you:'I don\'t see the supplier lead time on my sheet.',ai:'Supplier lead time is in your Anaplan export, so I can add it. I will put Lead Time (Weeks) next to Order By on the Planning Dashboard and the Master List.',ok:'Saved to your recipe. Your next planning spreadsheet will include it.'},
- {you:'Show the AI forecast next to the system forecast.',ai:'I will add AI Forecast Per Week and AI Vs System Forecast right after the system forecast column.',ok:'Saved to your recipe. Your next planning spreadsheet will include it.'},
- {you:'I changed the colors by hand in this file. Here it is.',file:'Planning-Sheet-edited.xlsx',ai:'Thanks. Comparing it with your recipe, I see you color Watch rows orange and moved Order By beside Stock-Out Week. I will use both from now on.',ok:'Saved. Every future run keeps your format.'}];
+ {you:'I do not see the supplier lead time on my sheet.',ai:'Supplier lead time is in your Anaplan export, so I can add it. I will put Lead Time (Weeks) next to Order By on the Planning Dashboard and the Master List.',ok:'Your Custom Metrics have been updated. Your next custom spreadsheet will include Lead Time (Weeks).'},
+ {you:'Show the AI forecast next to the system forecast.',ai:'I will add AI Forecast Per Week and AI Vs System Forecast right after the system forecast column.',ok:'Your Custom Metrics have been updated. Your next custom spreadsheet will include both columns.'},
+ {you:'I changed the colors by hand in this file. Here it is.',file:'Planning-Sheet-edited.xlsx',ai:'Thanks. Comparing it with your saved metrics, I see you color Watch rows orange and moved Order By beside Stock-Out Week. I will use both from now on.',ok:'Your Custom Metrics have been updated. Every future run keeps your format.'}];
 function startDemo(){
   const box=$('#vid');if(!box)return;const id=++demoId;
   const bubble=(cls,html)=>{const d=document.createElement('div');d.className='vmsg '+cls;d.innerHTML=html;box.appendChild(d);box.scrollTop=box.scrollHeight;return d};
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches){SCENES.forEach(sc=>{bubble('you',esc(sc.you)+(sc.file?`<div class="vfile">${esc(sc.file)}</div>`:''));bubble('ai',esc(sc.ai));bubble('ok','✔ '+esc(sc.ok))});$('#v-pause').hidden=true;return}
+  const youHtml=sc=>esc(sc.you)+(sc.file?`<div class="vfile">${esc(sc.file)}</div>`:'');
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){SCENES.forEach(sc=>{bubble('you',youHtml(sc));bubble('ai',esc(sc.ai));bubble('ok','✔ '+esc(sc.ok))});$('#v-pause').hidden=true;return}
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const alive=()=>id===demoId&&document.getElementById('vid')===box;
-  const hold=async ms=>{let t=0;while(t<ms){if(!alive())return false;if(demoPaused){await sleep(150);continue}await sleep(60);t+=60}return alive()};
+  const hold=async ms=>{let t=0;while(t<ms){if(!alive())return false;if(demoPaused){await sleep(120);continue}await sleep(50);t+=50}return alive()};
   (async()=>{while(alive()){box.innerHTML='';
     for(const sc of SCENES){
-      const u=bubble('you','');let txt='';
-      for(const ch of sc.you){txt+=ch;u.textContent=txt;if(!await hold(28))return}
-      if(sc.file)u.insertAdjacentHTML('beforeend',`<div class="vfile">${esc(sc.file)}</div>`);
-      if(!await hold(450))return;
-      const th=bubble('ai think','<span></span><span></span><span></span>');if(!await hold(1000))return;
+      bubble('you',youHtml(sc));if(!await hold(700))return;
+      const th=bubble('ai think','<span></span><span></span><span></span>');if(!await hold(800))return;
       th.className='vmsg ai';th.textContent=sc.ai;box.scrollTop=box.scrollHeight;if(!await hold(1700))return;
-      bubble('ok','✔ '+esc(sc.ok));if(!await hold(2300))return}
-    if(!await hold(2600))return}})();
+      bubble('ok','✔ '+esc(sc.ok));if(!await hold(1900))return}
+    if(!await hold(2200))return}})();
 }
-function renderEmailBox(k){return esc(A.emailText(k))}
 let emailKind='top';
+const EMAILF={top:['Top Items','The five biggest items, then what is new or missing in the files.'],risk:['At Risk Only','A short list of what needs action now.'],week:['Weekly Summary','Counts by status, decisions to make and the biggest three.'],supplier:['By Supplier','Items grouped by supplier, so each call or email to a supplier is one list.'],short:['Three Lines','The short version to read on a phone.']};
 function renderEmail(){
-  const F={top:['Top Items','The five biggest items, then what is new or missing in the files.'],risk:['At Risk Only','A short list of what needs action now.'],week:['Weekly Summary','Counts by status, decisions to make and the biggest three.']};
+  const F=EMAILF;
   $('#v-email').innerHTML=`<div class="page"><div class="pg-h"><h1>Custom Email</h1><span class="pill">Recommended Option</span></div>
-  <div class="card sec2"><ul class="mini big"><li>A second, optional flow. Your agent opens the <b>finished</b> planning spreadsheet in the shared folder, checks it and emails you a written summary.</li>
-   <li><b>Your format:</b> each person picks their own email, or no email at all. The spreadsheet does not need it.</li>
-   <li><b>Read only:</b> the email never changes the data or the calculations.</li></ul></div>
+  <div class="card sec2"><ul class="mini big"><li><b>Customize it any way you like:</b> You describe the email to your AI agent, and you can change it at any time.</li>
+   <li><b>The spreadsheet is attached:</b> The email carries the finished custom spreadsheet, so one message gives you the summary and the file.</li>
+   <li><b>Optional:</b> Each person picks their own format, or no email at all. The spreadsheet does not need it.</li>
+   <li><b>Read only:</b> The email never changes the data or the calculations.</li></ul></div>
   <h2 class="sec-h">Two Flows, Kept Separate</h2>
   <div class="card flowcard"><div class="flowcap"><b>Flow 1: Build The Spreadsheet</b> <span class="conf">Everyone. It also carries typed work over from the previous run by SKU.</span></div>${flowSvg([['Your sources','Anaplan + Tableau'],['AI agent','Merges and checks the data'],['Planning sheet','Saved to the shared folder']],'Flow 1')}</div>
-  <div class="card flowcard"><div class="flowcap"><b>Flow 2: Email The Spreadsheet</b> <span class="pill">Optional</span> <span class="conf">Only if you want an email.</span></div>${flowSvg([['Shared folder','Finished planning sheet'],['AI agent','Opens and checks it'],['Written summary','In your format'],['Your inbox','Or no email']],'Flow 2')}</div>
-  <h2 class="sec-h">Example Emails</h2><p class="pg-sub" style="margin-top:0">The same checked spreadsheet, written up three ways. Each person chooses theirs.</p>
-  <div class="row" role="group" aria-label="Email format" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${Object.keys(F).map(k=>`<button class="chip" data-ek="${k}" aria-pressed="${emailKind===k}">${F[k][0]}</button>`).join('')}</div>
+  <div class="card flowcard"><div class="flowcap"><b>Flow 2: Email The Spreadsheet</b> <span class="pill">Optional</span> <span class="conf">Only if you want an email.</span></div>${flowSvg([['Shared folder','Finished planning sheet'],['AI agent','Opens and checks it'],['Written summary','In your format'],['Your inbox','Spreadsheet attached']],'Flow 2')}</div>
+  <h2 class="sec-h">Some Ways You Could Build Your Email</h2><p class="pg-sub" style="margin-top:0">These are only examples. The email can be anything you describe, such as a different length, order, audience or time of day.</p>
+  <div class="row" role="group" aria-label="Email examples" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">${Object.keys(F).map(k=>`<button class="chip" data-ek="${k}" aria-pressed="${emailKind===k}">${F[k][0]}</button>`).join('')}</div>
   <p class="conf" style="margin:0 0 8px">${F[emailKind][1]}</p>
-  <div class="email">${renderEmailBox(emailKind)}</div>
-  <p style="margin-top:18px"><button class="btn pri" data-nav="sheet">See The Spreadsheet</button></p></div>`;
+  <div class="email">${esc(A.emailText(emailKind))}</div>
+  <p style="margin-top:18px"><button class="btn pri" data-nav="sheet">See The Spreadsheet</button> <button class="btn" data-nav="custom">Customize Your Email</button></p></div>`;
   const e=$('#v-email');$$('[data-ek]',e).forEach(b=>b.onclick=()=>{emailKind=b.dataset.ek;renderEmail()});$$('[data-nav]',e).forEach(b=>b.onclick=()=>go(b.dataset.nav));
 }
 const RULEPAT={history_gap:S_=>`Flagged when supply is more than ${S_.historyGapPct}% below need`,promo_repeat:S_=>`Shortfalls under ${S_.promoCushionPct}% are ignored`,overstock:S_=>`Above ${S_.overstockWOS} weeks of supply`,
  channel_fill:S_=>`Shipments above ${S_.channelRatio}x sales over 8 weeks`,pos_outpacing:S_=>`Sales above ${S_.outpaceRatio}x forecast for ${S_.outpaceWeeks} weeks in a row`,peak_cover:()=>'Under 2 weeks of peak cover',
+ eta_slipped:S_=>`Arrival ${S_.etaSlipDays} or more days later than first promised`,stuck_origin:S_=>`Waiting at origin ${S_.stuckExtraDays} or more days longer than usual`,
  missed_order:S_=>S_.leadTimeBasis==='p80'?'Uses the typical lead time from supplier history':'Uses the quoted lead time',late_po:S_=>S_.leadTimeBasis==='p80'?'Uses the typical lead time from supplier history':'Uses the quoted lead time'};
+let moreEx=false;
 function renderCustom(){
-  const S_=A.st.settings,RU=A.RULES;
+  const S_=A.st.settings,RU=A.RULES,shown=moreEx?SUG:SUG.slice(0,6),open=(id)=>customOpen[id]?' open':'';
   $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize</h1></div>
-  <div class="demo-note"><div class="dn-t">This page shows examples. The real conversation happens with your own AI agent.</div><p>In real use you talk to your own AI agent (for example Claude or ChatGPT), not to this site. The video and the practice chat below are simulated, and nothing on this site changes.</p><p><b>Your spreadsheet changes only through that conversation.</b> Columns, colors and rules all live in the agent's saved recipe, and every future run uses it.</p></div>
-  <h2 class="sec-h" style="margin-top:6px">Watch An Example</h2>
-  <div class="card vid"><div class="vid-h"><span>A conversation with your AI agent <span class="conf demo-tag">Simulated</span></span><button class="btn sm" id="v-pause" aria-pressed="false">Pause</button></div><div class="vid-body" id="vid" aria-live="off"></div></div>
-  <h2 class="sec-h">Try An Example Request</h2><p class="pg-sub" style="margin-top:0">A simulated practice chat. It answers a small set of requests and changes nothing.</p>
-  <div class="card chat"><div class="chat-h"><span>Practice Chat</span><span class="conf demo-tag">Simulated replies</span></div>
-   <div class="msgs" id="msgs" aria-live="polite">${msgs.map(m=>`<div class="msg ${m.w}">${m.w==='you'?esc(m.t):m.t}</div>`).join('')}</div>
-   <div class="sug-h">Example requests</div><div class="sug">${SUG.map((x,i)=>`<button class="chip" data-sug="${i}">${esc(x)}</button>`).join('')}</div>
-   <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Type a request (simulated)" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
+  <div class="demo-note"><div class="dn-t">This page shows examples. The real conversation happens with your own AI agent.</div><p>The video and practice chat below are simulated, and nothing on this site changes. Your spreadsheet changes only through your own agent.</p></div>
+  <h2 class="sec-h">Watch An Example</h2>
+  <div class="card vid"><div class="vid-h"><span class="vid-t"><i class="dot"></i><i class="dot"></i><i class="dot"></i> Conversation With Your AI Agent <span class="conf demo-tag">Simulated</span></span><button class="btn sm" id="v-pause" aria-pressed="false">Pause</button></div><div class="vid-body" id="vid" aria-live="off"></div></div>
+  <h2 class="sec-h" id="recustom">Re-Customize Anytime</h2>
+  <div class="card recipe"><ul class="mini big"><li><b>Use the same flow:</b> Tell your AI agent what to change. It updates your Custom Metrics, and the next run uses them, whether that run is daily, weekly or on request.</li>
+   <li><b>Edited the spreadsheet yourself?</b> Share the edited file. Your agent reads what you changed and learns how you like it.</li>
+   <li><b>Cannot describe the change?</b> Make it in the spreadsheet and share the file. Showing it is enough.</li>
+   <li><b>Good to know:</b> Your own edits do not carry into the next run unless your agent knows about them. Only the light yellow typing columns carry over by SKU on their own.</li></ul></div>
   <h2 class="sec-h">Example Prompts To Start With</h2>
-  <div class="card recipe"><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the planning sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div>
-  <h2 class="sec-h">Your Recipe</h2>
-  <div class="card recipe"><p class="conf" style="margin:0 0 10px">The AI agent's saved memory of how your spreadsheet is built. Every run reads it. It changes only when you tell your agent. Read only here.</p>
+  <div class="card recipe"><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the planning sheet look like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div>
+  <h2 class="sec-h">Try An Example Request</h2>
+  <div class="card chat compact"><div class="msgs" id="msgs" aria-live="polite">${msgs.slice(-4).map(m=>`<div class="msg ${m.w}">${m.w==='you'?esc(m.t):m.t}</div>`).join('')}</div>
+   <div class="sug">${shown.map(x=>`<button class="chip" data-sug="${SUG.indexOf(x)}">${esc(x)}</button>`).join('')}<button class="chip more" id="sug-more">${moreEx?'Show Fewer':'More Examples'}</button></div>
+   <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Type a request (simulated, changes nothing)" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
+  <details class="card fold" data-id="metrics"${open('metrics')}><summary><h2 class="fold-h">Your Custom Metrics</h2><span class="conf">Read only. Changes only through your agent.</span></summary>
    <h3 class="rh">Planning Dashboard Columns</h3><ol class="two">${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
-   <h3 class="rh">Master List</h3><p>Every column, with light yellow columns to type in: ${INK.map(k=>esc(COLS[k].h)).join(', ')}. Those carry over to the next run by SKU.</p>
+   <h3 class="rh">Master List</h3><p>Every column, with light yellow columns to type in: ${INK.map(k=>esc(COLS[k].h)).join(', ')}. They carry over to the next run by SKU.</p>
    <h3 class="rh">Tabs</h3><p>${TABS.map(t=>esc(t[1])).join(', ')}.</p>
-   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Spreadsheet</button><button class="btn dl" id="c-dl">Download Sheet</button></div></div>
-  <h2 class="sec-h">How Items Get Flagged</h2><p class="pg-sub" style="margin-top:0">The same rules apply to every planner. To change one, tell your AI agent.</p>
-  <div class="card recipe"><ul class="rules two">${Object.keys(RU).filter(k=>k!=='check_data'||true).map(k=>`<li><b>${esc(RU[k][0])}</b><span>${esc(RU[k][1])}</span>${RULEPAT[k]?`<em>${esc(RULEPAT[k](S_))}</em>`:''}</li>`).join('')}</ul></div>
-  <h2 class="sec-h" id="recustom">Re-Customize Anytime For Your Next Custom Spreadsheet</h2><span class="pill">Optional</span>
-  <div class="card recipe" style="margin-top:8px"><ul class="mini big"><li><b>Use the same flow.</b> Tell your AI agent what to change. It updates the saved recipe, and the next run uses it, whether that run is daily, weekly or on request.</li>
-   <li><b>Edited the spreadsheet yourself?</b> Share the edited file with your agent. It reads what you changed, learns how you like it and builds it into the recipe.</li>
-   <li><b>Cannot describe the change?</b> Make it in the spreadsheet yourself and share the file. Showing it is enough.</li></ul>
-   <div class="card rule" style="margin-top:12px"><b>Good to know</b><span>Your own edits do not carry into the next run unless your agent knows about them. The next run rebuilds from the saved recipe. Only the light yellow typing columns carry over by SKU on their own.</span></div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Spreadsheet</button><button class="btn dl" id="c-dl">Download Sheet</button></div></details>
+  <details class="card fold" data-id="rules"${open('rules')}><summary><h2 class="fold-h">How Items Get Flagged</h2><span class="conf">The same rules for every planner.</span></summary>
+   <ul class="rules two">${Object.keys(RU).map(k=>`<li><b>${esc(RU[k][0])}</b><span>${esc(RU[k][1])}</span>${RULEPAT[k]?`<em>${esc(RULEPAT[k](S_))}</em>`:''}</li>`).join('')}</ul></details>
   </div>`;
   const v=$('#v-custom'),box=$('#msgs');box.scrollTop=box.scrollHeight;
   const send=t=>{if(!t.trim())return;msgs.push({w:'you',t});msgs.push({w:'ai',t:reply(t)});renderCustom()};
   $$('[data-sug]',v).forEach(b=>b.onclick=()=>send(SUG[b.dataset.sug]));
+  $('#sug-more').onclick=()=>{moreEx=!moreEx;renderCustom()};
+  $$('details.fold',v).forEach(d=>d.addEventListener('toggle',()=>{customOpen[d.dataset.id]=d.open}));
   $('#chat-f').onsubmit=e=>{e.preventDefault();send($('#chat-t').value)};
   $$('[data-nav]',v).forEach(b=>b.onclick=()=>go(b.dataset.nav));
   $('#c-dl').onclick=downloadXlsx;
-  const pb=$('#v-pause');pb.onclick=()=>{demoPaused=!demoPaused;pb.textContent=demoPaused?'Play':'Pause';pb.setAttribute('aria-pressed',String(demoPaused))};
+  const pb=$('#v-pause');pb.textContent=demoPaused?'Play':'Pause';pb.onclick=()=>{demoPaused=!demoPaused;pb.textContent=demoPaused?'Play':'Pause';pb.setAttribute('aria-pressed',String(demoPaused))};
   startDemo();
 }
+const customOpen={};
 /* ---------- routing ---------- */
 const VIEWS=['home','custom','sheet','visual','email','options'];
 function go(v){

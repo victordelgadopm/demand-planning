@@ -373,3 +373,26 @@ ol.two li{break-inside:avoid;margin-bottom:3px}
 .card a{color:var(--brand)}
 .email{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:14px}
 .steps .pill{align-self:flex-start;margin:0 0 8px;width:auto}
+.flowinfo{margin-top:8px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;font-size:15px;background:var(--bg)}
+.flowmap.rich{max-height:none}
+.fold{padding:0}.fold>summary{list-style:none;cursor:pointer;padding:14px 18px;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary::before{content:"▸";font-size:18px;margin-right:2px}.fold[open]>summary::before{content:"▾"}
+.fold>*:not(summary){margin-left:18px;margin-right:18px}.fold>*:last-child{margin-bottom:16px}
+.fold-h{margin:0;font-size:20px;font-weight:800}
+.rh{margin:16px 0 6px;font-size:18px;font-weight:800}
+.card h3,.recipe h3{font-size:17px;font-weight:800}
+.chat.compact .msgs{max-height:120px;min-height:0;overflow:auto;padding:10px 12px}
+.chat.compact .sug{padding:8px 12px}
+.chip.more{border-style:dashed}
+.vid-t .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--line);margin-right:4px;vertical-align:middle}
+.vmsg{animation:vin .35s ease-out}
+@keyframes vin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.vmsg{animation:none}}
+.vid-body{height:250px}
+.tscroll{overflow-x:auto}.shp td,.shp th{white-space:nowrap}
+.fold{margin-top:14px}.chat.compact{margin-bottom:0}
+.flowh{margin:12px 0 4px;font-size:18px;font-weight:800}
+.card.sec2,.flowcard{padding:14px 18px}.flowcap{margin-bottom:8px}
+.shp th{position:static;top:auto}.shp td{vertical-align:top}.shp td.bad,.shp td.warn{border-radius:0}
+.flowscroll{overflow-x:auto}.flowscroll .flowmap.rich{min-width:680px}

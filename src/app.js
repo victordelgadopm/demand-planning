@@ -27,10 +27,12 @@ const RULES={
  channel_fill:['Shipping ahead of sales','Shipments to retailers are well above what shoppers bought over 8 weeks, so retailers may be building stock.'],
  newitem_gap:['New item forecast','The forecast for a new item is far from what similar past launches sold in their first 12 weeks.'],
  peak_cover:['Thin cover into peak','The busiest weeks in the next 12 (weeks selling at least 1.5x a normal week last year) would leave less than 2 weeks of peak demand in stock at their lowest point, using the quoted delivery dates.'],
+ eta_slipped:['ETA slipped','An order or shipment arrives at least 7 days later than first promised, and stock would run out if it slipped 2 more weeks.'],
+ stuck_origin:['Stuck at origin','Finished goods have waited at the origin warehouse more than 7 days longer than usual, and stock would run out if the delay grew 2 more weeks.'],
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={nextarrq:'int',arr2q:'int',aifdiff:'intS',onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'x2',lyunits:'int',promoext:'int',totlift:'int',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int',addqty:'int',aifcst:'int',cmpai:'intS'};
+const PNUM={prodq:'int',orgq:'int',etachg:'intS',ptime:'dec1',ttq:'int',tta:'dec1',nextarrq:'int',arr2q:'int',aifdiff:'intS',onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'x2',lyunits:'int',promoext:'int',totlift:'int',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int',addqty:'int',aifcst:'int',cmpai:'intS'};
 const r3=x=>Math.round(x*10000)/10000;
 /* one chain for the peak and promo order: units short of 2 weeks of peak cover (after stock and orders on the way),
    plus the units a confirmed promo adds, plus what a typed peak override adds, less what Suggested Order Qty already covers */
@@ -57,6 +59,10 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'orderby':return nw||m.onHand<0?'n/a':(m.orderBy||'None');
    case 'nextarr':return m.nextArr?m.nextArr.date:'None';
    case 'nextarrq':return m.nextArr?m.nextArr.qty:'';
+   case 'prodq':return m.inProd;case 'orgq':return m.atOrigin;
+   case 'readyd':return m.nextReady||'None';
+   case 'etachg':return m.nextArr&&m.etaChg!=null?m.etaChg:'';
+   case 'ptime':return m.stage?Math.round(m.stage.prodT*10)/10:'';case 'ttq':return m.stage?m.stage.transitQ:'';case 'tta':return m.stage?Math.round(m.stage.transitT*10)/10:'';
    case 'arr2':return m.nextArr2?m.nextArr2.date:'None';
    case 'arr2q':return m.nextArr2?m.nextArr2.qty:'';
    case 'aifdiff':{if(nw)return '';return pv('aifcst',r)-Math.round(m.fcstWk)}
@@ -99,13 +105,15 @@ function fv(k,v){if(v===''||v==null)return '';const t=PNUM[k];if(!t||typeof v!==
    case 'money':return v>0?money(v):'—';case 'money2':return '$'+v.toFixed(2);case 'x2':return v.toFixed(2)+'x';}
   return String(v)}
 const AIK=new Set(['suggest','addqty','addwhy','ordovr','aifcst']);
-function isoOf(k,r){const m=r.metrics;if(r.isNew||m.onHand<0&&(k==='stockout'||k==='orderby'))return null;return k==='nextarr'?(m.nextArr&&m.nextArr.iso):k==='arr2'?(m.nextArr2&&m.nextArr2.iso):k==='stockout'?m.stockOutISO:k==='orderby'?m.orderByISO:null}
+function isoOf(k,r){const m=r.metrics;if(r.isNew||m.onHand<0&&(k==='stockout'||k==='orderby'))return null;return k==='nextarr'?(m.nextArr&&m.nextArr.iso):k==='arr2'?(m.nextArr2&&m.nextArr2.iso):k==='readyd'?m.nextReadyISO:k==='stockout'?m.stockOutISO:k==='orderby'?m.orderByISO:null}
 function pcls(k,v){if(AIK.has(k))return 'ai';if(v===''||v==null)return '';
   if(k==='cmptxt')return String(v).startsWith('Near')?'ok':String(v).startsWith('Below')?'bad':String(v).startsWith('Above')?'warn':'';
   if(k==='wos'&&typeof v==='number')return v<4?'bad':v>st.settings.overstockWOS?'ovr':'';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
   if(k==='onhand'&&v<0)return 'bad';
+  if(k==='etachg'&&typeof v==='number')return v>=14?'bad':v>=st.settings.etaSlipDays?'warn':'';
+  if(k==='tta'&&typeof v==='number'){const q=0;return ''}
   if(k==='peakgap')return typeof v==='number'&&v>0?'warn':'';
   if(k==='stocklp')return String(v).startsWith('Out')?'warn':'';
   if(k==='peakcover')return v==='Short'?'bad':v==='Thin'?'warn':'';
@@ -252,7 +260,7 @@ function accHtml(){
    return `<tr class="r" tabindex="0" data-open="${r.id}"><td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(E.FLAG_LABEL[f.type])}</div></td>
    <td><span class="tag">${esc(n.reason)}</span>${esc(n.text)}<div class="conf">${esc(n.who)}, ${esc(n.date)}. Kept until you remove it.</div></td>
    <td class="num">${fmt(n.acceptedGap)} units</td><td class="num">${fmt(f.gapUnits)} units</td><td class="num">${n.realertGap!=null?(n.realertGap>1e8?'Never':fmt(n.realertGap)+' units'):fmt(n.acceptedGap*1.5)+' units'}</td></tr>`})).join('')}</tbody></table></div>
-   <p class="foot">Notes never expire on their own. The only thing that brings a flag back is the data: if the gap grows past 1.5x what you accepted (adjustable per note), or you remove the note.</p>`}
+   <p class="foot">Notes never expire on their own. The only thing that brings a flag back is the data: If the gap grows past 1.5x what you accepted (adjustable per note), or you remove the note.</p>`}
 /* ---------- seasonality and promos: shared by the Visual View, the sheet preview and the download ---------- */
 const MONS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],PEAKSH=1.5/12;
 const PRANK={'Confirmed, short':0,'Not confirmed':1,'Confirmed, covered':3,'New this year':4,'Last year only':5};
@@ -296,18 +304,18 @@ function seasonHtml(){
   return `<div class="card sec" data-g="season"><h3>Seasonal And Promo Lifts</h3>
   <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
 
-  <h4 class="sub-h">Items With A Peak Or A Promo</h4><p class="mute">Read left to right: the peak (when, how big the lift is, your override and reason, the lift used and its units), then the promo (this year's weeks, last year's weeks and units sold, the lift it gave, whether it falls inside the peak, and the extra units it adds), then whether stock and orders on the way cover it. Promo extra units sit on top of the peak level for weeks they share, so the two are added in units, never averaged. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
+  <h4 class="sub-h">Items With A Peak Or A Promo</h4><p class="mute">Read left to right: The peak (when, how big the lift is, your override and reason, the lift used and its units), then the promo (this year's weeks, last year's weeks and units sold, the lift it gave, whether it falls inside the peak, and the extra units it adds), then whether stock and orders on the way cover it. Promo extra units sit on top of the peak level for weeks they share, so the two are added in units, never averaged. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
 function accuracyHtml(){
   const a=E.accuracy(snap()),T=E.accuracyTotal(snap());
   const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-watch">◉ Watch</span>':'<span class="ok-t">✔ On target</span>';
   return `<div class="card sec" data-g="accuracy"><h3>Forecast Accuracy By Line (Last 13 Weeks)</h3>
-  <p class="mute">Miss (WMAPE) adds up the gap between actual sales and forecast for every SKU and week, then divides by total sales. Bias is whether the forecast runs high (+) or low (-) overall. Common targets: miss under 25%, bias within 5% either way. The bias signal below is checked at line level, so one noisy item cannot trigger a false alarm.</p>
+  <p class="mute">Miss (WMAPE) adds up the gap between actual sales and forecast for every SKU and week, then divides by total sales. Bias is whether the forecast runs high (+) or low (-) overall. Common targets: Miss under 25%, bias within 5% either way. The bias signal below is checked at line level, so one noisy item cannot trigger a false alarm.</p>
   <div class="xl-scroll"><table class="list"><thead><tr><th>Line</th><th class="num">SKUs</th><th class="num">Forecast accuracy</th><th class="num">Miss (WMAPE)</th><th class="num">Bias</th><th>Against targets</th><th>Signal</th></tr></thead><tbody>
   <tr><td><b>All lines</b></td><td class="num">${T.n}</td><td class="num">${pctN(1-T.wmape)}</td><td class="num">${pctN(T.wmape)}</td><td class="num">${pctSN(T.bias)}</td><td>${tgt(T.wmape,T.bias)}</td><td></td></tr>
   ${Object.entries(a).sort((x,y)=>y[1].wmape-x[1].wmape).map(([k,v])=>`<tr><td><b>${esc(k)}</b></td><td class="num">${v.n}</td><td class="num">${pctN(1-v.wmape)}</td><td class="num">${pctN(v.wmape)}</td><td class="num">${pctSN(v.bias)}</td><td>${tgt(v.wmape,v.bias)}</td>
-  <td>${v.possible?`<span class="tier t-watch">◉ Possible bias: forecast runs ${v.direction === 'under' ? 'low' : 'high'}</span><div class="conf">Seen over 8 weeks across ${v.n} SKUs. Worth a look at the forecast method.</div>`:'<span class="ok-t">✔ No consistent bias</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
+  <td>${v.possible?`<span class="tier t-watch">◉ Possible bias: Forecast runs ${v.direction === 'under' ? 'low' : 'high'}</span><div class="conf">Seen over 8 weeks across ${v.n} SKUs. Worth a look at the forecast method.</div>`:'<span class="ok-t">✔ No consistent bias</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
 
 /* ---------- charts ---------- */
 function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p;return (f<1.5?1:f<3?2:f<7?5:10)*p}
@@ -374,7 +382,7 @@ function invCharts(sku,res){
    `<div class="legend"><span><i style="border-color:${C.ty}"></i>If supplier is on time</span>${late?`<span><i style="border-color:${C.late};border-top-style:dashed"></i>If supplier runs ${slipW} wk${slipW>1?'s':''} late (their history)</span>`:''}${wi?`<span><i style="border-color:${C.wi}"></i>Your what-if</span>`:''}</div>`;
   let v='';const res2=wi||base,ps=res.price;
   if(res2.first!==null)v=`<div class="verdict v-bad">${active?'With your changes: ':''}stock runs out the week of ${E.fmtDate(E.weekStart(snap(),res2.first))}. Short ${fmt(res2.short)} units (${money(res2.short*ps)} of sales).</div>`;
-  else v=`<div class="verdict v-ok">${active?'With your changes: ':''}no stock-out in the next 12 weeks.</div>`;
+  else v=`<div class="verdict v-ok">${active?'With your changes: no':'No'} stock-out in the next 12 weeks.</div>`;
   if(base.first!==null&&!active){const ob=E.addDays(E.weekStart(snap(),base.first),-Math.round(lt.use*7)),td=E.parseDay(snap().meta.today);
     v+=`<div class="mute" style="margin-top:6px">Supplier lead time is ${lt.q} weeks quoted${lt.p80?`, about ${lt.p80.toFixed(1)} in practice`:''}. ${ob>td?'Order by '+E.fmtDate(ob)+' to avoid it.':'The order date has already passed, so this needs an expedite or another source.'}</div>`}
   return {html,v,wiMax:Math.max(2000,Math.ceil((base.short||F.reduce((a,b)=>a+b,0)/4)*2/100)*100)};
@@ -438,7 +446,7 @@ function itemBlocks(sku,res){
   const m=res.metrics,V=k=>{const v=pv(k,res);return v===''||v==null?'—':(typeof v==='number'?fv(k,v):String(v))};
   const blk=(t,rows)=>`<div class="card sec"><h3>${t}</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`;
   const arr2=m.nextArr2?[['2nd arrival',V('arr2')+', '+fmt(m.nextArr2.qty)+' units','planning']]:[];
-  const b1=blk('Stock And Orders',[['On hand',V('onhand'),'planning'],['In transit',V('transit'),'planning'],['Open PO',V('openpo'),'planning'],['Next arrival',m.nextArr?V('nextarr')+', '+fmt(m.nextArr.qty)+' units':'None','planning'],...arr2,
+  const b1=blk('Stock And Orders',[['On hand',V('onhand'),'planning'],['In production',V('prodq'),'planning'],['At origin',V('orgq'),'planning'],['In transit',V('transit'),'planning'],['Open PO',V('openpo'),'planning'],['Next arrival',m.nextArr?V('nextarr')+', '+fmt(m.nextArr.qty)+' units':'None','planning'],...arr2,
     ['Weeks of supply',V('wos'),'calc'],['Stock-out week',V('stockout'),'calc'],['Order by',V('orderby'),'calc']]);
   const b2=blk('Forecast',[['System forecast per week',V('fcstwk'),'planning'],['AI forecast per week',V('aifcst'),'ai'],['AI vs system forecast',V('aifdiff'),'calc'],['Sales vs forecast (last 3 weeks)',V('salesvs'),'calc']]);
   const b3=blk('Peak And Promo',[['Peak weeks in the next 12',V('peakwk'),'calc'],['Peak cover',V('peakcover'),'calc'],['Peak lift',V('peaklift'),'calc'],['This year promo (weeks starting)',V('nextpromo')+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Last year promo (weeks starting)',V('lypromo'),'calc'],['Promo and peak overlap',V('overlap'),'calc']]);
@@ -449,7 +457,10 @@ function itemBlocks(sku,res){
    ['Your peak lift override',pv('ovr',res)===''?'None typed':fv('ovr',pv('ovr',res))+(pv('ovrwhy',res)?' ('+pv('ovrwhy',res)+')':''),'sheet'],['Peak months (last 2 years)',V('peak'),'calc'],
    ['Last promo units sold',V('lyunits'),'calc'],['Last promo lift',V('lift'),'calc'],['Promo extra units',V('promoext'),'calc'],['Peak + promo units above a normal week',V('totlift'),'calc'],['Promo status',V('promo'),'calc']
   ].map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></details>`;
-  return {grid:`<div class="blk-grid" data-g="season-sku">${b1}${b2}${b3}${b4}</div>`,more};
+  const dd=iso=>iso?E.fmtDate(new Date(iso+'T00:00:00Z')):'—',sg=m.stage,shp=m.shipments||[];
+  const stg=shp.length?`<div class="card sec"><h3>Orders And Shipments</h3><div class="tscroll"><table class="list shp"><thead><tr><th>Order</th><th>Stage</th><th class="num">Units</th><th>Ready</th><th>Ships</th><th>Arrives</th><th class="num">ETA Change</th></tr></thead><tbody>${shp.map(x=>`<tr><td>${esc(x.ref)}<div class="conf">${esc(x.mode||'')}</div></td><td>${esc(x.stage)}</td><td class="num">${fmt(x.qty)}</td><td>${x.stage==='In Production'?dd(x.readyISO)+(x.readyOrigISO&&x.readyOrigISO!==x.readyISO?'<div class="conf">was '+dd(x.readyOrigISO)+'</div>':''):x.stage==='At Origin'?'Done, '+x.finishedAgo+' days ago':'Done'}</td><td>${x.stage==='In Transit'?'Shipped '+dd(x.shipISO):dd(x.shipISO)}</td><td>${dd(x.etaISO)}${x.slipDays?'<div class="conf">was '+dd(x.origEtaISO)+'</div>':''}</td><td class="num ${x.slipDays>=14?'bad':x.slipDays>=st.settings.etaSlipDays?'warn':''}">${x.slipDays?'+'+x.slipDays:'0'}</td></tr>`).join('')}</tbody></table></div>
+    ${sg?`<p class="conf" style="margin:10px 0 0"><b>Supplier timing in days:</b> Making (quoted ${sg.prodQ}, typical ${Math.round(sg.prodT)}) · waiting at origin (quoted ${sg.holdQ}, typical ${Math.round(sg.holdT)}) · ocean transit (quoted ${sg.transitQ}, typical ${Math.round(sg.transitT)}) · receiving (quoted ${sg.recvQ}, typical ${Math.round(sg.recvT)}). ${src('planning')}</p>`:''}</div>`:'';
+  return {grid:`<div class="blk-grid" data-g="season-sku">${b1}${b2}${b3}${b4}</div>${stg}`,more};
 }
 function updateOut(){const w=st.wi,set=(i,t)=>{const e=$('#'+i);if(e)e.textContent=t};
   set('o-slip',w.slip+' wk');set('o-lift',(w.lift>0?'+':'')+w.lift+'%');set('o-qty',fmt(w.qty));set('o-h','wk +'+w.h)}
@@ -594,7 +605,10 @@ function emailText(kind){
   const line=(r,i)=>`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n${r.dollars>0?'   '+money(r.dollars)+' at stake\n':''}\n`;
   const files=()=>{let b='';const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing: ${x.name} (${x.id}), check the shared files\n`);b+='\n'}return b};
   const health=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept.\n\n`;
-  const foot='Sample data, not Mattel data.';
+  const foot='Attached: Planning-Sheet.xlsx (the custom spreadsheet)\nSample data, not Mattel data.';
+  if(kind==='short'){return `Subject: ${at.length} at risk, ${t['Watch']} to watch (${TODAY_SHORT})\n\n1. ${live[0]?live[0].name+': '+live[0].headline:'Nothing needs action'}\n2. ${t['At risk']} at risk, ${t['Watch']} to watch, ${t['Overstocked']} overstocked.\n3. Full detail is in the attached spreadsheet.\n\n`+foot}
+  if(kind==='supplier'){const g={};live.filter(r=>r.tier==='At risk'||r.tier==='Watch').forEach(r=>{(g[skuOf(r.id).supplier]=g[skuOf(r.id).supplier]||[]).push(r)});
+    let b=`Subject: Items by supplier (${TODAY_SHORT})\n\n`;Object.keys(g).sort((x,y)=>g[y].length-g[x].length).slice(0,4).forEach(n=>{b+=`${n} (${g[n].length} items)\n`;g[n].slice(0,3).forEach(r=>b+=`  - ${r.name} (${r.id}): ${r.headline}\n`);b+='\n'});return b+foot}
   if(kind==='risk'){let b=`Subject: ${at.length} items at risk (${TODAY_SHORT})\n\nItems that need action now:\n\n`;at.slice(0,8).forEach((r,i)=>b+=line(r,i));return b+foot}
   if(kind==='week'){const dc=Object.keys(DEC).map(k=>`  - ${DEC[k][0]}: ${st.res.rows.filter(x=>x.decision===k).length}`).join('\n');
     let b=`Subject: Weekly planning summary (${TODAY_SHORT})\n\nWhere things stand:\n  - At risk: ${t['At risk']}\n  - Watch: ${t['Watch']}\n  - Overstocked: ${t['Overstocked']}\n  - No risk: ${t['No risk']}\n\nDecisions to make:\n${dc}\n\nBiggest three:\n\n`;

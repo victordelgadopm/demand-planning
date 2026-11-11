@@ -6,16 +6,16 @@
   const H = 12;
   const DEFAULTS = {
     historyGapPct: 10, promoCushionPct: 3, overstockWOS: 16, channelRatio: 1.3,
-    outpaceRatio: 1.2, outpaceWeeks: 3, leadTimeBasis: 'p80', minDollars: 0,
+    outpaceRatio: 1.2, outpaceWeeks: 3, leadTimeBasis: 'p80', minDollars: 0, etaSlipDays: 7, stuckExtraDays: 7,
     flags: { missed_order: true, late_po: true, history_gap: true, promo_repeat: true, pos_outpacing: true,
-             overstock: true, channel_fill: true, newitem_gap: true, check_data: true, peak_cover: true }
+             overstock: true, channel_fill: true, newitem_gap: true, check_data: true, peak_cover: true, eta_slipped: true, stuck_origin: true }
   };
   const TIER_ORDER = { 'At risk': 0, 'Watch': 1, 'Overstocked': 2, 'No risk': 3 };
   const DECISION_OF = { missed_order: 'order_more', late_po: 'order_more', history_gap: 'order_more', promo_repeat: 'order_more',
-    pos_outpacing: 'order_more', overstock: 'too_much', channel_fill: 'too_much', newitem_gap: 'forecast_off', check_data: 'check_data', peak_cover: 'order_more' };
+    pos_outpacing: 'order_more', overstock: 'too_much', channel_fill: 'too_much', newitem_gap: 'forecast_off', check_data: 'check_data', peak_cover: 'order_more', eta_slipped: 'order_more', stuck_origin: 'order_more' };
   const FLAG_LABEL = { missed_order: 'Missed order', late_po: 'Lead time risk', history_gap: 'Short vs last year', promo_repeat: 'Promo repeat',
     pos_outpacing: 'Sales above forecast', overstock: 'Too much stock', channel_fill: 'Shipping ahead of sales',
-    newitem_gap: 'New item forecast', check_data: 'Check the data', peak_cover: 'Thin cover into peak' };
+    newitem_gap: 'New item forecast', check_data: 'Check the data', peak_cover: 'Thin cover into peak', eta_slipped: 'ETA slipped', stuck_origin: 'Stuck at origin' };
 
   const sum = (a, f = 0, t = a.length) => { let s = 0; for (let i = f; i < t; i++) s += a[i] || 0; return s; };
   const mean = a => (a.length ? sum(a) / a.length : 0);
@@ -39,6 +39,20 @@
     if (!s.history || s.history.length < 4) return { q, p80: null, slip: 0, use: q };
     const p80 = (mean(s.history) + 0.84 * sd(s.history)) / 7;
     return { q, p80, slip: Math.max(0, p80 - q), use: basis === 'quoted' ? q : Math.max(q, p80) };
+  }
+
+
+  function stageAvg(s, k) { return s && s.stageHistory && s.stageHistory.length ? mean(s.stageHistory.map(x => x[k])) : null; }
+  /* every open order and shipment for a SKU with its stage, dates and ETA change. Day numbers are days from today. */
+  function shipmentsOf(sku, snap) {
+    const T = parseDay(snap.meta.today), out = [], inv = sku.inv;
+    const arrOf = h => addDays(weekStart(snap, h), 0);
+    (inv.transit || []).forEach(t => { const a = arrOf(t.etaH); out.push({ ref: t.ref || 'SH', kind: 'In Transit', stage: 'In Transit', qty: t.qty, mode: t.mode || '', shipISO: t.shippedAgo != null ? isoD(addDays(T, -t.shippedAgo)) : null, etaISO: isoD(a), origEtaISO: isoD(addDays(a, -(t.slipDays || 0))), slipDays: t.slipDays || 0, etaH: t.etaH }); });
+    (inv.pos || []).forEach(p => { const a = arrOf(p.etaH), inProd = p.stage === 'In Production';
+      out.push({ ref: p.ref || 'PO', kind: 'Open PO', stage: p.stage || 'In Production', qty: p.qty, mode: p.mode || '', readyISO: inProd ? isoD(addDays(T, p.readyIn)) : null, readyOrigISO: inProd ? isoD(addDays(T, p.readyOrigIn)) : null,
+        finishedISO: inProd ? null : isoD(addDays(T, -(p.finishedAgo || 0))), finishedAgo: inProd ? null : (p.finishedAgo || 0), shipISO: isoD(addDays(T, p.shipIn || 0)), etaISO: isoD(a), origEtaISO: isoD(addDays(a, -(p.slipDays || 0))), slipDays: p.slipDays || 0, etaH: p.etaH + 0 }); });
+    out.sort((a, b) => a.etaISO < b.etaISO ? -1 : a.etaISO > b.etaISO ? 1 : 0);
+    return out;
   }
 
   function lyValue(sku, h) {
@@ -78,7 +92,7 @@
   function project(sku, snap, o) {
     const inv = sku.inv; let cur = inv.onHand; const rows = []; let first = null, minInv = 0;
     const arr = new Array(H + 10).fill(0);
-    (inv.transit || []).forEach(t => { arr[Math.min(t.etaH, H + 9)] += t.qty; });
+    (inv.transit || []).forEach(t => { arr[Math.min(t.etaH + (o.tslip || 0), H + 9)] += t.qty; });
     (inv.pos || []).forEach(p => { arr[Math.min(p.etaH + (o.slip || 0), H + 9)] += p.qty; });
     if (o.extra && o.extra.qty > 0) arr[Math.min(o.extra.h, H + 9)] += o.extra.qty;
     for (let h = 0; h < H; h++) {
@@ -147,6 +161,11 @@
       arr.sort((a, b) => a.h - b.h);
       metrics.nextArr = arr.length ? { h: arr[0].h, qty: arr[0].qty, date: fmtDate(weekStart(snap, arr[0].h)), iso: isoD(weekStart(snap, arr[0].h)) } : null;
       metrics.nextArr2 = arr.length > 1 ? { h: arr[1].h, qty: arr[1].qty, date: fmtDate(weekStart(snap, arr[1].h)), iso: isoD(weekStart(snap, arr[1].h)) } : null;
+      { const sh = shipmentsOf(sku, snap), sup = snap.suppliers[sku.supplier], qs = sup && sup.stages;
+        metrics.shipments = sh; metrics.inProd = sum(sh.filter(x => x.stage === 'In Production').map(x => x.qty)); metrics.atOrigin = sum(sh.filter(x => x.stage === 'At Origin').map(x => x.qty));
+        const rd = sh.filter(x => x.readyISO).sort((a, b) => a.readyISO < b.readyISO ? -1 : 1)[0]; metrics.nextReadyISO = rd ? rd.readyISO : null; metrics.nextReady = rd ? fmtDate(parseDay(rd.readyISO)) : null;
+        metrics.etaChg = sh.length ? sh[0].slipDays : null;
+        metrics.stage = qs ? { prodQ: qs.prod, holdQ: qs.hold, transitQ: qs.transit, recvQ: qs.recv, prodT: stageAvg(sup, 'prod'), holdT: stageAvg(sup, 'hold'), transitT: stageAvg(sup, 'transit'), recvT: stageAvg(sup, 'recv') } : null; }
       metrics.stockOutH = null; metrics.orderBy = null; metrics.shortUnits = 0;
       if (inv.onHand >= 0 && !sku.isNew) {
         const pj = project(sku, snap, { demand: F, slip: 0 });
@@ -229,6 +248,21 @@
         else if (p.first !== null) add({ type: 'late_po', tier: 'Watch', rank: 1, dollars: p.short * price, gapUnits: p.short, firstH: p.first, confidence: 'High', slipWeeks: slipW,
           text: 'Supplier usually runs ~' + slipW + ' wk late. If so, stock runs out the week of ' + fmtDate(weekStart(snap, p.first)) });
       }
+      // order stages: a slipped arrival date, or finished goods waiting at the origin warehouse
+      { const sh = metrics.shipments || [], pj2 = project(sku, snap, { demand: F, slip: 2, tslip: 2 });
+        const sl = sh.filter(x => x.slipDays >= S.etaSlipDays).sort((a, b) => b.slipDays - a.slipDays)[0];
+        if (S.flags.eta_slipped && sl && (q.first !== null || pj2.first !== null)) {
+          const late = q.first !== null, hh = late ? q.first : pj2.first, pjx = late ? q : pj2;
+          add({ type: 'eta_slipped', tier: late ? 'At risk' : 'Watch', rank: late ? 0 : 1, dollars: late ? 0 : pjx.short * price, gapUnits: late ? 0 : pjx.short, firstH: hh, confidence: 'High', ref: sl.ref, slipDays: sl.slipDays,
+            text: sl.ref + ' arrival moved ' + sl.slipDays + ' days later (was ' + fmtDate(parseDay(sl.origEtaISO)) + ', now ' + fmtDate(parseDay(sl.etaISO)) + ')' + (late ? '. Stock runs out the week of ' + fmtDate(weekStart(snap, hh)) + ' before it arrives' : '. Stock still lasts, but 2 more weeks of slip would run out the week of ' + fmtDate(weekStart(snap, hh))) });
+        }
+        const holdT = metrics.stage ? metrics.stage.holdT : 4;
+        const st2 = sh.filter(x => x.stage === 'At Origin' && x.finishedAgo != null && x.finishedAgo - holdT > S.stuckExtraDays).sort((a, b) => b.finishedAgo - a.finishedAgo)[0];
+        if (S.flags.stuck_origin && st2 && (q.first !== null || pj2.first !== null)) {
+          const hh = q.first !== null ? q.first : pj2.first, pjx = q.first !== null ? q : pj2;
+          add({ type: 'stuck_origin', tier: 'Watch', rank: 1, dollars: q.first !== null ? 0 : pjx.short * price, gapUnits: q.first !== null ? 0 : pjx.short, firstH: hh, confidence: 'High', ref: st2.ref,
+            text: st2.ref + ' finished ' + st2.finishedAgo + ' days ago and is still at the origin warehouse (usually ' + Math.round(holdT) + ' days). Ask the supplier for a ship date' + (q.first !== null ? '. Stock runs out the week of ' + fmtDate(weekStart(snap, hh)) : '. Stock still lasts, but 2 more weeks of delay would run out the week of ' + fmtDate(weekStart(snap, hh))) });
+        } }
       // history gap
       if (S.flags.history_gap && needHist > 0 && supply < (1 - S.historyGapPct / 100) * needHist) {
         const gap = needHist - supply;
@@ -393,6 +427,13 @@
     } else if (f.type === 'newitem_gap') {
       o.push({ t: 'Review the analogs and the forecast together', note: 'Swap an analog if one does not fit' });
       o.push({ t: 'Adjust the forecast toward the analog range', note: 'Range: ' + fmtNum((analogsFor(sku, snap) || {}).min || 0) + ' to ' + fmtNum((analogsFor(sku, snap) || {}).max || 0) + ' units' });
+    } else if (f.type === 'eta_slipped') {
+      o.push({ t: 'Ask the supplier or forwarder to confirm the new date', note: f.ref + ' moved ' + f.slipDays + ' days. Ask what caused it and whether it can slip again' });
+      o.push({ t: 'Ask whether part of it can ship by air or on an earlier vessel', note: 'Freight cost needs a quote' });
+      o.push({ t: 'Check stock in other DCs', note: fmtNum(inv.otherDC || 0) + ' units sit in other locations' });
+    } else if (f.type === 'stuck_origin') {
+      o.push({ t: 'Ask the supplier for a ship date', note: f.ref + ' is finished and waiting at the origin warehouse' });
+      o.push({ t: 'Ask whether it can go by air or the next vessel', note: 'Freight cost needs a quote' });
     } else if (f.type === 'peak_cover') {
       o.push({ t: 'Add or pull in about ' + fmtNum(Math.ceil(f.gapUnits / 10) * 10) + ' units before the peak', note: 'Brings the lowest peak week back to 2 weeks of cover' });
       o.push({ t: 'Check the peak and promo weeks with Sales', note: 'The peak weeks come from the last two years of sales' });
@@ -403,6 +444,6 @@
   }
 
   const NOTE_LABEL = Object.assign({}, FLAG_LABEL, { promo: 'Promo or season', general: 'General' });
-  return { NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthIdx, typical, monthUnits, analogsFor, activeNotes, leadWeeks, options,
+  return { NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthIdx, typical, monthUnits, analogsFor, activeNotes, leadWeeks, options, shipmentsOf,
     weekStart, weekNum, fmtDate, fmtNum, fmtMoney, parseDay, addDays, sum, mean, sd };
 });

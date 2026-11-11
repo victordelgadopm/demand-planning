@@ -19,7 +19,7 @@ with sync_playwright() as p:
     # 2. typed-in columns can be requested and say where they are typed
     pg.fill('#chat-t','Add the date the units are needed by.');pg.click('#chat-f button');pg.wait_for_timeout(100)
     ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Needed By' in pg.locator('#msgs').inner_text())
-    rc=pg.locator('#v-custom').inner_text()
+    pg.evaluate("document.querySelectorAll('#v-custom details').forEach(d=>d.open=true)");rc=pg.locator('#v-custom').inner_text()
     ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Seasonal And Promo Lifts' in rc)
     # 3. no stale wording on any page or sheet tab
     allt=[]
@@ -53,5 +53,35 @@ with sync_playwright() as p:
     ok('order columns sit together',[mh.index(h) for h in ['AI Recommended Qty (Stock Gap)','AI Recommended Add (Peak + Promo)','AI Recommendation Why','AI Recommended Qty (Total)','Order Qty To Place (Type Here)','Variance Vs AI Qty','Your Qty Vs AI']]==list(range(mh.index('AI Recommended Qty (Stock Gap)'),mh.index('AI Recommended Qty (Stock Gap)')+7)))
     hs=wb['Sales History'];ok('Sales History has 4 rows per SKU',(hs.max_row-1)%4==0 and hs.max_row>100 and hs['E2'].value=='2026 Forecast' and hs['E5'].value=='2024 Sold')
     pg.click('nav [data-nav=sheet]');pg.click('[data-xt=hist]');ok('Sales History tab shows on the site',pg.locator('.xt tbody tr').count()>100)
+    # 8. supply chain stages: columns, tie-out, drawer table, workbook values
+    mh=[c.value for c in wb['Master List (Work Here)'][1]];ws_=wb['Master List (Work Here)']
+    need=['In Production (Units)','At Origin (Units)','In Transit (Units)','Open PO (Units)','Next Ready Date','ETA Change (Days)','Production Time (Days)','Transit Quoted (Days)','Transit Actual (Days)']
+    ok('master has the supply stage columns',all(h in mh for h in need))
+    ip,og,op=[mh.index(h) for h in ['In Production (Units)','At Origin (Units)','Open PO (Units)']]
+    ok('in production plus at origin equals open PO on every row',all((r[ip] or 0)+(r[og] or 0)==(r[op] or 0) for r in ws_.iter_rows(min_row=2,values_only=True) if r[0]))
+    ok('ETA Change has flagged rows',sum(1 for r in ws_.iter_rows(min_row=2,values_only=True) if (r[mh.index('ETA Change (Days)')] or 0)>=7)>=5)
+    pg.click('nav [data-nav=visual]');pg.wait_for_selector('tr.r');pg.fill('#q','FD-1126') if pg.locator('#q').count() else None
+    pg.click('tr.r >> nth=0');pg.wait_for_selector('#drawer.on');dt=pg.inner_text('#drawer');ok('drawer shows Orders And Shipments with stages','Orders And Shipments' in dt and ('In Production' in dt or 'At Origin' in dt or 'In Transit' in dt))
+    pg.click('#d-close')
+    # 9. capitalization after every colon, on every page, sheet tab, email example and the workbook
+    import re
+    cpat=re.compile(r"[A-Za-z)\]%]: [a-z]\w*");badc=[]
+    def cs(tag,tx):
+        for m in cpat.finditer(tx):badc.append((tag,tx[max(0,m.start()-25):m.end()+15].replace('\n',' ')))
+    for n in ['home','custom','sheet','visual','email','options']:
+        pg.click('nav [data-nav=%s]'%n);pg.wait_for_timeout(150)
+        if n=='custom':pg.evaluate("document.querySelectorAll('details').forEach(d=>d.open=true)")
+        if n=='sheet':
+            for k in pg.eval_on_selector_all('[data-xt]','e=>e.map(x=>x.dataset.xt)'):pg.click('[data-xt=%s]'%k);cs('sheet-'+k,pg.inner_text('.xl'))
+        if n=='email':
+            for k in pg.eval_on_selector_all('[data-ek]','e=>e.map(x=>x.dataset.ek)'):pg.click('[data-ek=%s]'%k);cs('email-'+k,pg.inner_text('#v-email'))
+        if n=='home':
+            for r in ['manual','folder','copilot','chatgpt']:pg.click('[data-route=%s]'%r);cs('home-'+r,pg.inner_text('#v-home'))
+        cs(n,pg.inner_text('#v-'+n))
+    for sh in wb.worksheets:
+        for row in sh.iter_rows(values_only=True):
+            for c in row:
+                if isinstance(c,str):cs('xlsx-'+sh.title,c)
+    ok('every colon is followed by a capital letter '+str(badc[:5]),not badc)
     ok('console clean',not errs)
 print(sum(R),'/',len(R))

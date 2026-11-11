@@ -10,7 +10,7 @@ with sync_playwright() as p:
     # decision filter
     pg.click('[data-dec=too_much]');ok('decision filter narrows list',pg.locator('tr.r').count()==3,pg.locator('tr.r').count());pg.click('[data-dec=too_much]')
     # tier chip
-    pg.click('[data-tier="No risk"]');ok('No risk list shows 106',pg.locator('#cnt').inner_text().startswith('106'));pg.click('[data-tier=attn]')
+    pg.click('[data-tier="No risk"]');ok('No risk list shows 101',pg.locator('#cnt').inner_text().startswith('101'));pg.click('[data-tier=attn]')
     pg.fill('#q','Treehouse');ok('search',pg.locator('tr.r').count()==1);pg.fill('#q','')
     # drill
     (pg.locator('#showmore').click() if pg.locator('#showmore').count() else None);pg.locator('tr.r',has_text='Holiday Ball Gown').click();pg.wait_for_timeout(500)

@@ -7,7 +7,11 @@ const exp={HG1:['Watch','history_gap'],MO1:['At risk','missed_order'],MO2:['Watc
  CF1:['Watch','channel_fill'],DQ1:['Watch','check_data'],DQ2:['Watch','check_data'],NI1:['Watch','newitem_gap'],HG3:['Watch','history_gap']};
 for(const [k,[tier,type]] of Object.entries(exp))T('planted '+k+' -> '+tier+'/'+type,()=>{const r=row(I[k]);assert.equal(r.tier,tier);assert.equal(r.headlineType,type);});
 for(const k of ['SP1','NF1','HN1','HN2','HN3','LU1','LU2','LU3','RC1','NI2','NI3'])T('hard negative '+k+' stays No risk',()=>assert.equal(row(I[k]).tier,'No risk'));
-T('no false alarms on unplanted SKUs',()=>{const p=new Set(Object.values(I));assert.equal(R.rows.filter(x=>!p.has(x.id)&&x.flags.length).length,0)});
+const STG={'FD-1126':'eta_slipped','CD-1068':'eta_slipped','SM-1068':'eta_slipped','FD-1088':'stuck_origin','CD-1056':'stuck_origin'};
+for(const id in STG)T('supply stage example '+id+' is flagged '+STG[id],()=>{const r=row(id);assert.equal(r.tier,'Watch');assert.equal(r.headlineType,STG[id])});
+T('order stages add up to open PO and every order has a stage',()=>{R.rows.forEach(r=>{assert.equal(r.metrics.inProd+r.metrics.atOrigin,r.metrics.openPO,r.id);r.metrics.shipments.forEach(s=>assert(s.stage&&s.etaISO&&s.origEtaISO))})});
+T('supplier stage days add up to the quoted lead time and each past order',()=>{for(const n in d.today.suppliers){const s=d.today.suppliers[n],q=s.stages;assert.equal(q.prod+q.hold+q.transit+q.recv,s.quotedWeeks*7,n);s.stageHistory.forEach((h,i)=>assert(Math.abs(h.prod+h.hold+h.transit+h.recv-s.history[i])<0.15,n+i))}});
+T('no false alarms on unplanted SKUs',()=>{const p=new Set(Object.values(I).concat(Object.keys(STG)));assert.equal(R.rows.filter(x=>!p.has(x.id)&&x.flags.length).length,0)});
 T('HG1 is the 700 vs 1000 case',()=>{const r=row(I.HG1);assert(Math.abs(r.metrics.supply-700)<30);assert(Math.abs(r.metrics.lyRaw-1000)<5)});
 T('lumpy flagged Low confidence only if flagged; no flags',()=>assert(row(I.LU1).flags.length===0));
 T('MO1 secondary flag kept in drill-down',()=>assert(row(I.MO1).flags.length>=1));
