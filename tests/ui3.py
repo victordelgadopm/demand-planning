@@ -32,7 +32,7 @@ with sync_playwright() as p:
     pg.click('[data-xt=plan]');ok('plan tab shows negative weeks',pg.locator('.xt td.bad').count()>0)
     pg.click('[data-xt=acc]');ok('accuracy tab has All Lines','All Lines' in pg.locator('.xt').inner_text())
     pg.click('[data-xt=dash]')
-    nav=pg.locator('nav button').all_inner_texts();ok('nav order',nav==['How It Works','Daily Sheet','Visual View','Setup Options','Customize'])
+    nav=pg.locator('nav button').all_inner_texts();ok('nav order',nav==['How It Works','Daily Sheet','Visual View','Setup Options','AI Chat Example'])
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Dashboard']

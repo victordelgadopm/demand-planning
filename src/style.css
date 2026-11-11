@@ -330,3 +330,6 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .ckey .k{padding:5px 9px;border-radius:4px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center}.ckey .k.ai{background:#d2f1f2;color:#00525a;border:1px solid #00838F}.ckey .k.inp{background:#fffbd0;color:#6b5200;border:1px solid #9a7b00}
 .ckey .k.ok{background:#d9efd9;color:#1b5e20;border:1px solid #1b5e20}.ckey .k.nw{background:#d6eaf8;color:#0b4f7c;border:1px solid #0b4f7c}.ckey .k.warn{background:#ffe5b4;color:#8a4b08;border:1px solid #8a4b08}.ckey .k.bad{background:#f8d7da;color:#842029;border:1px solid #842029}
 .xt thead th.ai,.xt tr.heads th.ai{background:#00838F !important;color:#fff !important}
+
+.demo-note{background:#1f3864;color:#fff;border-radius:10px;padding:14px 18px;margin:0 0 16px;border-left:6px solid #f2b200;line-height:1.5}.demo-note .dn-t{font-size:1.05rem;font-weight:800;margin-bottom:4px}.demo-note p{margin:6px 0 0;color:#fff}.demo-note a{color:#ffd966;font-weight:700}.demo-note.slim{margin:0 0 12px;padding:10px 14px;font-size:.9rem;border-radius:8px}.demo-tag{background:#1f3864;color:#fff;border-radius:99px;padding:2px 10px;font-weight:700}
+.sug-h{padding:10px 14px 0;font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--mute,#5b6577)}

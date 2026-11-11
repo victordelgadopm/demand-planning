@@ -333,6 +333,9 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .ckey .k{padding:5px 9px;border-radius:4px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center}.ckey .k.ai{background:#d2f1f2;color:#00525a;border:1px solid #00838F}.ckey .k.inp{background:#fffbd0;color:#6b5200;border:1px solid #9a7b00}
 .ckey .k.ok{background:#d9efd9;color:#1b5e20;border:1px solid #1b5e20}.ckey .k.nw{background:#d6eaf8;color:#0b4f7c;border:1px solid #0b4f7c}.ckey .k.warn{background:#ffe5b4;color:#8a4b08;border:1px solid #8a4b08}.ckey .k.bad{background:#f8d7da;color:#842029;border:1px solid #842029}
 .xt thead th.ai,.xt tr.heads th.ai{background:#00838F !important;color:#fff !important}
+
+.demo-note{background:#1f3864;color:#fff;border-radius:10px;padding:14px 18px;margin:0 0 16px;border-left:6px solid #f2b200;line-height:1.5}.demo-note .dn-t{font-size:1.05rem;font-weight:800;margin-bottom:4px}.demo-note p{margin:6px 0 0;color:#fff}.demo-note a{color:#ffd966;font-weight:700}.demo-note.slim{margin:0 0 12px;padding:10px 14px;font-size:.9rem;border-radius:8px}.demo-tag{background:#1f3864;color:#fff;border-radius:99px;padding:2px 10px;font-weight:700}
+.sug-h{padding:10px 14px 0;font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--mute,#5b6577)}
 </style></head>
 <body>
 <header class="top"><div class="top-in">
@@ -342,7 +345,7 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
     <button data-nav="sheet">Daily Sheet</button>
     <button data-nav="visual">Visual View</button>
     <button data-nav="options">Setup Options</button>
-    <button data-nav="custom">Customize</button>
+    <button data-nav="custom">AI Chat Example</button>
   </nav>
   <div class="spacer"></div>
   <span class="badge-sample" data-g="badge">Sample data, not Mattel data</span>
@@ -1686,7 +1689,7 @@ function recipeItems(){
    ['New And Missing Items','A SKU in today\'s files that was not in yesterday\'s is marked New Today in the File Status column on the Master List, with the light yellow columns empty. A SKU that was in yesterday\'s file but is missing from today\'s goes to the New And Missing Items tab with the work you had typed, so you know to check the shared files for what happened.'],
    ['Peak Override And Orders','Read the peak columns left to right on the Master List: Peak Weeks is when, Peak Lift is how big (the forecast in the peak weeks divided by a normal week), with your Override and its Reason beside it and Peak Lift Used after them, Peak Bump is the extra units that means, and Units Short Of Peak Cover is what is still missing after stock and orders on the way. If you know last year was out of stock, type your own lift on the Master List. AI Recommended Qty (Stock Gap) covers stock-out gaps. AI Recommended Add (Peak + Promo) says how many more units to order so stock stays above 2 weeks of peak demand, counting the confirmed promo, and AI Recommendation Why gives the reason in words. AI Recommended Qty (Total) adds them together and recalculates with any override you typed. Order Qty To Place and Needed By are yours to type and copy into the planning system.'],
    ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
-   ['How To Change It','Tell the AI in chat what you are not seeing. It updates this recipe.'],
+   ['How To Change It','Ask your AI agent. Columns, colors and rules are changed in conversation with the agent, which updates this saved recipe so every future run uses it. They are not edited on this site or in the downloaded file.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
 }
 /* ---------- plan + accuracy data ---------- */
@@ -1769,9 +1772,10 @@ function renderSheet(){
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
    <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. The download opens in Excel with the same colors and formatting, on an interactive Dashboard where the yellow dropdowns change the boxes and the list.</p>
+   <div class="demo-note slim"><b>Columns are changed through your AI agent, not on this page.</b> The Dashboard columns are saved in the agent\'s recipe, so to add, remove or reorder them, tell your AI agent what you want and it updates the recipe for every future run. <a href="#" id="sh-how">See an example conversation</a></div>
    <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
     ${tab==='plan'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
-    <button class="btn sm" id="sh-custom">Add or remove columns</button>
+    <button class="btn sm" id="sh-custom">How To Change Columns</button>
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${roleHtml()}${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" class="${k==='all'?'work':k==='dash'?'front':''}" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
@@ -1782,7 +1786,7 @@ function renderSheet(){
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
   $$('[data-open]',v).forEach(e=>{e.onclick=()=>A.openSku(e.dataset.open);e.onkeydown=ev=>{if(ev.key==='Enter')A.openSku(e.dataset.open)}});
-  $('#sh-dl').onclick=downloadXlsx;$('#sh-custom').onclick=()=>go('custom');
+  $('#sh-dl').onclick=downloadXlsx;$('#sh-custom').onclick=()=>go('custom');$('#sh-how').onclick=e=>{e.preventDefault();go('custom')};
 }
 /* ---------- xlsx ---------- */
 function downloadXlsx(){
@@ -2002,8 +2006,8 @@ function renderHome(){
    <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning. It opens on a dashboard of what needs you, with stock counts, weeks of supply, stock-out dates, promo and peak cover, and notes. A light yellow Master List tab is where you type: notes, a peak lift override, and the order quantity to place. New and missing items get their own tab, and yesterday\'s typed work carries over by SKU.</p>
     ${miniSheet()}
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Sheet</button></div></div>
-   <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
-    <div class="quotes"><p class="quote">“I don't see the supplier lead time.”</p><p class="quote">“Add the ABC class.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">Try It Now</button></div>
+   <div class="card step"><div class="shead"><div class="num">4</div><h2>Adjust Anytime</h2><span class="optl">Optional</span></div><p>Columns, colors and rules are changed by telling your AI agent in conversation, not by editing the sheet. It updates the saved recipe and the next run uses it. The AI Chat Example page shows what that conversation looks like.</p>
+    <div class="quotes"><p class="quote">“I don't see the supplier lead time.”</p><p class="quote">“Add the ABC class.”</p><p class="quote">“Show me last year's sales for the same weeks.”</p></div><button class="btn go" data-nav="custom">See An Example Chat</button></div>
   </div>
   <h2 class="sec-h">What Connects To What</h2>
   <p class="pg-sub" style="margin-top:0">Checked against each company's own pages in November 2026. Shown for Anaplan and Tableau, the two sources in this example. Any other source works the same way: if it can export a file, it can go in the shared folder.</p>
@@ -2087,7 +2091,7 @@ function renderOptions(){
   $('#x-set').onclick=A.openSettings;$('#x-csv').onclick=A.downloadCsv;$('#x-reset').onclick=()=>{cols=DEFAULT.slice();saveCols();msgs=[hello()];rowsMode='attn';A.reset();renderAll()};
 }
 /* ---------- customize ---------- */
-const hello=()=>({w:'ai',t:'Hi. Tell me what you are not seeing in your daily sheet, and I will change it. In this demo, tap one of the examples below or type your own.'});
+const hello=()=>({w:'ai',t:'This is a simulated example of a conversation with your AI agent. Tell it what you are not seeing in your daily sheet and it changes the sheet. Tap one of the examples below, or type a request.'});
 let msgs=[hello()];
 const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add the ABC class.','Add the peak months and promo status.','Show the peak lift and how many extra units it means.','Show which items were out of stock last peak.','Show the AI forecast next to the system forecast.','Compare my order quantity with the AI Recommended Qty.','Show how many units to add for the peak and promo, and why.','Show last year\'s promo weeks and the units it sold.','Show whether the promo falls inside the peak weeks.','Add the order quantity I plan to place.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
 const PAT=[['aifdiff',/ai.*(vs|versus|minus|differ).*(system )?forecast|forecast.*(difference|gap).*ai/],['nextarrq',/arrival (qty|quantity|units)|units arriving/],['arr2',/second arrival|2nd arrival|later arrival/],['aifcst',/ai (suggested )?forecast|forecast.*(from|by) (the )?ai|ai.*forecast/],['cmpai',/difference.*ai|minus ai|how far.*ai/],['cmptxt',/compare.*ai|compared to (the )?ai|vs\.? (the )?ai|close to (the )?ai|match (the )?ai|my (qty|quantity).*ai/],['stocklp',/out of stock last|stock last peak|stock.?out last (year|peak)|was there (even )?stock/],['totlift',/peak (\+|and|plus) promo|total (extra |lift )?units|promo and peak units/],['promoext',/promo extra|extra units.*promo|promo.*extra|units.*promo (add|brings)|promo.*units.*add/],['overlap',/overlap|(inside|during|in) (the )?peak.*promo|promo.*(inside|during|falls? in|in) (the )?peak|promo.*peak weeks/],['lypromo',/last (year'?s? )?promo|promo.*last year|previous promo|promo weeks? (from )?last/],['lyunits',/promo units|units sold.*promo|promo.*units sold/],['bump',/peak bump|extra units|bump/],['peakgap',/short of peak|units short.*peak|peak (gap|shortfall)/],['addwhy',/why.*(add|order)|reason.*(add|suggest|order)|explain.*(add|suggest)/],['addqty',/(add|order) (more )?(for|to cover) (the )?(peak|promo)|suggested add|units to add|how many (more )?units.*(peak|promo)|ai (suggest|recommend)/],['ordovr',/total (suggested )?(qty|quantity)|order (qty|quantity) with override|with override/],['ovrwhy',/override reason/],['ovr',/override|my own peak|change the peak/],['plan',/(qty|quantity|order).*(to place|i plan|planned|place)|plan to order/],['needby',/needed by|need.?by date/],['suggest',/suggested order|how much (should i|to) order|order qty|order quantity/],['peaklift',/peak lift|how (big|much).*peak/],['filest',/new items?|new today|new skus?/],['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
@@ -2106,19 +2110,19 @@ function reply(text){
   return 'I only know a few requests in this demo. In the real chat you would explain it in your own words, and the AI works out which data to use. If the data is not in your files, it asks you where to find it or what file to add.';
 }
 function renderCustom(){
-  $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize</h1></div>
-  <p class="pg-sub">You shape the sheet by talking to the AI, not by editing settings. Start with a full prompt about what you want, then adjust anytime by saying what you are not seeing. It remembers for next time.</p>
-  <div class="chat-wrap"><div class="leftcol"><div class="card chat"><div class="chat-h"><span>Chat With The AI</span><span class="conf">Demo only: simulated replies</span></div>
+  $('#v-custom').innerHTML=`<div class="page"><div class="pg-h"><h1>Customize With Your AI Agent</h1><span class="conf">Example conversation</span></div>
+  <div class="demo-note"><div class="dn-t">This is an example, not the live chat</div><p>On this site you can see what a conversation with your AI agent looks like. In real use, you talk to your own AI agent (for example Claude or ChatGPT) instead of using this page. Replies here are simulated and recognize only a small set of requests.</p><p><b>The real sheet is changed only through that conversation.</b> To add, remove or reorder columns, or change colors and rules, you tell your agent. It updates the saved recipe, rebuilds the sheet and uses it for every future run. Nothing is edited in the file by hand.</p></div>
+  <div class="chat-wrap"><div class="leftcol"><div class="card chat"><div class="chat-h"><span>Example Conversation With Your AI Agent</span><span class="conf demo-tag">Simulated replies</span></div>
    <div class="msgs" id="msgs" aria-live="polite">${msgs.map(m=>`<div class="msg ${m.w}">${m.w==='you'?esc(m.t):m.t}</div>`).join('')}</div>
-   <div class="sug">${SUG.map((s,i)=>`<button class="chip" data-sug="${i}">${esc(s)}</button>`).join('')}</div>
-   <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Type what you are not seeing" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
+   <div class="sug-h">Try an example request (simulated)</div><div class="sug">${SUG.map((s,i)=>`<button class="chip" data-sug="${i}">${esc(s)}</button>`).join('')}</div>
+   <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Try an example request (simulated)" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
    <div class="card recipe" style="margin-top:14px"><h3>Example Prompts To Start With</h3><ul class="mini"><li><b>Match a format:</b> “Here are two sheets I like. Make the daily sheet look exactly like the first, with the color rules from the second.”</li><li><b>Blend documents:</b> “Combine the layout of this report with the columns from that one.”</li><li><b>Combine data:</b> “Join the Anaplan forecast and the Tableau sales by SKU, and flag any item where sales are above forecast and stock is low.”</li></ul></div></div>
-  <div><div class="card recipe"><h3>Your Recipe</h3><p class="conf" style="margin:0 0 8px">The AI's memory of how your sheet is built. Scheduled runs read it every morning.</p>
-   <p class="conf" style="margin:0 0 6px"><b>Dashboard columns</b> (view only)</p><ol>${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
+  <div><div class="card recipe"><h3>Your Recipe</h3><p class="conf" style="margin:0 0 8px">The AI agent's memory of how your sheet is built. Scheduled runs read it every morning. It changes only when you tell your agent.</p>
+   <p class="conf" style="margin:0 0 6px"><b>Dashboard columns</b> (view only: ask your agent to change them)</p><ol>${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
    <p style="margin:10px 0 0"><b>Master List:</b> every column, with light yellow columns to type in (${INK.map(k=>esc(COLS[k].h)).join(', ')}). Those carry over to tomorrow\'s file by SKU.</p>
    <p style="margin:6px 0 0"><b>Tabs:</b> ${TABS.map(t=>esc(t[1])).join(', ')}.</p>
    <p style="margin:10px 0 0"><b>Rows:</b> ${rowsMode==='all'?'All items':'Items that need attention'}</p>
-   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Sheet</button><button class="btn" id="c-reset">Reset Columns</button></div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Sheet</button><button class="btn" id="c-reset">Reset The Example</button></div></div>
    <div class="card recipe" style="margin-top:14px"><h3>How This Works In Real Life</h3><ol><li>You describe what you want, or what you are not seeing, in your own words.</li><li>The AI finds the field in your data, or asks you where it lives.</li><li>It updates the recipe and rebuilds the sheet.</li><li>Tomorrow's scheduled run uses the saved recipe.</li></ol>
    <p style="margin:10px 0 0"><button class="btn sm" id="c-adv">Advanced Thresholds</button></p></div></div></div></div>`;
   const v=$('#v-custom'),box=$('#msgs');box.scrollTop=box.scrollHeight;
