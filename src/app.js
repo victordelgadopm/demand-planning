@@ -127,7 +127,7 @@ function renderApp(){
      <div class="t">${DEC[k][0]}</div><div class="n">${it.length}</div><div class="d">${DEC[k][1]}</div>
      <div class="h">${d>0?money(d)+' at stake':'&nbsp;'}</div></button>`}).join('');
   $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${st.snap==='today'?'Today, '+esc(TODAY_LONG):'Yesterday (comparison)'}</span></div>
-   <p class="pg-sub">The same results as the Daily Sheet's Dashboard, shown as cards you can click, with the same Decision and Status choices and the same columns. Open any item to add a note, and that note shows in the Daily Sheet's Master List too. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list.</p>${health}${snapHtml}${sinceHtml()}
+   <p class="pg-sub">The same results as the Daily Sheet's Dashboard, shown as cards you can click, with the same Decision and Status choices and the same columns. Open any item to add a note, and that note shows in the Daily Sheet's Master List too. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list, which has a Seasonality and promos tab with the peak lift, the extra units it means and whether stock covers it. Peak overrides and order quantities to place are typed on the Master List in the Daily Sheet and show here.</p>${health}${snapHtml}${sinceHtml()}
    <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision, for the status chosen below, the same as the four boxes on the Daily Sheet dashboard. Tap a box to filter the list.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
    <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, forecast accuracy, and seasonality and promos.</p>
@@ -150,7 +150,7 @@ function sinceHtml(){
   const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
     return `<div class="sc ${cls}"><div class="sc-h"><span>${title}</span><b>${items.length}</b></div><div class="sc-sub">${sub}</div>
     ${items.length?`<ul>${shown.map(fmt).join('')}</ul>${more>0?`<div class="sc-more">and ${more} more in the list below</div>`:''}`:'<div class="sc-none">None today</div>'}</div>`};
-  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p>
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} dropped items. They are listed on the New And Dropped Items tab of the Daily Sheet.</p>
    <div class="since4" data-g="since">
     ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
@@ -540,6 +540,7 @@ function openEmail(){
   let b=`Subject: Demand planning, ${t['At risk']} at risk, ${t['Medium']} medium (${TODAY_SHORT})\n\nGood morning. Top items to look at today:\n\n`;
   top.forEach((r,i)=>{b+=`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n   ${r.dollars>0?money(r.dollars)+' at risk':''}\n\n`});
   if(st.diff){b+='Since yesterday:\n';st.diff.toAtRisk.forEach(i=>b+=`  - Newly at risk: ${rowOf(i).name}\n`);st.diff.reAlerted.forEach(i=>b+=`  - Re-alert (gap grew): ${rowOf(i).name}\n`);st.diff.recovered.forEach(i=>b+=`  - Fixed: ${rowOf(i).name}\n`);b+='\n'}
+  {const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files today:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Dropped: ${x.name} (${x.id}), check the shared files${x.plan?' (you had '+fmt(x.plan)+' units to place)':''}\n`);b+='\n'}}
   b+=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept. Open the tool for charts and options.\n\nSample data, not Mattel data.`;
   openModal('Daily email preview',`<p class="mute">Sent each morning after the files refresh. Accepted risks stay out of it unless they re-alert.</p><div class="email">${esc(b)}</div>`);
 }
