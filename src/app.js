@@ -8,9 +8,9 @@ const droppedList=()=>D.yesterday.skus.filter(x=>!TID.has(x.id)).map(x=>{const t
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=E.fmtNum, money=E.fmtMoney, KEY='dpa.v1';
-const TIERS=['At risk','Medium','Watch','Overstocked','No risk'];
-const TCLS={'At risk':'t-risk','Medium':'t-med','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
-const TICON={'At risk':'▲','Medium':'◆','Watch':'◉','Overstocked':'■','No risk':'✔'};
+const TIERS=['At risk','Watch','Overstocked','No risk'];
+const TCLS={'At risk':'t-risk','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
+const TICON={'At risk':'▲','Watch':'◉','Overstocked':'■','No risk':'✔'};
 const DEC={order_more:['Order more or expedite','Stock will run short'],too_much:['Too much stock','Cash tied up in stock'],forecast_off:['Forecast looks off','Sales moving away from plan'],check_data:['Check the data','Something looks wrong in a source']};
 const SRC={planning:'Planning system',bi:'Reporting tool',sharepoint:'Shared file',calc:'Calculated'};
 const REASONS=['Budget','Focus is on another line','Supplier constraint','Planned promo change','Other'],CREASONS=['Supplier update','Promo update','Waiting on Sales','Data issue','Follow-up','Other'];
@@ -19,7 +19,7 @@ function noteFor(id){const ns=Object.values(E.activeNotes(st.notes)).filter(x=>x
 const DEFSET={...E.DEFAULTS,flags:{...E.DEFAULTS.flags},minDollars:0,tierNames:{},cols:{sub:true,conf:true,dollars:true},profile:'Planner'};
 const RULES={
  missed_order:['Missed order','Nothing is on order or in transit and projected stock goes below zero. Critical when that happens inside the supplier lead time plus how late they usually run.'],
- late_po:['Lead time risk','An order exists but stock runs out first. Critical if it runs out even on the quoted arrival date. Medium if it only runs out when the supplier is as late as their history says.'],
+ late_po:['Lead time risk','An order exists but stock runs out first. Critical if it runs out even on the quoted arrival date. Watch if it only runs out when the supplier is as late as their history says.'],
  history_gap:['Short vs last year','Orders plus stock are well below what the same weeks needed last year, after removing last year\'s stock-outs and one-time promos and adjusting for this year\'s pace.'],
  promo_repeat:['Promo repeat','The same promo is planned again. Supply covers the base forecast but not the base plus last year\'s measured lift.'],
  pos_outpacing:['Sales above forecast','Sell-through beat the forecast by a set margin for several weeks in a row.'],
@@ -179,7 +179,7 @@ function sinceHtml(){
   if(!st.diff)return '';const d=st.diff,nm=id=>esc(rowOf(id).name),lk=id=>`<a data-open="${id}">${nm(id)}</a>`;
   const moved=new Set([...d.toAtRisk,...d.newFlags,...d.worsened,...d.reAlerted,...d.recovered]);
   const prevTier={};st.prev.rows.forEach(r=>{prevTier[r.id]=r.tier});
-  const still=st.res.rows.filter(r=>(r.tier==='At risk'||r.tier==='Medium')&&prevTier[r.id]===r.tier&&!moved.has(r.id)).sort((x,y)=>y.dollars-x.dollars).map(r=>r.id);
+  const still=st.res.rows.filter(r=>(r.tier==='At risk'||r.tier==='Watch')&&prevTier[r.id]===r.tier&&!moved.has(r.id)).sort((x,y)=>y.dollars-x.dollars).map(r=>r.id);
   const newRisk=[...d.toAtRisk.map(i=>[i,'now at risk']),...d.newFlags.filter(i=>!d.toAtRisk.includes(i)).map(i=>[i,'new flag'])];
   const worse=[...d.reAlerted.map(i=>[i,'<span class="re" style="margin:0">RE-ALERT</span> gap grew past what was accepted']),...d.worsened.filter(i=>!d.reAlerted.includes(i)).map(i=>[i,'gap got bigger'])];
   const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
@@ -301,13 +301,13 @@ function seasonHtml(){
 }
 function accuracyHtml(){
   const a=E.accuracy(snap()),T=E.accuracyTotal(snap());
-  const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-med">◆ Watch</span>':'<span class="ok-t">✔ On target</span>';
+  const tgt=(w,b)=>w>0.35||Math.abs(b)>0.10?'<span class="tier t-risk">▲ Off target</span>':w>0.25||Math.abs(b)>0.05?'<span class="tier t-watch">◉ Watch</span>':'<span class="ok-t">✔ On target</span>';
   return `<div class="card sec" data-g="accuracy"><h3>Forecast Accuracy By Line (Last 13 Weeks)</h3>
   <p class="mute">Miss (WMAPE) adds up the gap between actual sales and forecast for every SKU and week, then divides by total sales. Bias is whether the forecast runs high (+) or low (-) overall. Common targets: miss under 25%, bias within 5% either way. The bias signal below is checked at line level, so one noisy item cannot trigger a false alarm.</p>
   <div class="xl-scroll"><table class="list"><thead><tr><th>Line</th><th class="num">SKUs</th><th class="num">Forecast accuracy</th><th class="num">Miss (WMAPE)</th><th class="num">Bias</th><th>Against targets</th><th>Signal</th></tr></thead><tbody>
   <tr><td><b>All lines</b></td><td class="num">${T.n}</td><td class="num">${pctN(1-T.wmape)}</td><td class="num">${pctN(T.wmape)}</td><td class="num">${pctSN(T.bias)}</td><td>${tgt(T.wmape,T.bias)}</td><td></td></tr>
   ${Object.entries(a).sort((x,y)=>y[1].wmape-x[1].wmape).map(([k,v])=>`<tr><td><b>${esc(k)}</b></td><td class="num">${v.n}</td><td class="num">${pctN(1-v.wmape)}</td><td class="num">${pctN(v.wmape)}</td><td class="num">${pctSN(v.bias)}</td><td>${tgt(v.wmape,v.bias)}</td>
-  <td>${v.possible?`<span class="tier t-med">◆ Possible bias: forecast runs ${v.direction === 'under' ? 'low' : 'high'}</span><div class="conf">Seen over 8 weeks across ${v.n} SKUs. Worth a look at the forecast method.</div>`:'<span class="ok-t">✔ No consistent bias</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
+  <td>${v.possible?`<span class="tier t-watch">◉ Possible bias: forecast runs ${v.direction === 'under' ? 'low' : 'high'}</span><div class="conf">Seen over 8 weeks across ${v.n} SKUs. Worth a look at the forecast method.</div>`:'<span class="ok-t">✔ No consistent bias</span>'}</td></tr>`).join('')}</tbody></table></div></div>`}
 
 /* ---------- charts ---------- */
 function niceStep(x){const p=Math.pow(10,Math.floor(Math.log10(x))),f=x/p;return (f<1.5?1:f<3?2:f<7?5:10)*p}
@@ -579,7 +579,7 @@ function flowPanel(id){
 }
 function openEmail(){
   const live=st.res.rows.filter(r=>r.headline).sort((a,b)=>E.TIER_ORDER[a.tier]-E.TIER_ORDER[b.tier]||b.dollars-a.dollars),top=live.slice(0,5),t=st.res.tiers;
-  let b=`Subject: Demand planning, ${t['At risk']} at risk, ${t['Medium']} medium (${TODAY_SHORT})\n\nGood morning. Top items to look at today:\n\n`;
+  let b=`Subject: Demand planning, ${t['At risk']} at risk, ${t['Watch']} to watch (${TODAY_SHORT})\n\nGood morning. Top items to look at today:\n\n`;
   top.forEach((r,i)=>{b+=`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n   ${r.dollars>0?money(r.dollars)+' at risk':''}\n\n`});
   if(st.diff){b+='Since yesterday:\n';st.diff.toAtRisk.forEach(i=>b+=`  - Newly at risk: ${rowOf(i).name}\n`);st.diff.reAlerted.forEach(i=>b+=`  - Re-alert (gap grew): ${rowOf(i).name}\n`);st.diff.recovered.forEach(i=>b+=`  - Fixed: ${rowOf(i).name}\n`);b+='\n'}
   {const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files today:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing today: ${x.name} (${x.id}), check the shared files${x.plan?' (you had '+fmt(x.plan)+' units to place)':''}\n`);b+='\n'}}

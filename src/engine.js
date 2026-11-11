@@ -10,7 +10,7 @@
     flags: { missed_order: true, late_po: true, history_gap: true, promo_repeat: true, pos_outpacing: true,
              overstock: true, channel_fill: true, newitem_gap: true, check_data: true, peak_cover: true }
   };
-  const TIER_ORDER = { 'At risk': 0, 'Medium': 1, 'Watch': 2, 'Overstocked': 3, 'No risk': 4 };
+  const TIER_ORDER = { 'At risk': 0, 'Watch': 1, 'Overstocked': 2, 'No risk': 3 };
   const DECISION_OF = { missed_order: 'order_more', late_po: 'order_more', history_gap: 'order_more', promo_repeat: 'order_more',
     pos_outpacing: 'order_more', overstock: 'too_much', channel_fill: 'too_much', newitem_gap: 'forecast_off', check_data: 'check_data', peak_cover: 'order_more' };
   const FLAG_LABEL = { missed_order: 'Missed order', late_po: 'Lead time risk', history_gap: 'Short vs last year', promo_repeat: 'Promo repeat',
@@ -221,18 +221,18 @@
       if (!hasSupply && q.first !== null && S.flags.missed_order) {
         const urgent = q.first <= Math.ceil(ltUse);
         const ob = orderBy(q.first);
-        add({ type: 'missed_order', tier: urgent ? 'At risk' : 'Medium', dollars: q.short * price, gapUnits: q.short, firstH: q.first, confidence: 'High',
+        add({ type: 'missed_order', tier: urgent ? 'At risk' : 'Watch', rank: 1, dollars: q.short * price, gapUnits: q.short, firstH: q.first, confidence: 'High',
           text: 'No order placed. Stock runs out the week of ' + fmtDate(weekStart(snap, q.first)) + (ob ? '. Order by ' + fmtDate(ob) : '. Order now or expedite') });
       } else if (hasSupply && S.flags.late_po) {
         if (q.first !== null) add({ type: 'late_po', tier: 'At risk', dollars: q.short * price, gapUnits: q.short, firstH: q.first, confidence: 'High',
           text: 'Stock runs out the week of ' + fmtDate(weekStart(snap, q.first)) + ' before the PO arrives. Short ' + fmtNum(q.short) + ' units' });
-        else if (p.first !== null) add({ type: 'late_po', tier: 'Medium', dollars: p.short * price, gapUnits: p.short, firstH: p.first, confidence: 'High', slipWeeks: slipW,
+        else if (p.first !== null) add({ type: 'late_po', tier: 'Watch', rank: 1, dollars: p.short * price, gapUnits: p.short, firstH: p.first, confidence: 'High', slipWeeks: slipW,
           text: 'Supplier usually runs ~' + slipW + ' wk late. If so, stock runs out the week of ' + fmtDate(weekStart(snap, p.first)) });
       }
       // history gap
       if (S.flags.history_gap && needHist > 0 && supply < (1 - S.historyGapPct / 100) * needHist) {
         const gap = needHist - supply;
-        add({ type: 'history_gap', tier: 'Medium', dollars: gap * price, gapUnits: gap, confidence: 'High',
+        add({ type: 'history_gap', tier: 'Watch', rank: 1, dollars: gap * price, gapUnits: gap, confidence: 'High',
           text: 'Orders and stock cover ' + fmtNum(supply) + ' units. The same weeks last year sold ' + fmtNum(metrics.lyRaw) + ' (adjusted need ' + fmtNum(needHist) + ')' });
       }
       // promo repeat
@@ -242,7 +242,7 @@
         const c = S.promoCushionPct / 100;
         if (tyConf.length && supply < (1 - c) * needPromo && supply >= (1 - c) * needPlan) {
           const gap = needPromo - supply;
-          add({ type: 'promo_repeat', tier: 'Medium', dollars: gap * price, gapUnits: gap, confidence: 'High',
+          add({ type: 'promo_repeat', tier: 'Watch', rank: 1, dollars: gap * price, gapUnits: gap, confidence: 'High',
             text: 'Promo repeats (last year lifted sales ~' + Math.round(lift * 100) + '%). Needs ' + fmtNum(needPromo) + ' units, supply is ' + fmtNum(supply) });
         } else if (!tyConf.length) {
           add({ type: 'promo_repeat', tier: 'Watch', dollars: 0, gapUnits: 0, confidence: 'Medium', possible: true,
@@ -255,7 +255,7 @@
       if (S.flags.pos_outpacing && out) {
         const ratio = sum(pos26, 45 - n, 45) / Math.max(1, sum(f26, 45 - n, 45)); const adj = needPlan * Math.max(1, ratio);
         const pct = Math.round((ratio - 1) * 100);
-        if (adj > supply) add({ type: 'pos_outpacing', tier: 'Medium', dollars: (adj - supply) * price, gapUnits: adj - supply, confidence: 'High',
+        if (adj > supply) add({ type: 'pos_outpacing', tier: 'Watch', rank: 1, dollars: (adj - supply) * price, gapUnits: adj - supply, confidence: 'High',
           text: 'Sales ran ' + pct + '% above forecast for ' + n + ' weeks and supply will not cover that pace (short ' + fmtNum(adj - supply) + ')' });
         else add({ type: 'pos_outpacing', decision: 'forecast_off', tier: 'Watch', dollars: (adj - needPlan) * price, gapUnits: adj - needPlan, confidence: 'High',
           text: 'Sales ran ' + pct + '% above forecast for ' + n + ' weeks. Supply covers it, but the forecast looks low' });
@@ -278,7 +278,7 @@
       const an = analogsFor(sku, snap);
       if (an && an.mean > 0) {
         const r = needPlan / an.mean;
-        if (r < 0.75) add({ type: 'newitem_gap', tier: 'Medium', dollars: (an.mean - needPlan) * price, gapUnits: an.mean - needPlan, confidence: 'Medium',
+        if (r < 0.75) add({ type: 'newitem_gap', tier: 'Watch', rank: 1, dollars: (an.mean - needPlan) * price, gapUnits: an.mean - needPlan, confidence: 'Medium',
           text: 'Forecast is ' + Math.round((1 - r) * 100) + '% below similar past launches (' + fmtNum(needPlan) + ' vs ' + fmtNum(an.mean) + ' units in 12 weeks)' });
         else if (r > 1.33) add({ type: 'newitem_gap', tier: 'Watch', dollars: (needPlan - an.mean) * price, gapUnits: needPlan - an.mean, confidence: 'Medium',
           text: 'Forecast is ' + Math.round((r - 1) * 100) + '% above similar past launches (' + fmtNum(needPlan) + ' vs ' + fmtNum(an.mean) + ' units)' });
@@ -302,9 +302,9 @@
       }
     });
     const live = flags.filter(f => !f.accepted);
-    live.sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || b.dollars - a.dollars);
+    live.sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || (b.rank || 0) - (a.rank || 0) || b.dollars - a.dollars);
     const top = live[0] || null;
-    const allSorted = flags.slice().sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || b.dollars - a.dollars);
+    const allSorted = flags.slice().sort((a, b) => TIER_ORDER[a.tier] - TIER_ORDER[b.tier] || (b.rank || 0) - (a.rank || 0) || b.dollars - a.dollars);
     return { id: sku.id, name: sku.name, sub: sku.sub, price, isNew: !!sku.isNew, lumpy: !!sku.lumpy,
       tier: top ? top.tier : 'No risk', decision: top ? top.decision : null, headline: top ? top.text : null, headlineType: top ? top.type : null,
       dollars: top ? top.dollars : 0, gapUnits: top ? Math.round(top.gapUnits || 0) : 0, flags: allSorted, acceptedFlags: accepted, isAccepted: !top && accepted.length > 0, reAlert,
@@ -315,7 +315,7 @@
     const S = Object.assign({}, DEFAULTS, settings || {}); S.flags = Object.assign({}, DEFAULTS.flags, (settings || {}).flags || {});
     const notes = activeNotes(noteEvents || []);
     const rows = snap.skus.map(s => evalSku(s, snap, S, notes));
-    const tiers = { 'At risk': 0, 'Medium': 0, 'Watch': 0, 'Overstocked': 0, 'No risk': 0 };
+    const tiers = { 'At risk': 0, 'Watch': 0, 'Overstocked': 0, 'No risk': 0 };
     const dec = { order_more: { n: 0, d: 0 }, too_much: { n: 0, d: 0 }, forecast_off: { n: 0, d: 0 }, check_data: { n: 0, d: 0 } };
     // ABC class by share of 12-week forecast sales value (80 / 15 / 5)
     const totVal = sum(rows.map(r => r.metrics.fcstValue)); let cum = 0;
