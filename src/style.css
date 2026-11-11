@@ -402,3 +402,4 @@ ol.two li{break-inside:avoid;margin-bottom:3px}
 .route-lead.warn{background:var(--watch-bg,#ffe5b4);color:var(--watch,#8a4b08)}
 .routebox .mini li{margin:6px 0;color:var(--ink)}
 .flowlegend{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0;font-size:13px}.flowlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.flowsteps{margin:8px 0;padding-left:22px}.flowsteps li{margin:4px 0}

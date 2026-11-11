@@ -18,6 +18,11 @@ with sync_playwright() as p:
         ok('map colors match table for '+rk,all(pg.locator('[data-node^=conn%d%s] rect'%(i,s)).get_attribute('stroke')==cols_[s] for i,s in enumerate(sts)))
         cells=pg.locator('.mx >> nth=0').locator('tbody tr').nth(0).locator('td').all();cells2=pg.locator('.mx >> nth=0').locator('tbody tr').nth(1).locator('td').all()
         ok('matrix matches for '+rk,mt[sts[0]] in cells[ri].inner_text() and mt[sts[1]] in cells2[ri].inner_text())
+    for rk,blocked in [('chatgpt',1),('copilot',0),('manual',0),('folder',0)]:
+        pg.click('[data-route=%s]'%rk);pg.wait_for_timeout(80)
+        ok('map for %s always passes through the shared folder and names the agent'%rk,pg.locator('[data-node=folder]').count()==1 and pg.locator('[data-node=hub]').count()==1 and pg.locator('[data-node=email]').count()==1 and any(a in pg.locator('[data-node=hub]').text_content() for a in ['ChatGPT','Copilot']))
+        ok('map for %s shows the blocked box and an export workaround only where needed'%rk,(pg.locator('[data-node$=no] >> nth=0').count()==blocked) and (pg.locator('[data-node^=work]').count()>=blocked))
+    pg.click('[data-route=copilot]');ok('Copilot map offers an export for the partly rated Tableau','Copilot' in pg.locator('[data-node=hub]').text_content() and pg.locator('[data-node=work1]').count()==1)
     pg.click('[data-route=chatgpt]');ok('ChatGPT route says only Tableau connects directly and Anaplan needs an export','Tableau only' in pg.inner_text('#routebox') and 'Anaplan has no direct connection' in pg.inner_text('#routebox') and 'manual or automated export' in pg.inner_text('#routebox'))
     pg.click('nav [data-nav=sheet]');ok('sheet opens on Dashboard with 22 rows',pg.locator('.dtab tbody tr').count()==22 and pg.locator('.dbox').count()==4)
     pg.select_option('#dd','Order more or expedite');pg.select_option('#ds','All statuses');ok('dashboard pickers filter to 15',pg.locator('.dtab tbody tr').count()==15 and 'Items matching your choices: 15' in pg.locator('.dcount').inner_text())
