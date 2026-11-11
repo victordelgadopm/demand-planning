@@ -36,7 +36,7 @@ with sync_playwright() as p:
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Dashboard']
-    ok('xlsx 10 sheets, no Today tab',wb.sheetnames==['Dashboard','Master List (Work Here)','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Seasonal Items','Since Yesterday','Notes','Dropped Items','Recipe'])
+    ok('xlsx 11 sheets, no Today tab',wb.sheetnames==['Dashboard','Master List (Work Here)','12-Week Plan','Forecast Accuracy','Seasonal Calendar','Seasonal Items','Promos And Peaks','Since Yesterday','Notes','New And Dropped Items','Recipe'])
     ok('xlsx includes added column','Lead Time (Weeks)' in [c.value for c in ws[16]])
     wm=wb['Master List (Work Here)'];ok('master frozen+filter',wm.freeze_panes=='D2' and wm.auto_filter.ref is not None)
     ok('xlsx status colored',wb['Master List (Work Here)']['A2'].fill.fgColor.rgb=='FFF8D7DA')
@@ -61,10 +61,10 @@ with sync_playwright() as p:
     # new and dropped items, peak override, seasonal calendar
     pg.click('nav [data-nav=sheet]');pg.wait_for_timeout(100)
     pg.click('[data-xt=all]');ok('3 new rows highlighted on the master list',pg.locator('tr.newrow').count()==3 and pg.locator('td.t-new').count()==3)
-    pg.click('[data-xt=dropped]');ok('dropped items tab lists 2 items',pg.locator('.xt tbody tr').count()==2)
+    pg.click('[data-xt=dropped]');ok('new and dropped tab lists 3 new and 2 dropped',pg.locator('.xt tbody tr').count()==5 and pg.locator('.xt td.t-drop').count()==2)
     pg.click('[data-xt=season]');ok('calendar shows Normal and shaded peaks',pg.locator('.xt td:has-text("Normal")').count()>=60 and pg.locator('.xt td.warn').count()>=6)
     pg.click('[data-line=Collector]');ok('clicking a line opens Seasonal Items filtered to it',pg.locator('#il').input_value()=='Collector' and pg.locator('.xt tbody tr').count()==18)
-    wd=wb['Dropped Items'];ok('xlsx dropped items sheet has 2 rows',wd.max_row==3)
+    wd=wb['New And Dropped Items'];ok('xlsx new and dropped sheet has 5 rows',wd.max_row==6)
     hm=[c.value for c in wm[1]];ok('xlsx master has file status and order columns',all(h in hm for h in ['File Status','Peak Lift (x)','Stock Last Peak','Suggested Order Qty','Order Qty With Override']))
     fs=hm.index('File Status')+1;ok('xlsx 3 New Today cells',sum(1 for r in range(2,125) if wm.cell(r,fs).value=='New Today')==3)
     ok('override has number validation',any(d.type=='decimal' for d in wm.data_validations.dataValidation))

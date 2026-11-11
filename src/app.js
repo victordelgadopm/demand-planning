@@ -2,6 +2,7 @@
 'use strict';
 const D=window.__DATA__, E=window.Engine;
 const YID=new Set(D.yesterday.skus.map(x=>x.id)),NEWIDS=D.today.skus.filter(x=>!YID.has(x.id)).map(x=>x.id),TID=new Set(D.today.skus.map(x=>x.id));
+const IN=D.seedInputs||{},R3k=x=>Math.round(x*1000)/1000;
 const newToday=id=>NEWIDS.includes(id);
 const droppedList=()=>D.yesterday.skus.filter(x=>!TID.has(x.id)).map(x=>{const t=(D.dropped||[]).find(d=>d.id===x.id)||{};return {id:x.id,name:x.name,sub:x.sub,onHand:x.inv.onHand,po:(x.inv.pos||[]).reduce((a,p)=>a+p.qty,0)+(x.inv.transit||[]).reduce((a,p)=>a+p.qty,0),note:t.note||'',plan:t.plan||'',by:t.by||''}});
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -29,7 +30,7 @@ const RULES={
  check_data:['Check the data','A source value looks wrong or is missing, so flags that depend on it are paused until it is fixed.']};
 
 /* ---------- planner fields: one definition, used by the Visual View, the sheet preview and the download ---------- */
-const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int'};
+const PNUM={onhand:'int',transit:'int',openpo:'int',onorder:'int',supply:'int',fcstwk:'int',sales4:'int',salesvs:'pctS',wos:'dec1',gap:'int',dollars:'money',price:'money2',acc:'pct',bias:'pctS',ship:'x2',lt:'dec1',ly:'int',lift:'pctS',peaklift:'x2',ovr:'x2',used:'x2',suggest:'int',ordovr:'int',plan:'int',bump:'int',peakgap:'int'};
 const r3=x=>Math.round(x*10000)/10000;
 const GAPT={order_more:'Short',too_much:'Over',forecast_off:'Forecast off',check_data:'n/a'};
 function pv(k,r){const m=r.metrics,nw=r.isNew;
@@ -49,6 +50,17 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'peak':return nw?'n/a':(m.peakMonths||'None');
    case 'peakwk':return nw?'n/a':!m.peak?'None in window':(m.peak.start===m.peak.end?m.peak.start:m.peak.start+' to '+m.peak.end);
    case 'peakcover':return m.peakStatus==='—'?'No peak':m.peakStatus;
+   case 'filest':return newToday(r.id)?'New Today':'';
+   case 'suggest':return r.decision==='order_more'&&r.gapUnits>0?Math.ceil(r.gapUnits/10)*10:'';
+   case 'ovr':{const x=IN[r.id];return x&&x.ovr!=null?x.ovr:''}
+   case 'ovrwhy':return (IN[r.id]||{}).why||'';
+   case 'plan':{const x=IN[r.id];return x&&x.plan!=null?x.plan:''}
+   case 'needby':return (IN[r.id]||{}).by||'';
+   case 'used':{const o=pv('ovr',r);return o!==''?o:pv('peaklift',r)}
+   case 'bump':{const u=pv('used',r);return u===''||!m.baseWk?'':Math.round((u-1)*R3k(m.baseWk)*m.peakWks)}
+   case 'peakgap':{const pc=m.peakCover;return pc?Math.max(0,Math.ceil(pc.safety-pc.minInv)):''}
+   case 'ordovr':{const o=pv('ovr',r),sg0=pv('suggest',r),p=pv('peaklift',r);if(o===''||p===''||!m.baseWk)return sg0;
+     const sg=sg0===''?0:sg0,ex=(o-p)*R3k(m.baseWk)*m.peakWks,H=m.peakCover?R3k(Math.max(0,m.peakCover.minInv-m.peakCover.safety)):0,need=sg>0?sg+ex:ex-H;return need<=0?'':Math.ceil(need/10)*10}
    case 'peaklift':return nw||m.peakLift==null?'':r3(m.peakLift);
    case 'stocklp':return nw?'n/a':!m.peak?'No peak':m.stockLP;
    case 'promo':return m.promo.status;
@@ -64,6 +76,7 @@ function pcls(k,v){if(v===''||v==null)return '';
   if(k==='salesvs'&&typeof v==='number')return Math.abs(v)>=0.15?'warn':'';
   if((k==='stockout'||k==='orderby')&&v!=='None'&&v!=='n/a'&&v!=='—')return 'bad';
   if(k==='onhand'&&v<0)return 'bad';
+  if(k==='peakgap')return typeof v==='number'&&v>0?'warn':'';
   if(k==='stocklp')return String(v).startsWith('Out')?'warn':'';
   if(k==='peakcover')return v==='Short'?'bad':v==='Thin'?'warn':'';
   if(k==='promo')return v==='Confirmed, short'?'bad':v==='Not confirmed'?'warn':'';
@@ -166,7 +179,7 @@ function renderTab(){
   const tb=$('#tabbody');
   if(st.tab==='acc')return tb.innerHTML=accHtml(),bindRows(tb);
   if(st.tab==='acc2')return tb.innerHTML=accuracyHtml();
-  if(st.tab==='season')return tb.innerHTML=seasonHtml(),bindRows(tb);
+  if(st.tab==='season')return tb.innerHTML=seasonHtml(),bindRows(tb),bindSeason(tb);
   const subs=['',...D.subs];
   tb.innerHTML=`<div class="bar" data-g="filters">${chipsHtml()}</div>
    <div class="bar"><input type="search" id="q" placeholder="Search SKU or name" value="${esc(st.q)}" aria-label="Search">
@@ -224,17 +237,23 @@ const SEASON_SRC=[
  ['This year\'s promos','From a file','Read from the promo calendar in the Shared file, with a confirmed or not confirmed mark. If a promo is missing from the file, it will not show here, so "None" means none on file, not none planned.'],
  ['Last year\'s promo lift','Calculated','Measured by comparing last year\'s promo weeks with the normal weeks around them. It only shows when last year\'s promo weeks are tagged in the history.'],
  ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
+let vShow='promo',vLine='All Lines';
+const VCOLS=['promo','nextpromo','lift','peakwk','used','bump','peakgap','stocklp','peakcover','ordovr','plan','needby'];
+const VHEAD={promo:'Promo status',nextpromo:'Next promo',lift:'Last year promo lift',peakwk:'Peak weeks (next 12)',used:'Peak lift',bump:'Peak bump (units)',peakgap:'Units short of peak cover',stocklp:'Stock last peak',peakcover:'Peak cover',ordovr:'Order qty (with override)',plan:'Qty to place',needby:'Needed by'};
+function bindSeason(tb){const a=$('#v-show',tb),b=$('#v-line',tb);if(a)a.onchange=()=>{vShow=a.value;renderTab()};if(b)b.onchange=()=>{vLine=b.value;renderTab()}}
 function seasonHtml(){
   const d=seasonData(),n=d.n;
   const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Q4 share</th><th>Peak months</th></tr></thead><tbody>${d.lrow.map(l=>
     `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x>=1.5?x.toFixed(2)+'x':'Normal'}</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
-  const lst=`<div class="lscroll"><table class="list"><thead><tr><th>Item</th><th>Promo status</th><th>Next promo</th><th class="num">Last year lift</th><th>Peak weeks (next 12)</th><th>Peak cover</th></tr></thead><tbody>${d.list.map(r=>{
-    const g=k=>pv(k,r),c=k=>pcls(k,g(k));
-    return `<tr class="r" tabindex="0" data-open="${r.id}"><td><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}</div></td><td class="${c('promo')}">${esc(g('promo'))}</td><td>${esc(g('nextpromo'))}</td><td class="num">${g('lift')===''?'—':fv('lift',g('lift'))}</td><td>${esc(g('peakwk'))}</td><td class="${c('peakcover')}">${esc(g('peakcover'))}</td></tr>`}).join('')}</tbody></table></div>`;
+  const pool=(vShow==='peak'?d.items:d.list).filter(r=>vLine==='All Lines'||r.sub===vLine);
+  const num=new Set(['lift','used','bump','peakgap','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return k==='used'?(v===''?'—':fv('used',v)+(pv('ovr',r)!==''?' (override)':'')):num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
+  const lst=`<div class="lscroll tall"><table class="list nwtbl"><thead><tr><th>Item</th>${VCOLS.map(k=>`<th class="${num.has(k)?'num':''}">${VHEAD[k]}</th>`).join('')}</tr></thead><tbody>${pool.map(r=>
+    `<tr class="r" tabindex="0" data-open="${r.id}"><td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}${newToday(r.id)?' · new in today\'s files':''}</div></td>${VCOLS.map(k=>`<td class="${num.has(k)?'num ':''}${pcls(k,pv(k,r))}">${cellV(k,r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const picks=`<div class="row" style="gap:14px;flex-wrap:wrap;margin:6px 0 10px"><label>Show <select id="v-show"><option value="promo" ${vShow==='promo'?'selected':''}>Promo items and thin or short peaks</option><option value="peak" ${vShow==='peak'?'selected':''}>Every item with a peak</option></select></label><label>Line <select id="v-line">${d.lines.map(l=>`<option ${l===vLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label><span class="mute">${pool.length} items</span></div>`;
   return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
   <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
   <h4 class="sub-h">Which Months Are A Peak</h4><p class="mute">A normal month is the middle month of the year. A month that sells 1.5x that or more is a peak and shows its lift, shaded. Every other month is Normal. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
-  <h4 class="sub-h">Items With A Promo Or A Thin Peak</h4><p class="mute">Click a row for the numbers behind it.</p>${lst}
+  <h4 class="sub-h">Items To Check For Peaks And Promos</h4><p class="mute">Read left to right: when the peak weeks are, how big the lift is, how many extra units that means, and whether stock and orders on the way cover it. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
 function accuracyHtml(){
@@ -372,7 +391,9 @@ function drawerHtml(){
 }
 function seasonCard(sku,res){const m=res.metrics,pc=m.peakCover;
   const rows=[['Peak months (last 2 years)',pv('peak',res),'calc'],['Peak weeks in the next 12',pv('peakwk',res),'calc'],
-   ['Lowest stock in those weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Peak cover',pv('peakcover',res),'calc'],
+   ['Lowest stock in those weeks',pc?fmt(pc.minInv)+' units, against '+fmt(pc.safety)+' needed (2 weeks of peak demand)':'—','calc'],['Peak cover',pv('peakcover',res),'calc'],['Units short of peak cover',fv('peakgap',pv('peakgap',res)),'calc'],
+   ['Peak lift (calculated)',pv('peaklift',res)===''?'—':fv('peaklift',pv('peaklift',res)),'calc'],['Peak bump (extra units)',pv('bump',res)===''?'—':fmt(pv('bump',res)),'calc'],['Stock last peak',pv('stocklp',res),'calc'],
+   ['Your peak lift override',pv('ovr',res)===''?'None typed':fv('ovr',pv('ovr',res))+(pv('ovrwhy',res)?' ('+pv('ovrwhy',res)+')':''),'sheet'],['Order qty to place',pv('plan',res)===''?'None typed':fmt(pv('plan',res))+(pv('needby',res)?', needed by '+pv('needby',res):''),'sheet'],
    ['Next promo',pv('nextpromo',res)+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Promo status',pv('promo',res),'calc'],
    ['Promo lift last year',m.promo.lift==null?'—':fv('lift',r3(m.promo.lift)),'calc']];
   return `<div class="card sec" data-g="season-sku"><h3>Season And Promos</h3><div class="ev">${rows.map(e=>`<div>${esc(e[0])}</div><div>${esc(e[1])}${src(e[2])}</div>`).join('')}</div></div>`}

@@ -317,3 +317,5 @@ table.mx{width:100%;border-collapse:collapse;min-width:720px}
 .carry-box{border-left:4px solid var(--brand);padding:10px 14px;border-radius:0 9px 9px 0;margin-bottom:10px}
 #v-sheet .carry-box{background:#eef1fb;color:#1b2430}
 .xt td.prodcol{min-width:230px}
+.xt td.t-drop{background:#ffe5b4;color:#8a4b08;font-weight:700}
+.nwtbl td:not(.icol){white-space:nowrap}

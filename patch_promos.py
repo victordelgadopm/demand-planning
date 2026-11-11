@@ -51,8 +51,8 @@ d['dropped']=[
  {'id':'FD-1996','note':'Spring item, ran out on purpose. Supplier will not rebuy.','date':'Nov 5','plan':0,'by':''},
  {'id':'AC-1992','note':'Replaced by AC-1031 color refresh. Confirm with the buyer before closing.','date':'Nov 4','plan':600,'by':'Dec 1'}]
 d['seedInputs']={
- 'FD-1070':{'ovr':3.2,'why':'Out of stock 3 weeks last peak, so last year understates demand','plan':900,'by':'Nov 20'},
- 'CD-1042':{'ovr':3.4,'why':'Out of stock 3 weeks last peak. Collector fans buy ahead of Dec','plan':700,'by':'Nov 25'},
+ 'FD-1070':{'ovr':3.8,'why':'Out of stock 3 weeks last peak, so last year understates demand','plan':200,'by':'Nov 20'},
+ 'CD-1042':{'ovr':4.0,'why':'Out of stock 3 weeks last peak. Collector fans buy ahead of Dec','plan':250,'by':'Nov 25'},
  'PH-1011':{'plan':2000,'by':'Nov 16'},'FD-1026':{'plan':7000,'by':'Nov 20'},'AC-1010':{'plan':4400,'by':'Nov 22'}}
 json.dump(d,open('data/data.json','w'),separators=(',',':'))
 print('tagged',len(PLAN))
