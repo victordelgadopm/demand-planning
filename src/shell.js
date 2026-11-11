@@ -127,7 +127,7 @@ function recipeItems(){
    ['Data Sources',D.sources.map(s=>s.name).join(', ')],
    ['Checks Run',Object.keys(E.FLAG_LABEL).filter(k=>st.settings.flags[k]).map(k=>E.FLAG_LABEL[k]).join(', ')],
    ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal Calendar tab lists what is calculated, what comes from a file and what is not available.'],
-   ['Notes','Notes never expire. An accepted item comes back only if its gap grows past 1.5 times what was accepted.'],
+   ['Notes','Notes never expire. A comment keeps the alert on. An accepted risk stops the alert and comes back only if its gap grows past 1.5 times what was accepted.'],
    ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
    ['How To Change It','Tell the AI in chat what you are not seeing. It updates this recipe.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
@@ -269,7 +269,7 @@ function downloadXlsx(){
     return sh};
   /* ---- Forecast Accuracy ---- */
   const ac=accRows(),AR=ac.length+1;
-  const accSheet={name:'Forecast Accuracy',widths:[20,9,16,16,12,16,40],freeze:1,rows:[hdr(['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal']),
+  const accSheet={name:'Forecast Accuracy',fit:true,widths:[20,9,16,16,12,16,40],freeze:1,rows:[hdr(['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal']),
     ...ac.map((x,i)=>{const er=i+2;return [{v:x.line,s:'bold'},{v:x.n,s:'int'},{f:`1-D${er}`,v:1-x.w,s:'pct'},{v:x.w,s:'pct'},{v:x.b,s:'pctS'},
       {f:`IF(OR(D${er}>0.35,ABS(E${er})>0.1),"Off target",IF(OR(D${er}>0.25,ABS(E${er})>0.05),"Watch","On target"))`,v:tgtText(x.w,x.b),s:'ctr'},{v:x.sig,s:'txt'}]}),
     [],[{v:'How to read this',s:'bold'}],
@@ -295,7 +295,7 @@ function downloadXlsx(){
   plan.cf.push({ref:`${C(wc0)}2:${C(wcN)}${pl}`,rules:[{type:'expression',dxf:1,formula:`AND($D2="Peak / Promo Weeks",${C(wc0)}2<>"")`}]});
   /* ---- Seasonal Calendar and Promos And Peaks ---- */
   const SD=A.seasonData(),SR=SD.lines.length,sc0=5;
-  const season={name:'Seasonal Calendar',widths:[24,...Array(12).fill(8),10,16],freeze:0,rows:[],merges:[],cf:[]};
+  const season={name:'Seasonal Calendar',fit:true,widths:[24,...Array(12).fill(8),10,16],freeze:0,rows:[],merges:[],cf:[]};
   const sput=(r,c,o)=>{while(season.rows.length<r)season.rows.push([]);season.rows[r-1][c]=o};
   const sspan=(r,c0,c1,o)=>{sput(r,c0,o);for(let c=c0+1;c<=c1;c++)sput(r,c,{v:'',s:o.s});if(c1>c0)season.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
   const LC=14;
@@ -309,7 +309,7 @@ function downloadXlsx(){
   season.cf.push({ref:`B6:M${5+SR}`,rules:[{type:'cellIs',op:'greaterThanOrEqual',dxf:1,formula:'1.5'}]});
   const wr=7+SR;sspan(wr,0,LC,{v:'Where This Comes From',s:'sect'});
   A.SEASON_SRC.forEach((x,i)=>{const r=wr+1+i;sspan(r,0,0,{v:x[0],s:'bold'});sspan(r,1,2,{v:x[1],s:'ctr'});sspan(r,3,LC,{v:x[2],s:'note'});season.rows[r-1].h=40});
-  const promoSheet=mkL(SD.list,'Promos And Peaks',PPK);promoSheet.freezeCols=3;
+  const promoSheet=mkL(SD.list,'Promos And Peaks',PPK);promoSheet.fit=true;promoSheet.freezeCols=3;
   /* ---- Dashboard ---- */
   const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
   const nd=DASHK.length,HC=nd; // helper column index on the dashboard
@@ -362,10 +362,10 @@ function downloadXlsx(){
   dash.cf.push(...cfList(DASHK,first,last));
   dash.freeze=4;
   const sheets=[dash,mkL(sheetRows(rowsMode),'Today',cols),dataSheet,plan,accSheet,season,promoSheet,
-   {name:'Since Yesterday',widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
-   {name:'Notes',widths:[11,30,20,15,20,64,11,9,14],rows:[hdr(['SKU','Product','About','Type','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===8&&t!==''?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
-   {name:'Recipe',widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'How The Tabs Connect',s:'bold'},{v:'Notes are typed on the Notes tab. The Master List pulls each item\'s first note by SKU. Dashboard, Today and Promos And Peaks read every column from the Master List by SKU, and 12-Week Plan and Since Yesterday read their Note column from it. Update the Notes tab or the Master List and those tabs follow. Do not delete or move the SKU column.',s:'txt'}],
-   [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the All Items sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
+   {name:'Since Yesterday',fit:true,widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
+   {name:'Notes',fit:true,widths:[11,30,20,15,20,64,11,9,14],rows:[hdr(['SKU','Product','About','Type','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===8&&t!==''?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
+   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'How The Tabs Connect',s:'bold'},{v:'Notes are typed on the Notes tab. The Master List pulls each item\'s first note by SKU. Dashboard, Today and Promos And Peaks read every column from the Master List by SKU, and 12-Week Plan and Since Yesterday read their Note column from it. Update the Notes tab or the Master List and those tabs follow. Do not delete or move the SKU column.',s:'txt'}],
+   [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
@@ -395,7 +395,7 @@ function renderHome(){
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Prompt Your AI Agent</h2></div><p>Most of the work happens here.</p>
     <ul class="mini"><li>Show examples of sheets you like, for exact formatting</li><li>Blend documents into one custom format</li><li>Explain how to combine the data and what you want out of it. This is also where the voice of the customer (VOC) comes in.</li></ul>
     <button class="btn pri go" data-nav="custom">See Example Prompts</button></div>
-   <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning. It opens on a dashboard of what needs you, with stock counts, weeks of supply and stock-out dates.</p>
+   <div class="card step"><div class="shead"><div class="num">3</div><h2>Get Your Sheet</h2></div><p>A formatted Excel file every morning. It opens on a dashboard of what needs you, with stock counts, weeks of supply, stock-out dates, promo and peak cover, and notes.</p>
     ${miniSheet()}
     <div class="row" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri go" data-nav="sheet">See The Sheet</button><button class="btn dl go" id="h-dl">Download Sheet</button></div></div>
    <div class="card step"><div class="shead"><div class="num">4</div><h2>Customize</h2><span class="optl">Optional, anytime</span></div><p>Tell the agent what you are not seeing or want to change. It can always be adjusted.</p>
