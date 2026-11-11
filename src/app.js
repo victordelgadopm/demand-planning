@@ -10,7 +10,8 @@ const TICON={'At risk':'▲','Medium':'◆','Watch':'◉','Overstocked':'■','N
 const DEC={order_more:['Order more or expedite','Stock will run short'],too_much:['Too much stock','Cash tied up in stock'],forecast_off:['Forecast looks off','Sales moving away from plan'],check_data:['Check the data','Something looks wrong in a source']};
 const SRC={planning:'Planning system',bi:'Reporting tool',sharepoint:'Shared file',calc:'Calculated'};
 const REASONS=['Budget','Focus is on another line','Supplier constraint','Planned promo change','Other'],CREASONS=['Supplier update','Promo update','Waiting on Sales','Data issue','Follow-up','Other'];
-function noteFor(id){const n=Object.values(E.activeNotes(st.notes)).filter(x=>x.sku===id).sort((a,b)=>a.id-b.id)[0];return n?{topic:E.NOTE_LABEL[n.flag]||n.flag,reason:n.reason,text:n.text,line:n.reason+': '+n.text}:null}
+function noteFor(id){const ns=Object.values(E.activeNotes(st.notes)).filter(x=>x.sku===id).sort((a,b)=>a.id-b.id);if(!ns.length)return null;const l=ns[ns.length-1];
+  return {topic:E.NOTE_LABEL[l.flag]||l.flag,reason:l.reason,text:l.text,by:l.who,date:l.date,line:ns.map(n=>n.reason+': '+n.text).join(' | ')}}
 const DEFSET={...E.DEFAULTS,flags:{...E.DEFAULTS.flags},minDollars:0,tierNames:{},cols:{sub:true,conf:true,dollars:true},profile:'Planner'};
 const RULES={
  missed_order:['Missed order','Nothing is on order or in transit and projected stock goes below zero. Critical when that happens inside the supplier lead time plus how late they usually run.'],
@@ -107,7 +108,7 @@ function renderApp(){
      <div class="t">${DEC[k][0]}</div><div class="n">${it.length}</div><div class="d">${DEC[k][1]}</div>
      <div class="h">${d>0?money(d)+' at stake':'&nbsp;'}</div></button>`}).join('');
   $('#app').innerHTML=`<div class="pg-h"><h1>Visual View</h1><span class="datepill">${st.snap==='today'?'Today, '+esc(TODAY_LONG):'Yesterday (comparison)'}</span></div>
-   <p class="pg-sub">The same results as the Daily Sheet, shown as cards you can click. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list.</p>${health}${snapHtml}${sinceHtml()}
+   <p class="pg-sub">The same results as the Daily Sheet's Dashboard, shown as cards you can click, with the same Decision and Status choices and the same columns. Open any item to add a note, and that note shows in the Daily Sheet's Master List too. Five sections: the data check, the portfolio snapshot, what changed, the decisions to make, and the item list.</p>${health}${snapHtml}${sinceHtml()}
    <h2 class="sec-h" style="margin-top:6px">Decisions To Make Today</h2><p class="sec-sub">Each box counts the items that need one kind of decision, for the status chosen below, the same as the four boxes on the Daily Sheet dashboard. Tap a box to filter the list.</p>
    <div class="decisions" data-g="decisions">${dsum}</div>
    <h2 class="sec-h" style="margin-top:20px">Items To Review</h2><p class="sec-sub">Every item with the reason it was flagged. Click a row for the numbers behind it. $ At stake is the unit gap times the unit price: units we would be short, units we hold in excess, or units the forecast is off by. The tabs switch between items that need attention, risks you accepted, forecast accuracy, and seasonality and promos.</p>

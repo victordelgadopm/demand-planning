@@ -2,7 +2,7 @@
 'use strict';
 const A=window.__app,E=A.E,D=A.D,st=A.st,esc=A.esc,money=A.money;
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
-const CK='dpa.cols.v3';
+const CK='dpa.cols.v4';
 /* ---------- columns ---------- */
 const OWN={Fashion:'Planner A',Collector:'Planner B',Small:'Planner C',Baby:'Planner A',"Playsets & Houses":'Planner B',Accessories:'Planner C'};
 const TODO={order_more:'Place or expedite an order',too_much:'Pause new orders and review promos',forecast_off:'Review the forecast',check_data:'Fix the source data first'};
@@ -39,11 +39,15 @@ const COLS={
  promo:{h:'Promo Status',w:18,src:'from the Shared file (the promo calendar) and last year\'s tagged promo weeks'},
  nextpromo:{h:'Next Promo',w:22,src:'from the Shared file: the next promo week on the calendar and whether it is confirmed'},
  lift:{h:'Promo Lift (Last Year)',w:12,num:'pctS',src:'calculated: last year\'s promo weeks compared with the normal weeks around them'},
+ decision:{h:'Decision',w:21,src:'calculated: the action the item needs (order more, too much stock, forecast looks off, check the data)'},
+ attn:{h:'Needs Attention',w:11,src:'calculated: Yes when any check flagged the item today'},
+ noteby:{h:'Noted By',w:13,src:'typed in the Master List next to the note'},
+ notedate:{h:'Note Date',w:11,src:'typed in the Master List next to the note'},
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
- note:{h:'Note',w:48,wide:1,src:'from the notes you save on each item'}};
-const DEFAULT=['status','sku','product','sub','onhand','onorder','wos','fcstwk','salesvs','stockout','gap','dollars','going','note','conf'];
-const FULLK=['status','sku','product','sub','abc','supplier','owner','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note'];
-const DASHK=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','note','conf'];
+ note:{h:'Note',w:48,wide:1,src:'typed in the Master List, one note per item'}};
+const DEFAULT=['status','sku','product','onhand','onorder','wos','fcstwk','salesvs','stockout','nextarr','peakcover','nextpromo','gap','dollars','going','note','conf'];
+const MASTER='Master List (Work Here)',INK=['note','noteby','notedate'],MINCOLS=12;
+const FULLK=['status','sku','product','sub','decision','attn','abc','supplier','owner','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','ly','peak','peakwk','peakcover','promo','nextpromo','lift','wos','lt','stockout','orderby','nextarr','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','note','noteby','notedate'];
 const DH={onhand:'On Hand',onorder:'On Order',wos:'Wks Of Supply',fcstwk:'Fcst / Wk',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=(function(){try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(Array.isArray(c)&&c.every(k=>COLS[k]))return c}catch(e){}return DEFAULT.slice()})();
@@ -61,7 +65,8 @@ function val(k,r){
    case 'lt':return m.lt&&m.lt.q!=null?m.lt.q:'';
    case 'ly':return Math.round(m.lyRaw||0);
    case 'supplier':return sk?sk.supplier:'';case 'owner':return OWN[r.sub]||'Planner A';
-   case 'note':return n?n.line:'';}
+   case 'note':return n?n.line:'';case 'noteby':return n?n.by:'';case 'notedate':return n?n.date:'';
+   case 'decision':return r.decision?A.DEC[r.decision][0]:'No decision needed';case 'attn':return r.headline?'Yes':'No';}
   return '';
 }
 function sheetRows(mode){
@@ -79,20 +84,20 @@ function dashHtml(){
   const all=sheetRows('all'),rows=all.filter(dashMatch);
   const boxes=DECKEYS.map((k,i)=>{const lab=DECL[i],it=all.filter(r=>dName(r)===lab&&statOK(r));
     return `<div class="dbox${dashDec===lab?' sel':''}"><div class="dbt">${esc(lab)}</div><div class="dbn">${it.length}</div><div class="dbs">${money(sumD(it))} at stake</div></div>`}).join('');
-  const head=DASHK.map(k=>`<th class="${COLS[k].num?'money':''}">${esc(dh(k))}</th>`).join('');
-  const body=rows.map(r=>`<tr data-open="${r.id}" tabindex="0">${DASHK.map(k=>{const v=val(k,r),C=COLS[k];
+  const head=cols.map(k=>`<th class="${COLS[k].num?'money':''}">${esc(dh(k))}</th>`).join('');
+  const body=rows.map(r=>`<tr data-open="${r.id}" tabindex="0">${cols.map(k=>{const v=val(k,r),C=COLS[k];
     if(k==='status')return `<td class="st ${TCLASS[r.tier]||'t-ok'}">${esc(v)}</td>`;
     if(C.num)return `<td class="money ${A.pcls(k,v)}">${esc(A.fv(k,v))}</td>`;
     return `<td class="${k==='going'?'wide':(k==='sku'||k==='conf'||k==='nextarr'?'c':'')} ${A.pcls(k,v)}">${esc(String(v))}</td>`}).join('')}</tr>`).join('');
   return `<div class="dash"><h3>Daily Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
-   <p class="dnote">Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells. The four boxes count the items for the status you picked, and the list rebuilds itself. This is the same dashboard that opens first in the downloaded sheet.</p>
+   <p class="dnote">Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. To act on what you see, go to the Master List (Work Here) and filter to the same choices. This is the same dashboard that opens first in the downloaded sheet.</p>
    <div class="dpick"><label>Decision <select id="dd">${[ALLD,...DECL].map(o=>`<option ${o===dashDec?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
    <label>Status <select id="ds">${STAT().map(o=>`<option ${o===dashStat?'selected':''}>${esc(o)}</option>`).join('')}</select></label></div>
    <div class="dboxes">${boxes}</div>
    <div class="dsec">Portfolio Snapshot <span>All items, not filtered by the picks above</span></div>
    <div class="snap dsnap">${A.snapTiles().map(([t,n,sub])=>`<div class="snapt"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>
    <div class="dcount">Items matching your choices: <b>${rows.length}</b><span class="dsep">·</span>Total $ at stake: <b>${money(sumD(rows))}</b><span class="dsep">·</span>No decision needed: <b>${rows.filter(r=>!r.decision).length}</b></div>
-   <div class="xl-scroll"><table class="xt dtab"><thead><tr class="heads">${head}</tr></thead><tbody>${body||`<tr><td colspan="${DASHK.length}">Nothing matches these choices.</td></tr>`}</tbody></table></div>
+   <div class="xl-scroll"><table class="xt dtab"><thead><tr class="heads">${head}</tr></thead><tbody>${body||`<tr><td colspan="${cols.length}">Nothing matches these choices.</td></tr>`}</tbody></table></div>
    <p class="dfoot">$ At Stake is the unit gap times the unit price. Unit gap is units short for Order more, units over for Too much stock, and units the forecast is off by for Forecast looks off. Red weeks of supply is under 4, purple is over ${st.settings.overstockWOS}. Amber sales vs forecast is 15% or more either way.</p></div>`;
 }
 /* ---------- since / notes / recipe data ---------- */
@@ -122,12 +127,12 @@ const DEFS=[
  ['Promo Lift (Last Year)','Last year\'s promo weeks compared with the normal weeks around them.'],
  ['12-Week Plan','Projected On Hand each week is last week plus receipts minus forecast demand. Red means below zero. Lowest Point is the lowest projected week. The Peak / Promo Weeks row marks PEAK weeks, PROMO weeks (PROMO? if not confirmed) and BOTH.']];
 function recipeItems(){
-  return [['Rows Shown','Items that need attention, ranked by status then dollars. Switch to all items any time.'],
-   ['Columns',cols.map(k=>COLS[k].h).join(', ')],
+  return [['Rows Shown','The Master List holds every item, with the ones that need attention first, ranked by status then dollars. The Dashboard starts on the items that need attention.'],
+   ['Dashboard Columns',cols.map(k=>COLS[k].h).join(', ')+'. The Master List always holds every column.'],
    ['Data Sources',D.sources.map(s=>s.name).join(', ')],
    ['Checks Run',Object.keys(E.FLAG_LABEL).filter(k=>st.settings.flags[k]).map(k=>E.FLAG_LABEL[k]).join(', ')],
    ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal Calendar tab lists what is calculated, what comes from a file and what is not available.'],
-   ['Notes','Notes never expire. A comment keeps the alert on. An accepted risk stops the alert and comes back only if its gap grows past 1.5 times what was accepted.'],
+   ['Notes','Notes never expire. Type one note per item in the Master List. In the app, a comment keeps the alert on and an accepted risk stops it, coming back only if its gap grows past 1.5 times what was accepted.'],
    ['Schedule','Every morning after the files refresh (sample: 6:05 AM)'],
    ['How To Change It','Tell the AI in chat what you are not seeing. It updates this recipe.'],
    ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
@@ -152,12 +157,12 @@ function gridHtml(heads,rows,o){
    <tr class="heads"><th class="rn">1</th>${heads.map(h=>`<th class="${h.cls||''}">${esc(h.t)}</th>`).join('')}</tr></thead>
    <tbody>${rows.length?rows.map((r,i)=>`<tr ${r.id?`data-open="${r.id}" tabindex="0"`:''}><td class="rn">${i+2}</td>${r.c.map(c=>`<td class="${c.cls||''}">${esc(c.t)}</td>`).join('')}</tr>`).join(''):`<tr><td class="rn">2</td><td colspan="${heads.length}">${esc(o.empty||'Nothing here.')}</td></tr>`}</tbody></table></div>`;
 }
-function colGrid(keys,rows,empty){
-  const heads=keys.map(k=>({t:COLS[k].h,cls:COLS[k].num?'money':''}));
+function colGrid(keys,rows,empty,inp){
+  inp=inp||[];const heads=keys.map(k=>({t:inp.includes(k)?COLS[k].h+' (Type Here)':COLS[k].h,cls:(COLS[k].num?'money':'')+(inp.includes(k)?' inp':'')}));
   const body=rows.map(r=>({id:r.id,c:keys.map(k=>{const v=val(k,r),C=COLS[k];
     if(k==='status')return {t:v,cls:'st '+TCLASS[r.tier]};
     if(C.num)return {t:A.fv(k,v),cls:'money '+A.pcls(k,v)};
-    return {t:String(v),cls:(C.wide?'wide ':'')+A.pcls(k,v)}})}));
+    return {t:String(v),cls:(C.wide?'wide ':'')+(inp.includes(k)?'inp ':'')+A.pcls(k,v)}})}));
   return {html:gridHtml(heads,body,{empty}),n:rows.length};
 }
 function planGrid(rows){
@@ -171,6 +176,7 @@ function planGrid(rows){
     body.push({id:r.id,c:[...id(0),{t:'Peak / Promo Weeks'},{t:''},...b.mark.map(v=>({t:v,cls:v?'warn':''})),{t:''},{t:''},{t:''}]})});
   return {html:gridHtml(heads,body,{empty:'Nothing needs attention.'}),n:rows.length};
 }
+const NK=['status','sku','product','note','noteby','notedate','going'];
 const PPK=['status','sku','product','sub','promo','nextpromo','lift','peak','peakwk','peakcover','going','note'];
 const SEASON_KEY='How to read this: 1.00x is a normal month. 1.50x or more is a peak and is shaded. Q4 Share is the part of the year\'s sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak.';
 const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short.`;
@@ -184,29 +190,34 @@ function accGrid(){
   const rows=accRows(),heads=['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal'].map((t,i)=>({t,cls:i>=1&&i<=4?'money':''}));
   return {html:gridHtml(heads,rows.map(x=>({c:[{t:x.line,cls:'bold'},{t:String(x.n),cls:'money'},{t:A.pctN(1-x.w),cls:'money'},{t:A.pctN(x.w),cls:'money'},{t:A.pctSN(x.b),cls:'money'},{t:tgtText(x.w,x.b),cls:({'On target':'','Watch':'warn','Off target':'bad'})[tgtText(x.w,x.b)]},{t:x.sig,cls:'wide'}]}))),n:rows.length-1};
 }
-const TABS=[['dash','Dashboard'],['today','Today'],['all','Master List'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
+const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['season','Seasonal Calendar'],['promos','Promos And Peaks'],['since','Since Yesterday'],['notes','Notes'],['recipe','Recipe']];
+function roleHtml(){
+  if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type notes in the green columns. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div>`;
+  if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div>`;
+  if(tab==='recipe')return '';
+  return `<div class="role"><b>View only.</b> This tab reads from the Master List, so make changes there. It is locked so typing here does not get lost (in Excel: Review, then Unprotect Sheet, no password).</div>`;
+}
 function renderSheet(){
   const v=$('#v-sheet'),total=st.res.total;
   let inner,count='';
   if(tab==='dash'){inner=dashHtml();count='Interactive'}
-  else if(tab==='today'){const g=colGrid(cols,sheetRows(rowsMode),'Nothing needs attention.');inner=g.html;count=`${g.n} of ${total} items`}
-  else if(tab==='all'){const g=colGrid(FULLK,sheetRows('all'));inner=g.html;count=`${g.n} items, every column`}
+  else if(tab==='all'){const g=colGrid(FULLK,sheetRows('all'),null,INK);inner=g.html;count=`${g.n} items, every column`}
   else if(tab==='plan'){const g=planGrid(sheetRows(rowsMode));inner=g.html;count=`${g.n} items, ${E.H} weeks`}
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
   else if(tab==='season'){inner=seasonGrid();count='12 months, by line'}
   else if(tab==='promos'){const d=A.seasonData(),g=colGrid(PPK,d.list);inner=g.html;count=`${g.n} items with a promo or a thin peak`}
   else if(tab==='since'){const it=sinceItems();inner=gridHtml(['Change','Product','SKU','Detail','Note'].map(t=>({t})),it.map(r=>({id:r[2],c:[...r.map(t=>({t})),{t:val('note',A.rowOf(r[2])),cls:'wide'}]})),{empty:'Nothing changed since yesterday.'});count=it.length+' changes'}
-  else if(tab==='notes'){const it=noteItems();inner=gridHtml(['SKU','Product','About','Type','Reason','Note','Who','Date','Accepted Gap (Units)'].map(t=>({t})),it.map(r=>({id:r[0],c:r.map((t,i)=>({t:String(t),cls:i===5?'wide':''}))})),{empty:'No notes yet.'});count=it.length+' notes'}
+  else if(tab==='notes'){const g=colGrid(NK,sheetRows('all').filter(r=>A.noteFor(r.id)),'No notes yet.');inner=g.html;count=g.n+' notes'}
   else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Daily Sheet</h1></div>
    <p class="pg-sub">This is what lands in your Excel file every morning. Click any row to see the numbers behind it. The download opens in Excel with the same colors and formatting, on an interactive Dashboard where the yellow dropdowns change the boxes and the list.</p>
    <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Daily Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
-    ${tab==='today'||tab==='plan'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
+    ${tab==='plan'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
     <button class="btn sm" id="sh-custom">Add or remove columns</button>
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
-   ${inner}
-   <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <p class="sec-sub" style="margin:10px 0 0"><b>Tabs at the bottom:</b> Dashboard opens first. Today lists what needs you, with the columns you chose. Master List is the primary tab: it has every item and every column, and Dashboard, Today and Promos And Peaks read from it, so a change there shows up in all three. 12-Week Plan projects stock week by week. Forecast Accuracy shows how the forecast has done by line. Since Yesterday is what changed. Notes is where notes are typed, and the Master List pulls each item's note from it, so the Note column on every tab follows. Recipe explains how the sheet is built and defines every column.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   ${roleHtml()}${inner}
+   <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" class="${k==='all'?'work':k==='dash'?'front':''}" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
+   <p class="sec-sub" style="margin:10px 0 0"><b>How the tabs fit together:</b> You work in one place, the green Master List (Work Here) tab. Filter it and type your notes there. Every other tab only reads from it, so they update when it does, and they are locked so nothing typed in them gets lost. The Dashboard is where you look things over first: it is the same list, easier to see.</p><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
@@ -236,28 +247,26 @@ function downloadXlsx(){
     const data=rows.map(r=>keys.map(k=>cellOf(k,r)));
     return {name,widths:keys.map(k=>COLS[k].w),rows:[hdr(keys.map(k=>COLS[k].h)),...data],freeze:1,filter:data.length+1,cf:cfList(keys,2,data.length+1)};
   };
-  const since=sinceItems(),notes=noteItems(),rec=recipeItems();
+  const since=sinceItems(),rec=recipeItems(),DK=cols.slice();
   const allRows=sheetRows('all'),N=allRows.length;
   const STATL=STAT(),D0=dashDec,S0=dashStat;
-  /* ---- Master List: every item, every column, plus four hidden helper columns that drive the dashboard ---- */
+  /* ---- Master List (Work Here): every item, every column, plus two hidden helper columns that drive the dashboard ---- */
   const nf=FULLK.length,ix=k=>FULLK.indexOf(k);
-  const HELP=['Decision','Needs Attention','Status Match','Show'];
-  const dataSheet=mk(allRows,'Master List',FULLK);
-  dataSheet.freezeCols=3;
+  const HELP=['Status Match','Show'];
+  const dataSheet=mk(allRows,MASTER,FULLK);
+  dataSheet.tab='FF2E7D32';dataSheet.freezeCols=3;
+  /* the three green columns are the only place anyone types */
+  INK.forEach(k=>{const c=ix(k);dataSheet.rows[0][c]={v:COLS[k].h+' (Type Here)',s:'headIn'};allRows.forEach((r,i)=>{dataSheet.rows[i+1][c]={v:val(k,r),s:'inp'}})});
   dataSheet.rows[0].push(...HELP.map(t=>({v:t,s:'head'})));
-  const hL=i=>C(nf+i),sCol=C(ix('status'));
+  const hL=i=>C(nf+i),sCol=C(ix('status')),aCol=C(ix('attn')),dCol=C(ix('decision'));
   let run=0;const showVal=allRows.map(r=>dashMatch(r)?++run:'');
   allRows.forEach((r,i)=>{const row=dataSheet.rows[i+1],er=i+2;
-    row.push({v:dName(r),s:'txt'},{v:r.headline?'Yes':'No',s:'txt'},
-     {f:`IF(OR(Dashboard!$F$4="All statuses",AND(Dashboard!$F$4="Needs attention",${hL(1)}${er}="Yes"),${sCol}${er}=Dashboard!$F$4),1,0)`,v:statOK(r)?1:0,s:'txt'},
-     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${hL(0)}${er}=Dashboard!$B$4),${hL(2)}${er}=1),MAX(${hL(3)}$1:${hL(3)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
+    row.push({f:`IF(OR(Dashboard!$F$4="All statuses",AND(Dashboard!$F$4="Needs attention",${aCol}${er}="Yes"),${sCol}${er}=Dashboard!$F$4),1,0)`,v:statOK(r)?1:0,s:'txt'},
+     {f:`IF(AND(OR(Dashboard!$B$4="${ALLD}",${dCol}${er}=Dashboard!$B$4),${hL(0)}${er}=1),MAX(${hL(1)}$1:${hL(1)}${er-1})+1,"")`,v:showVal[i],s:'txt'})});
   dataSheet.widths=[...dataSheet.widths,...HELP.map(()=>14)];
   dataSheet.hide=HELP.map((_,i)=>nf+i);
-  const rng=k=>{const c=C(typeof k==='number'?nf+k:ix(k));return `'Master List'!$${c}$2:$${c}$${N+1}`};
-  const rDec=rng(0),rAtt=rng(1),rSM=rng(2),rShow=rng(3);
-  /* Notes are typed on the Notes tab. The Master List pulls each item's first note by SKU, and every other tab pulls it from the Master List. */
-  const NA='Notes!$A$2:$A$500',NE='Notes!$E$2:$E$500',NF='Notes!$F$2:$F$500',skuC=C(ix('sku')),noteI=ix('note');
-  allRows.forEach((r,i)=>{const er=i+2;dataSheet.rows[i+1][noteI]={f:`IFERROR(INDEX(${NE},MATCH($${skuC}${er},${NA},0))&": "&INDEX(${NF},MATCH($${skuC}${er},${NA},0)),"")`,v:val('note',r),s:'txt'}});
+  const rng=k=>{const c=C(typeof k==='number'?nf+k:ix(k));return `'${MASTER}'!$${c}$2:$${c}$${N+1}`};
+  const rDec=rng('decision'),rAtt=rng('attn'),rSM=rng(0),rShow=rng(1);
   const TN0=['At risk','Medium','Watch','Overstocked','No risk'];
   /* list tabs that read every cell from the Master List by SKU */
   const mkL=(rows,name,keys)=>{const si=keys.indexOf('sku');if(si<0)return mk(rows,name,keys);const sc=C(si),skuR=rng('sku');
@@ -312,18 +321,18 @@ function downloadXlsx(){
   const promoSheet=mkL(SD.list,'Promos And Peaks',PPK);promoSheet.fit=true;promoSheet.freezeCols=3;
   /* ---- Dashboard ---- */
   const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:15,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
-  const nd=DASHK.length,HC=nd; // helper column index on the dashboard
-  const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:[...DASHK.map(k=>DW[k]),6],hide:[HC],rows:[],merges:[],cf:[],dv:[]};
+  const nd=DK.length,HC=nd; // helper column index on the dashboard
+  const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:[...DK.map(k=>DW[k]||COLS[k].w),6],hide:[HC],rows:[],merges:[],cf:[],dv:[]};
   const R=n=>{while(dash.rows.length<n)dash.rows.push([]);return dash.rows[n-1]};
   const put=(r,c,o)=>{R(r)[c]=o};
   const fill=(r,c0,c1,sty)=>{for(let c=c0;c<=c1;c++)if(!R(r)[c])put(r,c,{v:'',s:sty})};
   const span=(r,c0,c1,o)=>{put(r,c0,o);fill(r,c0+1,c1,o.s);if(c1>c0)dash.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
   span(1,0,nd-1,{v:'Daily Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
-  span(2,0,nd-1,{v:'Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells. The four boxes count the items for the status you picked, and the list rebuilds itself. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first.',s:'note'});R(2).h=34;
+  span(2,0,nd-1,{v:'VIEW ONLY. Look things over here, then do the work on the green Master List (Work Here) tab and filter it to the same Decision and Status. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first.',s:'note'});R(2).h=34;
   put(4,0,{v:'Decision',s:'label'});span(4,1,2,{v:D0,s:'pick'});
   span(4,3,4,{v:'Status',s:'label'});span(4,5,7,{v:S0,s:'pick'});R(4).h=24;
   dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[ALLD,...DECL].join(',')+'"'},{ref:'F4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STATL.join(',')+'"'});
-  const BOX=[[0,2],[3,7],[8,11],[12,nd-1]];
+  const q4=i=>[Math.round(i*nd/4),Math.round((i+1)*nd/4)-1],BOX=[0,1,2,3].map(q4),t6=i=>[Math.round(i*nd/6),Math.round((i+1)*nd/6)-1];
   BOX.forEach(([c0,c1],i)=>{const lab=DECL[i],it=allRows.filter(r=>dName(r)===lab&&statOK(r)),dol=sumD(it);
     span(6,c0,c1,{v:lab,s:'boxT'});
     span(7,c0,c1,{f:`COUNTIFS(${rDec},${C(c0)}6,${rSM},1)`,v:it.length,s:'boxN'});
@@ -335,37 +344,41 @@ function downloadXlsx(){
   span(10,0,nd-1,{v:'Portfolio Snapshot (all items, not filtered by the picks above)',s:'sect'});R(10).h=22;
   const sumP=allRows.reduce((t,r)=>t+r.metrics.onHand*r.price,0);
   const TILE=[
-   [[0,1],'Items Tracked',{f:`COUNTA(${rng('sku')})`,v:K.items,s:'boxN'},{f:`COUNTIF(${rAtt},"Yes")&" need attention today"`,v:attn+' need attention today'}],
-   [[2,2],'Units On Hand',{f:`SUM(${rng('onhand')})`,v:K.onHand,s:'boxN'},{f:`TEXT(SUMPRODUCT(${rng('onhand')},${rng('price')})/1000000,"$0.00")&"M at unit price"`,v:'$'+(sumP/1e6).toFixed(2)+'M at unit price'}],
-   [[3,5],'On Order',{f:`SUM(${rng('transit')})+SUM(${rng('openpo')})`,v:K.transit+K.openPO,s:'boxN'},{f:`TEXT(SUM(${rng('transit')}),"#,##0")&" transit + "&TEXT(SUM(${rng('openpo')}),"#,##0")&" PO"`,v:E.fmtNum(K.transit)+' transit + '+E.fmtNum(K.openPO)+' PO'}],
-   [[6,8],'Weeks Of Supply',{f:`(SUM(${rng('onhand')})+SUM(${rng('transit')}))/SUM(${rng('fcstwk')})`,v:K.wos,s:'boxN1'},{f:`COUNTIFS(${rng('wos')},"<4",${rng('onhand')},">=0",${rng('fcstwk')},">0")&" items under 4 weeks, "&COUNTIF(${rng('wos')},">${ovr}")&" over ${ovr}"`,v:K.lowCover+' items under 4 weeks, '+K.highCover+' over '+ovr}],
-   [[9,11],'Forecast Accuracy',{f:"'Forecast Accuracy'!C2",v:1-AC.wmape,s:'boxPct'},{f:`"Miss (WMAPE) "&TEXT('Forecast Accuracy'!D2,"0.0%")&", last 13 weeks"`,v:'Miss (WMAPE) '+(AC.wmape*100).toFixed(1)+'%, last 13 weeks'}],
-   [[12,nd-1],'Forecast Bias',{f:"'Forecast Accuracy'!E2",v:AC.bias,s:'boxPctS'},{f:`IF('Forecast Accuracy'!E2<0,"Forecast runs low (sales beat it)","Forecast runs high")`,v:AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high'}]];
+   [t6(0),'Items Tracked',{f:`COUNTA(${rng('sku')})`,v:K.items,s:'boxN'},{f:`COUNTIF(${rAtt},"Yes")&" need attention today"`,v:attn+' need attention today'}],
+   [t6(1),'Units On Hand',{f:`SUM(${rng('onhand')})`,v:K.onHand,s:'boxN'},{f:`TEXT(SUMPRODUCT(${rng('onhand')},${rng('price')})/1000000,"$0.00")&"M at unit price"`,v:'$'+(sumP/1e6).toFixed(2)+'M at unit price'}],
+   [t6(2),'On Order',{f:`SUM(${rng('transit')})+SUM(${rng('openpo')})`,v:K.transit+K.openPO,s:'boxN'},{f:`TEXT(SUM(${rng('transit')}),"#,##0")&" transit + "&TEXT(SUM(${rng('openpo')}),"#,##0")&" PO"`,v:E.fmtNum(K.transit)+' transit + '+E.fmtNum(K.openPO)+' PO'}],
+   [t6(3),'Weeks Of Supply',{f:`(SUM(${rng('onhand')})+SUM(${rng('transit')}))/SUM(${rng('fcstwk')})`,v:K.wos,s:'boxN1'},{f:`COUNTIFS(${rng('wos')},"<4",${rng('onhand')},">=0",${rng('fcstwk')},">0")&" items under 4 weeks, "&COUNTIF(${rng('wos')},">${ovr}")&" over ${ovr}"`,v:K.lowCover+' items under 4 weeks, '+K.highCover+' over '+ovr}],
+   [t6(4),'Forecast Accuracy',{f:"'Forecast Accuracy'!C2",v:1-AC.wmape,s:'boxPct'},{f:`"Miss (WMAPE) "&TEXT('Forecast Accuracy'!D2,"0.0%")&", last 13 weeks"`,v:'Miss (WMAPE) '+(AC.wmape*100).toFixed(1)+'%, last 13 weeks'}],
+   [t6(5),'Forecast Bias',{f:"'Forecast Accuracy'!E2",v:AC.bias,s:'boxPctS'},{f:`IF('Forecast Accuracy'!E2<0,"Forecast runs low (sales beat it)","Forecast runs high")`,v:AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high'}]];
   TILE.forEach(([[c0,c1],t,val_,sub])=>{span(11,c0,c1,{v:t,s:'boxT'});span(12,c0,c1,val_);span(13,c0,c1,Object.assign({s:'boxS'},sub))});
   R(11).h=22;R(12).h=40;R(13).h=20;
   /* totals line + list header */
   const first=17,last=16+N,matched0=allRows.filter(dashMatch);
   span(15,0,2,{v:'Items matching your choices:',s:'label'});put(15,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
-  span(15,4,6,{v:'Total $ at stake:',s:'label'});put(15,7,{f:`SUM(${C(DASHK.indexOf('dollars'))}${first}:${C(DASHK.indexOf('dollars'))}${last})`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(15,8,10,{v:'No decision needed:',s:'label'});put(15,11,{f:'IF($B$4="All decisions",D15-A7-D7-I7-M7,0)',v:matched0.filter(r=>!r.decision).length,s:'int'});R(15).h=24;
-  DASHK.forEach((k,c)=>put(16,c,{v:dh(k),s:'head'}));R(16).h=34;
-  const STY={status:'ctr',sku:'ctr',product:'txt',onhand:'int',onorder:'int',wos:'dec1',fcstwk:'int',salesvs:'pctS',stockout:'ctr',nextarr:'ctr',peakcover:'ctr',nextpromo:'ctr',gap:'int',dollars:'money0',going:'txt',note:'txt',conf:'ctr'};
+  span(15,4,6,{v:'Total $ at stake:',s:'label'});put(15,7,{f:`SUMIFS(${rng('dollars')},${rShow},">0")`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(15,8,10,{v:'No decision needed:',s:'label'});put(15,11,{f:`IF($B$4="All decisions",D15-${BOX.map(b=>C(b[0])+'7').join('-')},0)`,v:matched0.filter(r=>!r.decision).length,s:'int'});R(15).h=24;
+  DK.forEach((k,c)=>put(16,c,{v:dh(k),s:'head'}));R(16).h=34;
+  const CTRK=new Set(['status','sku','stockout','orderby','nextarr','peakcover','promo','nextpromo','peak','peakwk','abc','attn','gaptype','conf','noteby','notedate']),STY=new Proxy({dollars:'money0'},{get:(o,k)=>o[k]||(CTRK.has(k)?'ctr':COLS[k]&&COLS[k].num||'txt')});
   const matched=allRows.filter(dashMatch);
   for(let i=0;i<N;i++){const row=first+i,src=matched[i],hc=`$${C(HC)}${row}`;
     put(row,HC,{f:`IFERROR(MATCH(${i+1},${rShow},0),"")`,v:src?i+1+0:'',s:'txt'});
-    DASHK.forEach((k,c)=>{const rg=rng(k);let v=src?val(k,src):'';if(k==='dollars'&&src)v=Math.round(src.dollars>0?src.dollars:0);
+    DK.forEach((k,c)=>{const rg=rng(k);let v=src?val(k,src):'';if(k==='dollars'&&src)v=Math.round(src.dollars>0?src.dollars:0);
       put(row,c,{f:`IF(${hc}="","",IF(INDEX(${rg},${hc})="","",INDEX(${rg},${hc})))`,v:v,s:STY[k]})});
     R(row).h=46}
   // helper cell shows the position in the Master List, not the running number
   matched.forEach((r,i)=>{R(first+i)[HC].v=allRows.indexOf(r)+1});
   const TN=['At risk','Medium','Watch','Overstocked','No risk'];
   dash.cf.push({ref:`A${first}:A${last}`,rules:TN.map((t,i)=>({type:'cellIs',op:'equal',dxf:i,formula:`"${A.tn(t)}"`}))});
-  dash.cf.push(...cfList(DASHK,first,last));
+  dash.cf.push(...cfList(DK,first,last));
   dash.freeze=4;
-  const sheets=[dash,mkL(sheetRows(rowsMode),'Today',cols),dataSheet,plan,accSheet,season,promoSheet,
+  const notesSheet=mkL(allRows.filter(r=>A.noteFor(r.id)),'Notes',NK);
+  const sheets=[dash,dataSheet,plan,accSheet,season,promoSheet,
    {name:'Since Yesterday',fit:true,widths:[16,32,11,70,46],rows:[hdr(['Change','Product','SKU','Detail','Note']),...since.map((r,i)=>[...r.map(t=>({v:t,s:'txt'})),{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($C${i+2},${rng('sku')},0))),"")`,v:val('note',A.rowOf(r[2])),s:'txt'}])],freeze:1},
-   {name:'Notes',fit:true,widths:[11,30,20,15,20,64,11,9,14],rows:[hdr(['SKU','Product','About','Type','Reason','Note','Who','Date','Accepted Gap (Units)']),...notes.map(r=>r.map((t,i)=>i===8&&t!==''?{v:t,s:'int'}:{v:t,s:'txt'}))],freeze:1},
-   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'How The Tabs Connect',s:'bold'},{v:'Notes are typed on the Notes tab. The Master List pulls each item\'s first note by SKU. Dashboard, Today and Promos And Peaks read every column from the Master List by SKU, and 12-Week Plan and Since Yesterday read their Note column from it. Update the Notes tab or the Master List and those tabs follow. Do not delete or move the SKU column.',s:'txt'}],
+   notesSheet,
+   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the green Master List (Work Here) tab. It is the only tab you type in: filter any column, and type notes in the three green columns. Every other tab reads from it, so a note typed there shows on the Dashboard, 12-Week Plan, Promos And Peaks, Since Yesterday and Notes tabs. Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
+   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: each morning the run builds a new file. In the real setup the run reads the Note columns back from yesterday\'s file first, so notes carry forward.',s:'txt'}],
+   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Promos And Peaks and Notes lists update as soon as you change the Master List. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the morning run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
    [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
+  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Promos And Peaks'].includes(sh.name))});
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Daily-Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
@@ -490,15 +503,15 @@ const PAT=[['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|en
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();
-  if(/show all|all items|every (item|sku)|not just/.test(t)){rowsMode='all';return 'Done. The sheet now shows all items, not just the ones that need attention. Your recipe is updated.'}
-  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t)){rowsMode='attn';return 'Done. The sheet shows only the items that need attention.'}
+  if(/show all|all items|every (item|sku)|not just/.test(t)){rowsMode='all';dashStat='All statuses';return 'Done. The Dashboard now starts on all statuses, not just the items that need attention. Your recipe is updated.'}
+  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t)){rowsMode='attn';dashStat='Needs attention';return 'Done. The Dashboard starts on the items that need attention.'}
   const hit=PAT.find(p=>p[1].test(t));
   if(hit){const k=hit[0],C=COLS[k],has=cols.includes(k);
     if(RM.test(t)){if(C.core)return `I would keep "${C.h}" because the sheet is hard to read without it. I can hide any of the other columns.`;
-      if(!has)return `"${C.h}" is not in your sheet right now.`;cols=cols.filter(x=>x!==k);saveCols();return `Done. I removed "${C.h}" from the sheet and from your recipe.`}
-    if(has)return `"${C.h}" is already in your sheet.`;
+      if(!has)return `"${C.h}" is not on the Dashboard right now.`;if(cols.length<=MINCOLS)return `I would keep at least ${MINCOLS} columns on the Dashboard, because the boxes above it need the width. The Master List always keeps every column.`;cols=cols.filter(x=>x!==k);saveCols();return `Done. I removed "${C.h}" from the Dashboard and from your recipe. It stays on the Master List.`}
+    if(has)return `"${C.h}" is already on your Dashboard.`;
     cols.push(k);saveCols();
-    return `Done. I added "${C.h}" ${C.src||''}. I saved it in your recipe, so tomorrow's sheet has it too. <a href="#" data-see>See it in the sheet</a>`}
+    return `Done. I added "${C.h}" to the Dashboard (${C.src||'it is on the Master List'}). I saved it in your recipe, so tomorrow's sheet has it too. <a href="#" data-see>See it in the sheet</a>`}
   return 'I only know a few requests in this demo. In the real chat you would explain it in your own words, and the AI works out which data to use. If the data is not in your files, it asks you where to find it or what file to add.';
 }
 function renderCustom(){
@@ -519,7 +532,7 @@ function renderCustom(){
   const send=t=>{if(!t.trim())return;msgs.push({w:'you',t});msgs.push({w:'ai',t:reply(t)});renderCustom();renderSheet()};
   $$('[data-sug]',v).forEach(b=>b.onclick=()=>send(SUG[b.dataset.sug]));
   $('#chat-f').onsubmit=e=>{e.preventDefault();send($('#chat-t').value)};
-  $$('[data-see]',v).forEach(a=>a.onclick=e=>{e.preventDefault();go('sheet')});
+  $$('[data-see]',v).forEach(a=>a.onclick=e=>{e.preventDefault();tab='dash';go('sheet')});
   $$('[data-nav]',v).forEach(b=>b.onclick=()=>go(b.dataset.nav));
   $('#c-reset').onclick=()=>{cols=DEFAULT.slice();rowsMode='attn';saveCols();msgs=[hello()];renderCustom();renderSheet()};
   $('#c-adv').onclick=A.openSettings;
