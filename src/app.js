@@ -150,7 +150,7 @@ function sinceHtml(){
   const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
     return `<div class="sc ${cls}"><div class="sc-h"><span>${title}</span><b>${items.length}</b></div><div class="sc-sub">${sub}</div>
     ${items.length?`<ul>${shown.map(fmt).join('')}</ul>${more>0?`<div class="sc-more">and ${more} more in the list below</div>`:''}`:'<div class="sc-none">None today</div>'}</div>`};
-  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} dropped items. They are listed on the New And Dropped Items tab of the Daily Sheet.</p>
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since Yesterday</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} missing items. They are listed on the New And Missing Items tab of the Daily Sheet.</p>
    <div class="since4" data-g="since">
     ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
@@ -238,22 +238,22 @@ const SEASON_SRC=[
  ['Last year\'s promo lift','Calculated','Measured by comparing last year\'s promo weeks with the normal weeks around them. It only shows when last year\'s promo weeks are tagged in the history.'],
  ['Not available','Not in the data','Retailer ad plans, trade events, competitor moves and marketing calendars. Add a file for any of these and they can be included.']];
 let vShow='promo',vLine='All Lines';
-const VCOLS=['promo','nextpromo','lift','peakwk','used','bump','peakgap','stocklp','peakcover','ordovr','plan','needby'];
-const VHEAD={promo:'Promo status',nextpromo:'Next promo',lift:'Last year promo lift',peakwk:'Peak weeks (next 12)',used:'Peak lift',bump:'Peak bump (units)',peakgap:'Units short of peak cover',stocklp:'Stock last peak',peakcover:'Peak cover',ordovr:'Order qty (with override)',plan:'Qty to place',needby:'Needed by'};
+const VCOLS=['promo','nextpromo','lift','peakwk','peaklift','ovr','ovrwhy','used','bump','peakgap','stocklp','peakcover','suggest','ordovr','plan','needby'];
+const VHEAD={promo:'Promo status',nextpromo:'Next promo',lift:'Last year promo lift',peakwk:'Peak weeks (next 12)',peaklift:'Peak lift (calculated)',ovr:'Your override',ovrwhy:'Override reason',used:'Peak lift used',suggest:'Suggested order qty',bump:'Peak bump (units)',peakgap:'Units short of peak cover',stocklp:'Stock last peak',peakcover:'Peak cover',ordovr:'Order qty (with override)',plan:'Qty to place',needby:'Needed by'};
 function bindSeason(tb){const a=$('#v-show',tb),b=$('#v-line',tb);if(a)a.onchange=()=>{vShow=a.value;renderTab()};if(b)b.onchange=()=>{vLine=b.value;renderTab()}}
 function seasonHtml(){
   const d=seasonData(),n=d.n;
   const heat=`<div class="lscroll"><table class="list"><thead><tr><th>Line</th>${MONS.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Q4 share</th><th>Peak months</th></tr></thead><tbody>${d.lrow.map(l=>
     `<tr><td><b>${esc(l.line)}</b></td>${l.idx.map(x=>`<td class="num ${x>=1.5?'warn':''}">${x>=1.5?x.toFixed(2)+'x':'Normal'}</td>`).join('')}<td class="num">${pctN(l.q4,0)}</td><td>${esc(l.peak)}</td></tr>`).join('')}</tbody></table></div>`;
   const pool=(vShow==='peak'?d.items:d.list).filter(r=>vLine==='All Lines'||r.sub===vLine);
-  const num=new Set(['lift','used','bump','peakgap','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return k==='used'?(v===''?'—':fv('used',v)+(pv('ovr',r)!==''?' (override)':'')):num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
+  const num=new Set(['lift','peaklift','ovr','used','bump','peakgap','suggest','ordovr','plan']),cellV=(k,r)=>{const v=pv(k,r);return num.has(k)&&v!==''?fv(k,v):esc(v===''?'—':v)};
   const lst=`<div class="lscroll tall"><table class="list nwtbl"><thead><tr><th>Item</th>${VCOLS.map(k=>`<th class="${num.has(k)?'num':''}">${VHEAD[k]}</th>`).join('')}</tr></thead><tbody>${pool.map(r=>
     `<tr class="r" tabindex="0" data-open="${r.id}"><td class="icol"><div class="sku-name">${esc(r.name)}</div><div class="sku-id">${r.id} · ${esc(r.sub)}${newToday(r.id)?' · new in today\'s files':''}</div></td>${VCOLS.map(k=>`<td class="${num.has(k)?'num ':''}${pcls(k,pv(k,r))}">${cellV(k,r)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   const picks=`<div class="row" style="gap:14px;flex-wrap:wrap;margin:6px 0 10px"><label>Show <select id="v-show"><option value="promo" ${vShow==='promo'?'selected':''}>Promo items and thin or short peaks</option><option value="peak" ${vShow==='peak'?'selected':''}>Every item with a peak</option></select></label><label>Line <select id="v-line">${d.lines.map(l=>`<option ${l===vLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label><span class="mute">${pool.length} items</span></div>`;
   return `<div class="card sec" data-g="season"><h3>Seasonality And Promos</h3>
   <p class="mute"><b>${n.promo} of ${n.items} items</b> have a promo this year or last year (${n.ty} this year, ${n.unconf} not yet confirmed). <b>${n.peak} items</b> have a peak inside the next 12 weeks, and <b>${n.thin}</b> of those would run thin or short.</p>
   <h4 class="sub-h">Which Months Are A Peak</h4><p class="mute">A normal month is the middle month of the year. A month that sells 1.5x that or more is a peak and shows its lift, shaded. Every other month is Normal. Q4 share is the part of the year's sales that falls in Oct to Dec (25% would be flat). A line with no shaded month has no seasonal peak. The numbers come from the last two years of sales.</p>${heat}
-  <h4 class="sub-h">Items To Check For Peaks And Promos</h4><p class="mute">Read left to right: when the peak weeks are, how big the lift is, how many extra units that means, and whether stock and orders on the way cover it. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
+  <h4 class="sub-h">Items To Check For Peaks And Promos</h4><p class="mute">Read left to right: when the peak weeks are, how big the lift is (calculated, then your override and reason, then the lift used), how many extra units that means, and whether stock and orders on the way cover it. A line is an average, so pick a line to see every item behind it. Your overrides and quantities to place are typed on the Master List in the sheet and show here. Click a row for the numbers behind it.</p>${picks}${lst}
   <h4 class="sub-h">Where This Comes From</h4><div class="src-list">${SEASON_SRC.map(x=>`<div><b>${esc(x[0])}</b> <span class="tag">${esc(x[1])}</span><div class="conf">${esc(x[2])}</div></div>`).join('')}</div></div>`;
 }
 function accuracyHtml(){
@@ -540,7 +540,7 @@ function openEmail(){
   let b=`Subject: Demand planning, ${t['At risk']} at risk, ${t['Medium']} medium (${TODAY_SHORT})\n\nGood morning. Top items to look at today:\n\n`;
   top.forEach((r,i)=>{b+=`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n   ${r.dollars>0?money(r.dollars)+' at risk':''}\n\n`});
   if(st.diff){b+='Since yesterday:\n';st.diff.toAtRisk.forEach(i=>b+=`  - Newly at risk: ${rowOf(i).name}\n`);st.diff.reAlerted.forEach(i=>b+=`  - Re-alert (gap grew): ${rowOf(i).name}\n`);st.diff.recovered.forEach(i=>b+=`  - Fixed: ${rowOf(i).name}\n`);b+='\n'}
-  {const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files today:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Dropped: ${x.name} (${x.id}), check the shared files${x.plan?' (you had '+fmt(x.plan)+' units to place)':''}\n`);b+='\n'}}
+  {const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files today:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing today: ${x.name} (${x.id}), check the shared files${x.plan?' (you had '+fmt(x.plan)+' units to place)':''}\n`);b+='\n'}}
   b+=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept. Open the tool for charts and options.\n\nSample data, not Mattel data.`;
   openModal('Daily email preview',`<p class="mute">Sent each morning after the files refresh. Accepted risks stay out of it unless they re-alert.</p><div class="email">${esc(b)}</div>`);
 }

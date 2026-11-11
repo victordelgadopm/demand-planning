@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright
 import openpyxl,re
 R=[]
 def ok(n,c):R.append(bool(c));print('ok  ' if c else 'FAIL',n)
-BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items(?<!New And Dropped Items)',r'Promos And Peaks Seasonal']
+BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks Seasonal']
 with sync_playwright() as p:
     b=p.chromium.launch();pg=b.new_page(viewport={'width':1366,'height':850},accept_downloads=True)
     errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
@@ -22,7 +22,7 @@ with sync_playwright() as p:
     ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Order Qty To Place' in pg.locator('#msgs').inner_text())
     pg.click('#c-reset')
     rc=pg.locator('.recipe:has(h3:text("Your Recipe"))').inner_text()
-    ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Dropped Items' in rc and 'Promos And Peaks' in rc and 'Seasonal Items' in rc)
+    ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Promos And Peaks' in rc and 'Seasonal Items' in rc)
     # 3. no stale wording on any page or sheet tab
     allt=[]
     for v in ['home','sheet','custom','visual']:
@@ -48,6 +48,6 @@ with sync_playwright() as p:
         ws=wb[nm];ok(nm+' reads from the Master List',any(isinstance(c.value,str) and c.value.startswith('=') for c in ws[2]))
     # 6. Recipe sheet mentions every tab that holds typed or carried work
     rs=wb['Recipe'];rt=' '.join(str(c.value) for r in rs.iter_rows() for c in r if c.value)
-    ok('Recipe sheet mentions New And Dropped Items and Order Qty To Place','New And Dropped Items' in rt and 'Order Qty To Place' in rt)
+    ok('Recipe sheet mentions New And Missing Items and Order Qty To Place','New And Missing Items' in rt and 'Order Qty To Place' in rt)
     ok('console clean',not errs)
 print(sum(R),'/',len(R))
