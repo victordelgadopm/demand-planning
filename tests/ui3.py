@@ -14,7 +14,7 @@ with sync_playwright() as p:
     cols_={'yes':'#1f7a34','part':'#b45309','no':'#b3261e'}
     for ri,(rk,sts) in enumerate(exp.items()):
         pg.click('[data-route=%s]'%rk);pg.wait_for_timeout(100)
-        box=pg.inner_text('#routebox');ok('route box matches table for '+rk,all(('%s: %s.'%(n,mt[s])) in box for n,s in zip(['Anaplan','Tableau'],sts)))
+        box=pg.inner_text('#routebox');ok('route box explains why for both systems and why a shared folder on '+rk,box.count('Why this path:')==2 and 'Why a shared folder:' in box);ok('route box matches table for '+rk,all(('%s: %s.'%(n,mt[s])) in box for n,s in zip(['Anaplan','Tableau'],sts)))
         ok('map colors match table for '+rk,all(pg.locator('[data-node^=conn%d%s] rect'%(i,s)).get_attribute('stroke')==cols_[s] for i,s in enumerate(sts)))
         cells=pg.locator('.mx >> nth=0').locator('tbody tr').nth(0).locator('td').all();cells2=pg.locator('.mx >> nth=0').locator('tbody tr').nth(1).locator('td').all()
         ok('matrix matches for '+rk,mt[sts[0]] in cells[ri].inner_text() and mt[sts[1]] in cells2[ri].inner_text())
