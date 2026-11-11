@@ -93,5 +93,8 @@ with sync_playwright() as p:
                 pg.click(f'[data-route={r}]');badli+=pg.evaluate(LIJS)
         badli+=pg.evaluate(LIJS)
     ok('second lines in lists are nested sub-bullets '+str(badli[:3]),not badli)
+    pg.click('nav [data-nav=email]');pg.wait_for_timeout(200)
+    f1=pg.locator('.flowcard').first.inner_text().replace('\n',' ')
+    ok('Flow 1 order: sources, shared folder, AI agent, planning sheet',f1.find('Your sources')<f1.find('Shared folder')<f1.find('AI agent')<f1.find('Planning sheet'))
     ok('console clean',not errs)
 print(sum(R),'/',len(R))
