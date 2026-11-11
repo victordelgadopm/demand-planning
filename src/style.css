@@ -397,3 +397,8 @@ ol.two li{break-inside:avoid;margin-bottom:3px}
 .shp th{position:static;top:auto}.shp td{vertical-align:top}.shp td.bad,.shp td.warn{border-radius:0}
 .flowscroll{overflow-x:auto}.flowscroll .flowmap.rich{min-width:680px}
 .steps>*,.flowwrap,.s1-body{min-width:0;max-width:100%}
+.route-lead{font-weight:700;font-size:16px;padding:8px 12px;border-radius:8px;margin:6px 0 8px}
+.route-lead.ok{background:var(--ok-bg,#e8f5e9);color:var(--ok,#1b6b34)}
+.route-lead.warn{background:var(--watch-bg,#ffe5b4);color:var(--watch,#8a4b08)}
+.routebox .mini li{margin:6px 0;color:var(--ink)}
+.flowlegend{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0;font-size:13px}.flowlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}

@@ -400,6 +400,11 @@ ol.two li{break-inside:avoid;margin-bottom:3px}
 .shp th{position:static;top:auto}.shp td{vertical-align:top}.shp td.bad,.shp td.warn{border-radius:0}
 .flowscroll{overflow-x:auto}.flowscroll .flowmap.rich{min-width:680px}
 .steps>*,.flowwrap,.s1-body{min-width:0;max-width:100%}
+.route-lead{font-weight:700;font-size:16px;padding:8px 12px;border-radius:8px;margin:6px 0 8px}
+.route-lead.ok{background:var(--ok-bg,#e8f5e9);color:var(--ok,#1b6b34)}
+.route-lead.warn{background:var(--watch-bg,#ffe5b4);color:var(--watch,#8a4b08)}
+.routebox .mini li{margin:6px 0;color:var(--ink)}
+.flowlegend{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0;font-size:13px}.flowlegend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:middle}
 </style></head>
 <body>
 <header class="top"><div class="top-in">
@@ -2155,23 +2160,45 @@ function flowSvg(stages,label){
      <text x="${x+bw/2}" y="${y+56}" text-anchor="middle" font-size="${n>4?12.5:14}" fill="currentColor" opacity=".78">${esc(st_[1])}</text></g>`});
   return sv+'</svg>'}
 
+const ROUTEX={
+ manual:{lead:'Works for both systems.',leadCls:'ok',bullets:['<b>What you do:</b> Export the files from Anaplan and Tableau and put them in the shared folder.','<b>History:</b> Export three years of weekly sales once and save it as the reference file.'],needs:'Export access in each source, and your company\'s OK to use the data with the AI tool. Nothing to set up.'},
+ folder:{lead:'Partly works for both systems. Each needs one extra step.',leadCls:'warn',bullets:['<b>Anaplan:</b> Scheduled exports go to Amazon S3, Azure Blob or Google BigQuery, not SharePoint. A step moves the file to the shared folder.','<b>Tableau:</b> Subscriptions are email images or PDFs. Data comes through Prep file output or the REST API, and a step moves it to the shared folder.'],needs:'You or IT to set up each scheduled export and the step that moves the file.'},
+ copilot:{lead:'Connects directly to Anaplan only. Tableau needs a manual or automated export to the shared folder.',leadCls:'warn',bullets:['<b>Anaplan:</b> Yes. Anaplan\'s AI Gateway names Microsoft Copilot. Licensing is not stated.','<b>Tableau:</b> Partly. Microsoft\'s connector finds and answers questions about dashboards, but it does not say the full numbers are included (Tableau Cloud only). Use an export for the data.','<b>So you need two routes:</b> Copilot for Anaplan, and a manual or automated export for Tableau.'],needs:'A Copilot license, a Microsoft 365 AI admin and a Tableau site admin for the connector, plus an export route for Tableau.'},
+ chatgpt:{lead:'Connects directly to Tableau only. Anaplan needs a manual or automated export to the shared folder.',leadCls:'warn',bullets:['<b>Tableau:</b> Yes. Tableau lists ChatGPT as a supported client. It is read-only, with a sign-in per person.','<b>Anaplan:</b> No direct connection. It needs a custom connector or an outside bridge built first. Use an export for the data.','<b>So you need two routes:</b> ChatGPT for Tableau, and a manual or automated export for Anaplan.'],needs:'ChatGPT with connectors turned on, plus an export route for Anaplan. Scheduled ChatGPT tasks cannot take file uploads.'}};
 const NODEINFO={
- anaplan:['Anaplan','The forecast, open orders and ETAs come from here. The AI agent reads the file or connection and never writes back.'],
+ anaplan:['Anaplan','The forecast, open orders and ETAs come from here. The AI agent reads them and never writes back.'],
  tableau:['Tableau','Weekly sales and shipments come from here. Three years of history is loaded once and reused on every run.'],
- route:['How the files arrive','The route you picked in the list above. Which routes are allowed is up to your company IT.'],
+ direct:['Direct connection','This system connects straight to the AI tool, so no file is needed for it.'],
+ export:['Export needed','This system does not connect directly on this route. Use a manual or automated export so its file lands in the shared folder.'],
+ folder:['Shared folder','Every file that is not connected directly lands here, from a manual or automated export.'],
  hub:['AI agent','Matches renamed columns, holds back files with odd values, keeps new fields, and carries your typed notes forward by SKU.'],
- sheet:['Custom Spreadsheet','Saved to the shared folder on your schedule. This is the file you open and work in.'],
- email:['Custom Email','Optional. The agent opens the finished spreadsheet and sends a written summary in your format.']};
+ sheet:['Custom spreadsheet','Saved to the shared folder on your schedule. This is the file you open and work in.'],
+ email:['Custom email','Optional. The agent opens the finished spreadsheet and sends a written summary with the spreadsheet attached.']};
+/* what each route really does for each source (from the vendors' own pages, November 2026) */
+const ROUTEROWS={
+ manual:[['export','You Export','By hand, to the folder'],['export','You Export','By hand, to the folder']],
+ folder:[['export','Scheduled Export','Plus a step to move it'],['export','Scheduled Export','Plus a step to move it']],
+ copilot:[['direct','Copilot Connection','Works directly'],['export','Export Needed','Manual or automated']],
+ chatgpt:[['export','Export Needed','Manual or automated'],['direct','ChatGPT Connection','Works directly']]};
 function flowRich(route){
-  const rt=ROUTES[route],RL={manual:['Manual Export','You drop the files'],folder:['Automated Export','Runs on its own'],copilot:['Copilot Connection','Direct, no folder'],chatgpt:['ChatGPT Connection','Direct, no folder']}[route];
-  const N=(id,x,y,w,h,t,sub,stroke)=>`<g class="flow-node" tabindex="0" role="button" data-node="${id}" aria-label="${esc(t)}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="var(--card)" stroke="${stroke}" stroke-width="2.5"/><text x="${x+w/2}" y="${y+h/2-4}" text-anchor="middle" font-size="19" font-weight="800" fill="currentColor">${esc(t)}</text><text x="${x+w/2}" y="${y+h/2+20}" text-anchor="middle" font-size="14" fill="currentColor" opacity=".8">${esc(sub)}</text></g>`;
+  const rows=ROUTEROWS[route],anyFolder=rows.some(r=>r[0]==='export'),B='#2b4cc7',T='#00838F',G='#1f7a34',O='#b45309',col=k=>k==='direct'?G:(route==='manual'||route==='folder'?B:O);
+  const N=(id,x,y,w,h,t,sub,stroke)=>`<g class="flow-node" tabindex="0" role="button" data-node="${id}" aria-label="${esc(t)}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="var(--card)" stroke="${stroke}" stroke-width="2.5"/><text x="${x+w/2}" y="${y+h/2-3}" text-anchor="middle" font-size="18" font-weight="800" fill="currentColor">${esc(t)}</text><text x="${x+w/2}" y="${y+h/2+19}" text-anchor="middle" font-size="13" fill="currentColor" opacity=".82">${esc(sub)}</text></g>`;
   const P=(id,d,c,n)=>{let o=`<path id="${id}" d="${d}" fill="none" stroke="${c}" stroke-width="3" opacity=".4"/>`;for(let k=0;k<n;k++)o+=`<circle class="flow-dot" r="6" fill="${c}" opacity="0"><animateMotion dur="3.2s" begin="${(k*3.2/n).toFixed(2)}s" repeatCount="indefinite"><mpath href="#${id}"/></animateMotion><animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.08;.9;1" dur="3.2s" begin="${(k*3.2/n).toFixed(2)}s" repeatCount="indefinite"/></circle>`;return o};
-  const B='#2b4cc7',T='#00838F';
-  let sv=`<svg class="flowmap rich" viewBox="0 0 1000 300" role="group" aria-label="Animated data flow for ${esc(rt[0])}">`;
-  sv+=P('rf1','M215 85 C 255 85, 255 165, 290 165',B,2)+P('rf2','M215 245 C 255 245, 255 165, 290 165',B,2)+P('rf3','M480 165 L 545 165',B,2)+P('rf4','M765 165 C 800 165, 800 85, 825 85',T,2)+P('rf5','M765 165 C 800 165, 800 245, 825 245',T,2);
-  sv+=N('anaplan',15,45,200,80,'Anaplan','Forecast, POs, ETAs',B)+N('tableau',15,205,200,80,'Tableau','Sales, shipments',B)+N('route',290,125,190,80,RL[0],RL[1],B)+N('hub',545,70,220,190,'AI Agent','Checks and combines',T)+N('sheet',825,45,160,80,'Spreadsheet','Shared folder',T)+N('email',825,205,160,80,'Email','Optional',T);
-  sv+=`<text x="655" y="205" text-anchor="middle" font-size="13" fill="currentColor" opacity=".8">Match, hold back, keep</text><text x="655" y="226" text-anchor="middle" font-size="13" fill="currentColor" opacity=".8">Carry typed work forward</text></svg>`;
-  return `<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px"><span class="conf">Click any box to see what it does.</span><button class="btn sm" id="fl-pause" aria-pressed="false">Pause</button></div><div class="flowscroll">${sv}</div><div class="flowinfo" id="flowinfo" aria-live="polite"><b>${NODEINFO.hub[0]}.</b> ${NODEINFO.hub[1]}</div>`}
+  const ys=[40,215],fx=455,hx=640;
+  let sv=`<svg class="flowmap rich" viewBox="0 0 1000 340" role="group" aria-label="Animated data flow for ${esc(route)}">`;
+  rows.forEach((r,k)=>{const y=ys[k],my=y+40;
+    sv+=P('rs'+k,`M180 ${my} L225 ${my}`,col(r[0]),1);
+    if(r[0]==='export'){sv+=P('rc'+k,`M425 ${my} C 445 ${my}, 440 170, ${fx} 170`,col(r[0]),2)}
+    else{sv+=P('rc'+k,`M425 ${my} C 520 ${my}, 560 170, ${hx} 170`,G,2)}});
+  if(anyFolder)sv+=P('rf',`M${fx+140} 170 L${hx} 170`,B,2);
+  sv+=P('ro1','M800 170 C 830 170, 830 80, 845 80',T,2)+P('ro2','M800 170 C 830 170, 830 255, 845 255',T,2);
+  rows.forEach((r,k)=>{const y=ys[k];sv+=N(k?'tableau':'anaplan',10,y,170,80,k?'Tableau':'Anaplan',k?'Sales, shipments':'Forecast, POs, ETAs',B)+N(r[0],225,y,200,80,r[1],r[2],col(r[0]))});
+  if(anyFolder)sv+=N('folder',fx-10,130,140,80,'Shared Folder','Files land here',B);
+  sv+=N('hub',hx,60,170,220,'AI Agent','Checks and combines',T)+N('sheet',845,40,145,80,'Spreadsheet','Shared folder',T)+N('email',845,215,145,80,'Email','Optional, attached',T);
+  sv+=`<text x="${hx+85}" y="235" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">Match, hold back, keep</text><text x="${hx+85}" y="253" text-anchor="middle" font-size="12" fill="currentColor" opacity=".8">Carry typed work forward</text></svg>`;
+  const mixed=rows.some(r=>r[0]==='direct');
+  const legend=`<div class="flowlegend"><span><i style="background:${G}"></i>Works directly</span><span><i style="background:${route==='manual'||route==='folder'?B:O}"></i>${mixed?'Needs an export to the folder':'Files land in the shared folder'}</span></div>`;
+  return `<div class="row" style="justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px"><span class="conf">Click any box to see what it does.</span><button class="btn sm" id="fl-pause" aria-pressed="false">Pause</button></div><div class="flowscroll">${sv}</div>${legend}<div class="flowinfo" id="flowinfo" aria-live="polite"><b>${NODEINFO.hub[0]}.</b> ${NODEINFO.hub[1]}</div>`}
 function wireFlow(root){const svg=root.querySelector('.flowmap.rich'),pb=root.querySelector('#fl-pause'),info=root.querySelector('#flowinfo');if(!svg)return;let paused=false;
   if(matchMedia('(prefers-reduced-motion: reduce)').matches){svg.pauseAnimations();paused=true;pb.textContent='Play'}
   pb.onclick=()=>{paused=!paused;paused?svg.pauseAnimations():svg.unpauseAnimations();pb.textContent=paused?'Play':'Pause';pb.setAttribute('aria-pressed',String(paused))};
@@ -2184,7 +2211,7 @@ function renderHome(){
   <div class="steps">
    <div class="card step s1"><div class="shead"><div class="num">1</div><h2>Connect Your Data</h2></div><p>Pick how your files reach your AI agent. The map below follows your choice.</p>
     <div class="s1-body"><div class="routes" role="group" aria-label="Ways to connect">${Object.keys(ROUTES).map(k=>`<button class="route" data-route="${k}" aria-pressed="${route===k}">${ROUTES[k][0].replace(' Connection','')}</button>`).join('')}</div>
-    <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="conf" style="margin-bottom:6px">${r[1]}</div><p>${r[2]}</p><p><b>What it needs:</b> ${r[3]}</p></div></div>
+    <div class="routebox" id="routebox"><h3>${r[0]}</h3><div class="route-lead ${ROUTEX[route].leadCls}">${ROUTEX[route].lead}</div><ul class="mini">${ROUTEX[route].bullets.map(b=>`<li>${b}</li>`).join('')}<li><b>What it needs:</b> ${ROUTEX[route].needs}</li></ul></div></div>
     <div class="flowwrap"><h3 class="flowh">Data Flow: ${esc(r[0])}</h3>${flowRich(route)}</div></div>
    <div class="card step"><div class="shead"><div class="num">2</div><h2>Customize With Your AI Agent</h2></div><p>Prepare your custom spreadsheet. Describe it, show examples of sheets you like, and explain how to combine your data.</p>
     <button class="btn pri go" data-nav="custom">See Customize</button></div>
