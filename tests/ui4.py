@@ -3,7 +3,7 @@ from playwright.sync_api import sync_playwright
 import openpyxl,re
 R=[]
 def ok(n,c):R.append(bool(c));print('ok  ' if c else 'FAIL',n)
-BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks|Seasonal Items|Seasonal Calendar|Since Yesterday, Notes']
+BAD=[r'New And New',r'Planned Order',r'Noted By',r'Today tab',r'three green',r'Dropped Items|New And Dropped|dropped from|were dropped|Dropped:',r'Promos And Peaks|Seasonal Items|Seasonal Calendar|Since Yesterday, Notes|12-Week Plan|Recipe sheet|Portfolio Snapshot']
 with sync_playwright() as p:
     b=p.chromium.launch();pg=b.new_page(viewport={'width':1366,'height':850},accept_downloads=True)
     errs=[];pg.on('pageerror',lambda e:errs.append(str(e)))
@@ -44,9 +44,9 @@ with sync_playwright() as p:
     # 5. each non-Master sheet reads the Master (no hard-coded stale copies): formulas present
     for nm in ['Seasonal And Promo Lifts','Notes']:
         ws=wb[nm];ok(nm+' reads from the Master List',any(isinstance(c.value,str) and c.value.startswith('=') for c in ws[2]))
-    # 6. Recipe sheet mentions every tab that holds typed or carried work
-    rs=wb['Recipe'];rt=' '.join(str(c.value) for r in rs.iter_rows() for c in r if c.value)
-    ok('Recipe sheet mentions New And Missing Items and Order Qty To Place','New And Missing Items' in rt and 'Order Qty To Place' in rt)
+    # 6. the Dashboard note says where to work, and no Recipe or 12-Week Plan tab remains
+    dn=str(wb['Dashboard']['A2'].value)
+    ok('Dashboard note says where to work and leads with demand','Master List (Work Here)' in dn and dn.startswith('VIEW ONLY. Start with demand') and 'Recipe' not in wb.sheetnames and '12-Week Plan' not in wb.sheetnames)
     # 7. peak, promo and order chain: columns adjacent, history tab present, a typed override reaches the order total
     mh=[c.value for c in wb['Master List (Work Here)'][1]]
     ok('promo columns sit together',mh.index('Last Promo Lift (x)')==mh.index('Last Year Promo (Weeks Starting)')+2 and mh.index('Promo Extra Units')==mh.index('Promo And Peak Overlap')+1)

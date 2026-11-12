@@ -140,6 +140,24 @@
     const out = { all: norm(all), lines: {} }; Object.keys(lines).forEach(k => { out.lines[k] = norm(lines[k]); }); return out;
   }
 
+
+  /* ---- Demand view: calendar months. A week belongs to the month of its middle day. 2026 weeks 53 to 57 are lined up with weeks 1 to 5 and land in Jan 2027 ---- */
+  const BUCKETS = ['Jan 2026', 'Feb 2026', 'Mar 2026', 'Apr 2026', 'May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026', 'Nov 2026', 'Dec 2026', 'Jan 2027'];
+  function weekMonth(snap, wn) { return addDays(parseDay(snap.meta.weekOneStart), 7 * (wn - 1) + 3).getUTCMonth(); }
+  function bucketOfWeek(snap, w) { return w > 52 ? 12 : weekMonth(snap, w); }
+  function demandOf(sku, snap, F, aiWk, shipRatio) {
+    const z = () => new Array(13).fill(0), fcF = z(), lyF = z(), ly = z(), ty = z(), fc = z(), ai = z(), sh = z(), shp = z(), nAct = z(), nFwd = z();
+    const p25 = sku.pos.y2025 || [], p26 = sku.pos.y2026 || [], f26 = sku.forecast26 || [], s26 = (sku.ship && sku.ship.y2026) || [];
+    const ratio = clip(shipRatio == null || !isFinite(shipRatio) ? 1 : shipRatio, 0.7, 1.3);
+    for (let w = 1; w <= 57; w++) {
+      const b = bucketOfWeek(snap, w);
+      const lv = w <= 52 ? (p25[w - 1] || 0) : (p26[w - 53] || 0); ly[b] += lv; if (w > 45) lyF[b] += lv;
+      if (w <= 45) { ty[b] += p26[w - 1] || 0; fc[b] += f26[w - 1] || 0; sh[b] += s26[w - 1] || 0; nAct[b]++; }
+      else { fc[b] += F[w - 46] || 0; fcF[b] += F[w - 46] || 0; ai[b] += aiWk[w - 46] || 0; shp[b] += (aiWk[w - 46] || 0) * ratio; nFwd[b]++; }
+    }
+    const out = ty.map((x, b) => x + ai[b]);
+    return { ly, lyF, fcF, ty, fc, ai, out, ship: sh, shipPred: shp, nAct, nFwd, ratio };
+  }
   function evalSku(sku, snap, S, notes) {
     const flags = []; const price = sku.price; const F = sku.fcstH; const needPlan = sum(F);
     const inv = sku.inv; const transitQty = sum((inv.transit || []).map(t => t.qty)); const poQty = sum((inv.pos || []).map(p => p.qty));
@@ -222,7 +240,15 @@
       else if (!tyC.length) pr.status = 'Not confirmed';
       else if (!lyP.length || sku.isNew) pr.status = 'New this year';
       else pr.status = supply >= (1 - S.promoCushionPct / 100) * (needPlan + meanF * pr.lift * tyC.length) ? 'Confirmed, covered' : 'Confirmed, short';
-      metrics.promo = pr; }
+      metrics.promo = pr; metrics.aiWk = F.map((f, h) => f + (okLift && tyC.some(x => x.h === h) ? f * pr.lift : 0)); }
+
+    // demand view: next 12 weeks against last year, year to date comps, monthly series, shipment prediction
+    { const md = demandOf(sku, snap, F, metrics.aiWk, metrics.shipRatio);
+      let lyW = 0; for (let h = 0; h < H; h++) lyW += lyValue(sku, h).v;
+      const fc12 = sum(F), ai12 = sum(metrics.aiWk), ytd = sum(pos26, 0, 45), ytdLY = sum(sku.pos.y2025 || [], 0, 45);
+      const ship12 = sum(md.shipPred);
+      Object.assign(metrics, { monthly: md, fc12, ai12, ly12: lyW, fc12vsLY: lyW > 0 && !sku.isNew ? fc12 / lyW - 1 : null, ai12vsLY: lyW > 0 && !sku.isNew ? ai12 / lyW - 1 : null,
+        aiVsSys: ai12 - fc12, ytd, ytdLY, ytdComp: ytdLY > 0 && !sku.isNew ? ytd / ytdLY - 1 : null, ship12, shipBuild: ship12 - ai12, shipLast8: sum(sku.ship.y2026, 37, 45), posLast8: sum(pos26, 37, 45) }); }
 
     // data checks
     const issues = (sku.dataIssues || []).slice();
@@ -361,6 +387,11 @@
       onHandValue: sum(rows.map(r => r.metrics.onHand * r.price)), fcstWk: sum(rows.map(r => Math.round(r.metrics.fcstWk))),
       lowCover: act.filter(r => r.metrics.onHand >= 0 && r.metrics.wos < 4).length, highCover: act.filter(r => r.metrics.wos > S.overstockWOS).length };
     kpi.wos = kpi.fcstWk > 0 ? (kpi.onHand + kpi.transit) / kpi.fcstWk : 0;
+    { const old = rows.filter(r => !r.isNew), M = r => r.metrics, T = f => sum(rows.map(r => f(M(r)))), To = f => sum(old.map(r => f(M(r))));
+      kpi.dem = { fc12: T(m => m.fc12), ai12: T(m => m.ai12), ly12: To(m => m.ly12), ai12Old: To(m => m.ai12), ai12Value: sum(rows.map(r => M(r).ai12 * r.price)),
+        ytd: To(m => m.ytd), ytdLY: To(m => m.ytdLY), sales4: To(m => m.sales4), fcst4: To(m => m.fcst4), ship8: sum(rows.map(r => M(r).shipLast8)), pos8: sum(rows.map(r => M(r).posLast8)),
+        promoItems: rows.filter(r => M(r).promo && M(r).promo.status !== 'None' && M(r).promo.status !== 'Last year only' && M(r).promo.next).length,
+        aiDiffItems: rows.filter(r => Math.round(M(r).aiVsSys / 12) !== 0).length, aiAdd: T(m => m.aiVsSys) }; }
     return { rows, tiers, dec, accepted, kpi, settings: S, total: rows.length };
   }
 
@@ -444,6 +475,6 @@
   }
 
   const NOTE_LABEL = Object.assign({}, FLAG_LABEL, { promo: 'Promo or season', general: 'General' });
-  return { NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthIdx, typical, monthUnits, analogsFor, activeNotes, leadWeeks, options, shipmentsOf,
+  return { BUCKETS, bucketOfWeek, NOTE_LABEL, H, DEFAULTS, TIER_ORDER, DECISION_OF, FLAG_LABEL, compute, project, histDemand, diff, accuracy, accuracyTotal, seasonality, peakMonthsOf, monthIdx, typical, monthUnits, analogsFor, activeNotes, leadWeeks, options, shipmentsOf,
     weekStart, weekNum, fmtDate, fmtNum, fmtMoney, parseDay, addDays, sum, mean, sd };
 });

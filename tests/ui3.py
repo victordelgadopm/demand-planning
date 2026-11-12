@@ -44,23 +44,24 @@ with sync_playwright() as p:
     for i,lab in enumerate(['Order more or expedite','Too much stock','Forecast looks off','Check the data']):
         n=int(pg.locator('.dbn').nth(i).inner_text());pg.select_option('#dd',lab);ok('box "'+lab+'" matches list',pg.locator('.dtab tbody tr').count()==n)
     pg.select_option('#dd','All decisions')
-    ok('dashboard has planner headers',all(h in pg.locator('.dtab thead').inner_text() for h in ['On Hand','In Transit','In Production','At Origin','ETA Change','Wks Of Supply','Stock-Out','System Forecast Per Week','AI Forecast Per Week','AI Recommended Qty (Total)','Order Qty To Place','Your Qty Vs AI']))
-    pg.click('[data-xt=plan]');ok('plan tab shows negative weeks',pg.locator('.xt td.bad').count()>0)
+    dh=pg.locator('.dtab thead').inner_text();ok('dashboard leads with demand columns in order',all(h in dh for h in ['Sales, Last 3 Wks','Forecast, Last 3 Wks','Sales vs Fcst','YTD Comp Vs LY','System Forecast (Next 12 Wks)','AI Forecast (Next 12 Wks)','Last Year (Same 12 Wks)','AI Vs Last Year','Peak Months','Next Promo']) and dh.index('Sales, Last 3 Wks')<dh.index('System Forecast (Next 12 Wks)')<dh.index('AI Forecast (Next 12 Wks)'))
+    ok('dashboard keeps supply columns off the front',not any(h in dh for h in ['On Hand','In Transit','In Production','At Origin','ETA Change','Wks Of Supply','Stock-Out','Order Qty To Place']))
+    sec=pg.locator('.dsec').all_inner_texts();ok('dashboard sections lead with demand',[x.split('\n')[0].split(' All items')[0].split(' These')[0].strip() for x in sec][:3]==['Demand Snapshot','Demand Signals','Planner Actions'])
     pg.click('[data-xt=acc]');ok('accuracy tab has All Lines','All Lines' in pg.locator('.xt').inner_text())
     pg.click('[data-xt=dash]')
     nav=pg.locator('nav button').all_inner_texts();ok('nav order',nav==['How It Works','Customize','Custom Spreadsheet','Visual View','Custom Email','Setup Options'])
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Dashboard']
-    ok('xlsx 9 sheets, no Today tab',wb.sheetnames==['Dashboard','Master List (Work Here)','12-Week Plan','Forecast Accuracy','Seasonal And Promo Lifts','Sales History','Notes','New And Missing Items','Recipe'])
-    ok('xlsx matches default columns','Lead Time (Weeks)' not in [c.value for c in ws[21]])
+    ok('xlsx 11 sheets in demand-first order, no Recipe or 12-Week Plan',wb.sheetnames==['Dashboard','Master List (Work Here)','Sales History','Seasonal And Promo Lifts','Monthly Demand','POS Prediction','Shipping Prediction','Forecast Accuracy','Demand Vs Supply','Notes','New And Missing Items'])
+    ok('xlsx matches default columns','Lead Time (Weeks)' not in [c.value for c in ws[22]])
     wm=wb['Master List (Work Here)'];ok('master frozen+filter',wm.freeze_panes=='D2' and wm.auto_filter.ref is not None)
     ok('xlsx status colored',wb['Master List (Work Here)']['A2'].fill.fgColor.rgb=='FFF8D7DA')
     hd=[c.value for c in wb['Master List (Work Here)'][1]]
     ok('all items has planner columns',all(h in hd for h in ['On Hand (Units)','In Transit (Units)','Open PO (Units)','Weeks Of Supply','System Forecast Per Week (Units)','Stock-Out Week','Order By','ABC Class','Forecast Accuracy (13 Wks)']))
-    ok('plan sheet 4 rows per item',wb['12-Week Plan'].max_row==1+123*4)
+    ok('monthly demand sheet: total, 6 lines and 123 items, 6 rows each',wb['Monthly Demand'].max_row==1+(1+6+123)*6)
     nt=wb['Notes'];ok('notes tab has 15 notes',nt.max_row==16)
-    for sh,hr in [('Master List (Work Here)',1),('Seasonal And Promo Lifts',1),('12-Week Plan',1),('Dashboard',21)]:
+    for sh,hr in [('Master List (Work Here)',1),('Seasonal And Promo Lifts',1),('Dashboard',22)]:
         ok('note column on '+sh,('Note (Type Here)' if sh.startswith('Master') else 'Note') in [c.value for c in wb[sh][hr]])
     wv=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx',data_only=True)['Master List (Work Here)'];ok('master list note filled for 15 items',sum(1 for r in range(2,125) if wv.cell(r,[c.value for c in wv[1]].index('Note (Type Here)')+1).value)==15)
     ok('only the master list is unlocked',[n for n in wb.sheetnames if not wb[n].protection.sheet]==['Master List (Work Here)'])

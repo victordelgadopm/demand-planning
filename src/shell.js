@@ -8,7 +8,37 @@ const TODO={order_more:'Place or expedite an order',too_much:'Pause new orders a
 const TS={'At risk':'t_risk','Watch':'t_watch','Overstocked':'t_much','No risk':'t_ok'};
 const TCLASS={'At risk':'t-risk','Watch':'t-watch','Overstocked':'t-much','No risk':'t-ok'};
 const R3=x=>Math.round(x*1000)/1000;
+const FW0=E.fmtDate(E.weekStart(A.snap(),0));
 const COLS={
+ ytd:{h:'POS Year To Date (Units)',w:13,num:'int',src:'from the Reporting tool: units retailers sold to shoppers this year so far'},
+ ytdly:{h:'Same Weeks Last Year, Year To Date (Units)',w:15,num:'int',src:'from the Reporting tool: units sold in the same weeks last year'},
+ ytdcomp:{h:'Year To Date Comp Vs Last Year',w:13,num:'pctS',src:'calculated: this year to date compared with the same weeks last year (the comp)'},
+ fcst4:{h:'Forecast, Last 3 Weeks (Units)',w:13,num:'int',src:'from the Planning system: what the forecast said for the last 3 weeks of sales'},
+ fc12:{h:'System Forecast, Next 12 Weeks (Units)',w:14,num:'int',src:'from the Planning system: the current forecast added up over the next 12 weeks'},
+ ai12:{h:'AI Forecast, Next 12 Weeks (Units)',w:14,num:'int',src:'calculated by the AI: the System Forecast plus the units a confirmed promo adds (last year\'s promo lift applied to this year\'s promo weeks), added up over the next 12 weeks'},
+ aid12:{h:'AI Vs System Forecast, Next 12 Weeks (Units)',w:15,num:'intS',src:'calculated: AI Forecast minus System Forecast over the next 12 weeks. Positive means the AI expects more than the system, usually from a confirmed promo'},
+ vsly:{h:'AI Forecast Vs Last Year',w:13,num:'pctS',src:'calculated: the AI Forecast for the next 12 weeks compared with the units sold in the same weeks last year'},
+ aim10:{h:'Nov 2026 AI Forecast (From '+FW0+')',w:15,num:'int',src:'calculated by the AI: the AI forecast for the weeks in November from '+FW0+' on'},
+ aim11:{h:'Dec 2026 AI Forecast',w:13,num:'int',src:'calculated by the AI: the AI forecast for the weeks in December'},
+ aim12:{h:'Jan 2027 AI Forecast',w:13,num:'int',src:'calculated by the AI: the AI forecast for the weeks that fall in January 2027'},
+ lym10:{h:'Nov 2026 Last Year (Same Weeks)',w:15,num:'int',src:'from the Reporting tool: units sold in the same weeks last year'},
+ lym11:{h:'Dec 2026 Last Year (Same Weeks)',w:15,num:'int',src:'from the Reporting tool: units sold in the same weeks last year'},
+ lym12:{h:'Jan 2027 Last Year (Same Weeks)',w:15,num:'int',src:'from the Reporting tool: units sold in the same weeks of this January'},
+ cmpm10:{h:'Nov 2026 AI Vs Last Year',w:12,num:'pctS',src:'calculated: the AI forecast compared with last year for the same weeks'},
+ cmpm11:{h:'Dec 2026 AI Vs Last Year',w:12,num:'pctS',src:'calculated: the AI forecast compared with last year for the same weeks'},
+ cmpm12:{h:'Jan 2027 AI Vs Last Year',w:12,num:'pctS',src:'calculated: the AI forecast compared with last year for the same weeks'},
+ shm10:{h:'Nov 2026 Shipment Prediction (From '+FW0+')',w:16,num:'int',src:'calculated by the AI: the AI POS forecast times the recent shipped to sold ratio, for the weeks in November from '+FW0+' on'},
+ shm11:{h:'Dec 2026 Shipment Prediction',w:14,num:'int',src:'calculated by the AI: the AI POS forecast times the recent shipped to sold ratio, for December'},
+ shm12:{h:'Jan 2027 Shipment Prediction',w:14,num:'int',src:'calculated by the AI: the AI POS forecast times the recent shipped to sold ratio, for the weeks in January 2027'},
+ ship12:{h:'Shipment Prediction, Next 12 Weeks (Units)',w:15,num:'int',src:'calculated by the AI: the AI POS forecast times the shipped to sold ratio used (the recent 8 week ratio, kept between 0.7 and 1.3)'},
+ shipbuild:{h:'Shipments Minus POS, Next 12 Weeks (Units)',w:15,num:'intS',src:'calculated: predicted shipments minus predicted POS. Positive means retailers are building stock, negative means they are selling down what they hold'},
+ shipsig:{h:'Channel Signal',w:22,src:'calculated: Retailers building stock when shipments ran 5% or more above sales over the last 8 weeks, burning stock when 5% or more below, otherwise in line with sales'},
+ shipused:{h:'Shipped ÷ Sold Used',w:12,num:'x2',src:'calculated: the recent 8 week shipped to sold ratio, kept between 0.7 and 1.3, used to turn POS into shipments'},
+ shipl8:{h:'Shipped, Last 8 Weeks (Units)',w:13,num:'int',src:'from the Reporting tool: units shipped to retailers over the last 8 weeks'},
+ posl8:{h:'Sold, Last 8 Weeks (Units)',w:13,num:'int',src:'from the Reporting tool: units retailers sold to shoppers over the last 8 weeks'},
+ dvsgap:{h:'Supply Minus AI Demand (Units)',w:14,num:'intS',src:'calculated: Total Supply minus the AI Forecast for the next 12 weeks. Negative means supply does not cover demand'},
+ cover:{h:'Months Of Cover',w:11,num:'dec1',src:'calculated: Total Supply divided by the AI Forecast for an average month'},
+ dvsstat:{h:'Supply Vs Demand',w:15,src:'calculated: Short when Total Supply is below the AI Forecast for the next 12 weeks, Excess when weeks of supply are above the overstock limit, otherwise Covered'},
  filest:{h:'File Status',w:13,src:'calculated by the scheduled run: New Today when the item is in the latest files but was not in the previous run\'s'},
  peaklift:{h:'Peak Lift (x)',w:10,num:'x2',src:'calculated: forecast per week in the peak weeks divided by a normal week (the middle week of the next 12)'},
  stocklp:{h:'Stock Last Peak',w:20,src:'calculated from last year\'s weekly stock: In stock, or how many weeks of last year\'s peak the item was out of stock (so last year\'s sales understate demand)'},
@@ -43,7 +73,7 @@ const COLS={
  aifcst:{h:'AI Forecast Per Week (Units)',w:14,num:'int',src:'calculated by the AI: the System Forecast plus the units a confirmed promo adds (last year\'s promo lift applied to this year\'s promo weeks), spread over the 12 weeks. Equal to the System Forecast when there is no confirmed promo'},
  sales4:{h:'Sales, Last 3 Weeks (Units)',w:12,num:'int',src:'from the Reporting tool: units sold over the last 3 weeks'},
  salesvs:{h:'Sales vs Forecast (Last 3 Weeks)',w:13,num:'pctS',src:'from the Reporting tool and the Planning system: last 3 weeks of sales compared with the forecast for the same weeks'},
- ly:{h:'Same Weeks Last Year (Units)',w:16,num:'int',src:'from the Reporting tool: units sold in the same weeks last year'},
+ ly:{h:'Last Year, Same 12 Weeks (Units)',w:16,num:'int',src:'from the Reporting tool: units sold in the same 12 weeks last year'},
  wos:{h:'Weeks Of Supply',w:11,num:'dec1',src:'from the Planning system: stock on hand plus in transit, divided by the average weekly forecast'},
  lt:{h:'Lead Time (Weeks)',w:11,num:'dec1',src:'from the Shared file: the supplier\'s quoted lead time'},
  stockout:{h:'Stock-Out Week',w:13,src:'calculated: The first week stock goes below zero, using quoted delivery dates'},
@@ -76,15 +106,15 @@ const COLS={
  notedate:{h:'Note Date',w:11,src:'typed in the Master List next to the note'},
  going:{h:'What Is Going On',w:62,core:1,wide:1},todo:{h:'What To Do',w:34},conf:{h:'Confidence',w:12},
  note:{h:'Note',w:48,wide:1,src:'typed in the Master List, one note per item'}};
-const DEFAULT=['status','sku','product','decision','going','onhand','prodq','orgq','transit','nextarr','nextarrq','etachg','wos','stockout','orderby','fcstwk','aifcst','aifdiff','salesvs','peakcover','nextpromo','gap','dollars','suggest','addqty','ordovr','plan','cmptxt','note','conf'];
+const DEFAULT=['status','sku','product','sub','decision','going','sales4','fcst4','salesvs','ytdcomp','fc12','ai12','ly','vsly','peak','nextpromo','dollars','note','conf'];
 const MASTER='Master List (Work Here)',INK=['ovr','ovrwhy','plan','needby','note','notedate'],MINCOLS=12;
-const FULLK=['status','sku','product','filest','sub','decision','attn','abc','supplier','onhand','prodq','orgq','transit','openpo','onorder','supply','fcstwk','aifcst','aifdiff','sales4','salesvs','ly','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','wos','lt','ptime','ttq','tta','stockout','orderby','readyd','nextarr','nextarrq','etachg','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','going','todo','conf','suggest','addqty','addwhy','ordovr','plan','cmpai','cmptxt','needby','note','notedate'];
-const DH={onhand:'On Hand',prodq:'In Production',orgq:'At Origin',etachg:'ETA Change',readyd:'Next Ready Date',transit:'In Transit',openpo:'Open PO',orderby:'Order By',onorder:'On Order',wos:'Wks Of Supply',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival Date',nextarrq:'Next Arrival Qty',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
+const FULLK=['status','sku','product','filest','sub','decision','attn','abc','going','ytd','ytdly','ytdcomp','sales4','fcst4','salesvs','fcstwk','aifcst','aifdiff','fc12','ai12','aid12','ly','vsly','acc','bias','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','ship','supplier','onhand','prodq','orgq','transit','openpo','onorder','supply','wos','lt','ptime','ttq','tta','stockout','orderby','readyd','nextarr','nextarrq','etachg','arr2','arr2q','peakcover','peakgap','gap','gaptype','dollars','price','todo','conf','suggest','addqty','addwhy','ordovr','plan','cmpai','cmptxt','needby','note','notedate'];
+const DH={sales4:'Sales, Last 3 Wks',fcst4:'Forecast, Last 3 Wks',ytdcomp:'YTD Comp Vs LY',fc12:'System Forecast (Next 12 Wks)',ai12:'AI Forecast (Next 12 Wks)',ly:'Last Year (Same 12 Wks)',vsly:'AI Vs Last Year',peak:'Peak Months',sub:'Line',decision:'Decision',conf:'Confidence',onhand:'On Hand',prodq:'In Production',orgq:'At Origin',etachg:'ETA Change',readyd:'Next Ready Date',transit:'In Transit',openpo:'Open PO',orderby:'Order By',onorder:'On Order',wos:'Wks Of Supply',salesvs:'Sales vs Fcst (3 Wk)',stockout:'Stock-Out Week',nextarr:'Next Arrival Date',nextarrq:'Next Arrival Qty',peakcover:'Peak Cover',nextpromo:'Next Promo',gap:'Unit Gap',dollars:'$ At Stake',going:'What Is Going On',note:'Note'};
 const dh=k=>DH[k]||COLS[k].h;
 let cols=DEFAULT.slice();
 const saveCols=()=>{};
-let rowsMode='attn',tab='dash';
-const PLK=new Set(['prodq','orgq','readyd','etachg','ptime','ttq','tta','nextarrq','arr2','arr2q','aifdiff','filest','suggest','addqty','addwhy','aifcst','aifdiff','cmpai','cmptxt','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift']);
+let tab='dash';
+const PLK=new Set(['ytd','ytdly','ytdcomp','fcst4','fc12','ai12','ly','vsly','aid12','aim10','aim11','aim12','lym10','lym11','lym12','cmpm10','cmpm11','cmpm12','ship12','shm10','shm11','shm12','shipbuild','shipused','shipl8','posl8','shipsig','dvsgap','cover','dvsstat','prodq','orgq','readyd','etachg','ptime','ttq','tta','nextarrq','arr2','arr2q','aifdiff','filest','suggest','addqty','addwhy','aifcst','aifdiff','cmpai','cmptxt','ovr','ovrwhy','plan','needby','used','ordovr','bump','peakgap','peaklift','stocklp','onhand','transit','openpo','onorder','supply','fcstwk','sales4','salesvs','wos','stockout','orderby','nextarr','nextarrq','arr2','arr2q','gap','gaptype','dollars','price','acc','bias','ship','abc','peak','peakwk','peakcover','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift']);
 function val(k,r){
   if(PLK.has(k))return A.pv(k,r);
   const m=r.metrics,sk=A.skuOf(r.id),n=A.noteFor(r.id);
@@ -121,66 +151,25 @@ function dashHtml(){
     if(k==='status')return `<td class="st ${TCLASS[r.tier]||'t-ok'}">${esc(v)}</td>`;
     if(C.num)return `<td class="money ${A.pcls(k,v)}">${esc(A.fv(k,v))}</td>`;
     return `<td class="${k==='going'?'wide':(k==='sku'||k==='conf'||k==='nextarr'||k==='arr2'?'c':'')} ${A.pcls(k,v)}">${esc(String(v))}</td>`}).join('')}</tr>`).join('');
-  return `<div class="dash"><h3>Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
-   <p class="dnote">Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. To act on what you see, go to the Master List (Work Here) and filter to the same choices. This is the same dashboard that opens first in the downloaded sheet.</p>
+  const tiles=(L,ai)=>`<div class="snap dsnap">${L.map(([t,n,sub])=>`<div class="snapt${ai?' ai':''}"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>`;
+  return `<div class="dash"><h3>Demand Planning Dashboard (Sample Data), ${esc(A.TODAY_SHORT)}</h3>
+   <p class="dnote">Start with demand: How much is selling, how it compares with last year, and what the forecast and the AI expect next. Then pick a Decision and a Status in the two yellow cells and the boxes and list rebuild. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. To act on what you see, go to the Master List (Work Here) and filter to the same choices. This is the same dashboard that opens first in the downloaded sheet.</p>
    ${colorKey()}
    <div class="dpick"><label>Decision <select id="dd">${[ALLD,...DECL].map(o=>`<option ${o===dashDec?'selected':''}>${esc(o)}</option>`).join('')}</select></label>
    <label>Status <select id="ds">${CONSTAT().map(o=>`<option ${o===dashStat?'selected':''}>${esc(o)}</option>`).join('')}</select></label></div>
+   <div class="dsec">Demand Snapshot <span>All items, not filtered by the picks above</span></div>${tiles(A.snapTiles())}
+   <div class="dsec">Demand Signals <span>All items, not filtered by the picks above</span></div>${tiles(A.signalTiles(),0)}
+   <div class="dsec">Planner Actions <span>These boxes follow the Decision and Status picks</span></div>
    <div class="dboxes">${boxes}</div>
-   <div class="dsec">Portfolio Snapshot <span>All items, not filtered by the picks above</span></div>
-   <div class="snap dsnap">${A.snapTiles().map(([t,n,sub])=>`<div class="snapt"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>
-   <div class="dsec">AI Recommendations And Your Orders <span>All items, not filtered by the picks above</span></div>
-   <div class="snap dsnap">${A.aiTiles().map(([t,n,sub])=>`<div class="snapt ai"><div class="t">${t}</div><div class="n">${n}</div><div class="d">${esc(sub)}</div></div>`).join('')}</div>
    <div class="dcount">Items matching your choices: <b>${rows.length}</b><span class="dsep">·</span>Total $ at stake: <b>${money(sumD(rows))}</b><span class="dsep">·</span>No decision needed: <b>${rows.filter(r=>!r.decision).length}</b></div>
    <div class="xl-scroll"><table class="xt dtab"><thead><tr class="heads">${head}</tr></thead><tbody>${body||`<tr><td colspan="${cols.length}">Nothing matches these choices.</td></tr>`}</tbody></table></div>
-   <p class="dfoot">$ At Stake is the unit gap times the unit price. Unit gap is units short for Order more, units over for Too much stock, and units the forecast is off by for Forecast looks off. Red weeks of supply is under 4, blue is over ${st.settings.overstockWOS}. Orange sales vs forecast is 15% or more either way.</p></div>`;
+   <p class="dfoot">$ At Stake is the unit gap times the unit price. Unit gap is units short for Order more, units over for Too much stock, and units the forecast is off by for Forecast looks off. Orange sales vs forecast, comps and AI vs last year are 15% or more either way. The supply columns (stock, orders, stock-out week) are on the Master List and the Demand Vs Supply tab.</p></div>`;
 }
 /* ---------- notes / recipe data ---------- */
 function noteItems(){
   return Object.values(E.activeNotes(st.notes)).sort((a,b)=>a.id-b.id).map(n=>{const r=A.rowOf(n.sku);return [n.sku,r?r.name:'',E.NOTE_LABEL[n.flag]||n.flag,n.kind==='comment'?'Comment':'Accepted risk',n.reason,n.text,n.who,n.date,n.kind==='comment'?'':Math.round(n.acceptedGap||0)]});
 }
-const DEFS=[
- ['On Hand / In Transit / Open PO','Units in the warehouse today / units on the way with a delivery date / units ordered from the supplier that have not shipped. On Order is In Transit plus Open PO. Total Supply is On Hand plus On Order.'],
- ['Forecast Per Week','The average of the next 12 weekly forecasts.'],
- ['Sales vs Forecast (3 Wk)','Sales over the last 3 weeks divided by the forecast for the same weeks, minus 1. Orange when it is 15% or more either way.'],
- ['Weeks Of Supply','(On Hand + In Transit) divided by Forecast Per Week. Red under 4 weeks. Blue over '+st.settings.overstockWOS+' weeks (a setting).'],
- ['Stock-Out Week','The first week in the next 12 where projected stock goes below zero, using the quoted delivery dates. "None" means no stock-out in 12 weeks. "n/a" means a new item or a data problem.'],
- ['Order By','The stock-out week minus the supplier lead time (the longer of quoted and typical). "Now" means that date has already passed.'],
- ['Next Arrival','The soonest delivery, in transit or on a PO, with its units.'],
- ['Unit Gap','Units short (Order more or expedite), units over (Too much stock), or units the forecast is off by (Forecast looks off).'],
- ['$ At Stake','Unit Gap times Unit Price.'],
- ['ABC Class','A is the items that make the first 80% of 12-week forecast sales value, B the next 15%, C the last 5%.'],
- ['Forecast Accuracy / Bias','Accuracy is 1 minus the miss (WMAPE) over the last 13 weeks. Miss is the sum of |actual - forecast| divided by total actual. Bias is (forecast - actual) divided by actual, so negative means the forecast runs low.'],
- ['Shipped ÷ Sold (8 Wks)','Shipments to retailers divided by retailer sales over 8 weeks. Above 1.3x suggests retailers are building stock.'],
- ['Peak Months / Peak Weeks','Peak months are the calendar months that sold at least 1.5x an average month, over the last two years. Peak weeks are the weeks in the next 12 that sold at least 1.5x a normal week last year.'],
- ['Peak Cover','OK means projected stock stays above 2 weeks of peak demand through the peak weeks. Thin means it dips below that. Short means stock goes below zero. "No peak" means no peak week falls in the next 12.'],
- ['Promo Status','None, Last year only, Not confirmed (this year\'s promo is on the calendar but not confirmed), Confirmed covered or short (supply against the base forecast plus last year\'s lift), or New this year.'],
- ['Last Promo Lift And Units','Last year\'s promo weeks compared with the normal weeks around them, after taking out the season. 1.50x means the promo weeks sold 50% more. Last Promo Units Sold is the total sold in those weeks, so you can see the real number behind the lift. Both are measured from the weeks last year\'s promo ran, moved to the same calendar weeks this year.'],
- ['Promo And Peak Overlap','Says whether this year\'s promo weeks fall inside the peak weeks. When they do, the promo lands on top of an already busy season.'],
- ['Promo Extra Units And Peak + Promo Units','Peak Bump is the units the peak weeks sell above a normal week. Promo Extra Units is what the confirmed promo adds on top of the forecast in its weeks (forecast times the last promo lift). For a promo inside the peak it scales with the Peak Lift Used, so a peak override moves it. Peak + Promo Units adds the two in units. It is 0 for a promo with no last-year history (New this year), because there is no lift to measure. Nothing is averaged, and a week is never counted twice: The promo sits on top of the peak level, and the peak bump is measured against a normal week.'],
- ['12-Week Plan','Projected On Hand each week is last week plus receipts minus forecast demand. Red means below zero. Lowest Point is the lowest projected week. The Peak / Promo Weeks row marks PEAK weeks, PROMO weeks (PROMO? if not confirmed) and BOTH.']];
-function recipeItems(){
-  return [['Rows Shown','The Master List holds every item, with the ones that need attention first, ranked by status then dollars. The Dashboard starts on the items that need attention.'],
-   ['Dashboard Columns',cols.map(k=>COLS[k].h).join(', ')+'. The Master List always holds every column.'],
-   ['Data Sources',D.sources.map(s=>s.name).join(', ')],
-   ['Checks Run',Object.keys(E.FLAG_LABEL).filter(k=>st.settings.flags[k]).map(k=>E.FLAG_LABEL[k]).join(', ')],
-   ['Seasonality And Promos','Peak months are calculated from sales history. Promos are read from the promo calendar file. The Seasonal And Promo Lifts tab shows each item\'s peak and promo, and its Where This Comes From section lists what is calculated, what comes from a file and what is not available. The Sales History tab shows the weekly sales behind the peaks, and the Master List suggests how many units to add for a peak or promo, with the reason.'],
-   ...A.SEASON_SRC.map(x=>['Source: '+x[0],x[1]+'. '+x[2]]),
-   ['Notes','Notes never expire. Type one note per item in the Master List. In the app, a comment keeps the alert on and an accepted risk stops it, coming back only if its gap grows past 1.5 times what was accepted.'],
-   ['Carrying Work Forward','Each run starts from the previous file and the two fresh source files. Calculated columns are replaced from the new files. The light yellow columns are copied across by SKU, so notes, peak overrides, order quantities to place and needed-by dates carry forward. An order quantity to place is flagged for review once its Needed By date passes, and an override is flagged for review after two weeks, so old fixes do not drive orders forever.'],
-   ['New And Missing Items','A SKU in the latest files that was not in the previous run\'s is marked New Today in the File Status column on the Master List, with the light yellow columns empty. A SKU that was in the previous file but is missing from today\'s goes to the New And Missing Items tab with the work you had typed, so you know to check the shared files for what happened.'],
-   ['Peak Override And Orders','Read the peak columns left to right on the Master List: Peak Weeks is when, Peak Lift is how big (the forecast in the peak weeks divided by a normal week), with your Override and its Reason beside it and Peak Lift Used after them, Peak Bump is the extra units that means, and Units Short Of Peak Cover is what is still missing after stock and orders on the way. If you know last year was out of stock, type your own lift on the Master List. AI Recommended Qty (Stock Gap) covers stock-out gaps. AI Recommended Add (Peak + Promo) says how many more units to order so stock stays above 2 weeks of peak demand, counting the confirmed promo, and AI Recommendation Why gives the reason in words. AI Recommended Qty (Total) adds them together and recalculates with any override you typed. Order Qty To Place and Needed By are yours to type and copy into the planning system.'],
-   ['Schedule','On your schedule: Daily, weekly or on request (sample: 6:05 AM)'],
-   ['How To Change It','Ask your AI agent. Columns, colors and rules are changed in conversation with the agent, which updates this saved recipe so every future run uses it. They are not edited on this site or in the downloaded file.'],
-   ...DEFS.map(d=>['Definition: '+d[0],d[1]])];
-}
-/* ---------- plan + accuracy data ---------- */
-function planBlocks(rows){
-  return rows.map(r=>{const sk=A.skuOf(r.id),pj=E.project(sk,A.snap(),{demand:sk.fcstH,slip:0}).rows;const pw=new Set(r.metrics.peak?r.metrics.peak.weeks:[]),ty={};((sk.promo&&sk.promo.ty)||[]).forEach(x=>{ty[x.h]=x.confirmed});
-    const mark=pj.map((x,h)=>{const pk=pw.has(h),pr=h in ty;return pk&&pr?'BOTH':pk?'PEAK':pr?(ty[h]?'PROMO':'PROMO?'):''});
-    return {r,onHand:sk.inv.onHand,dem:pj.map(x=>x.demand),rec:pj.map(x=>x.arrival),inv:pj.map(x=>x.inv),mark}});
-}
-const weekLabels=()=>Array.from({length:E.H},(_,h)=>E.fmtDate(E.weekStart(A.snap(),h)));
+/* ---------- accuracy data ---------- */
 const tgtText=(w,b)=>w>0.35||Math.abs(b)>0.10?'Off target':w>0.25||Math.abs(b)>0.05?'Watch':'On target';
 function accRows(){
   const T=E.accuracyTotal(A.snap()),a=E.accuracy(A.snap());
@@ -204,17 +193,34 @@ function colGrid(keys,rows,empty,inp){
     return {t:String(v),cls:(C.wide?'wide ':'')+(inp.includes(k)?'inp ':'')+A.pcls(k,v)}})}));
   return {html:gridHtml(heads,body,{empty}),n:rows.length};
 }
-function planGrid(rows){
-  const wl=weekLabels(),heads=[{t:'Status'},{t:'SKU'},{t:'Product'},{t:'Measure'},{t:'On Hand Now',cls:'money'},...wl.map(t=>({t,cls:'money'})),{t:'12-Wk Total',cls:'money'},{t:'Lowest Point',cls:'money'},{t:'Note'}];
-  const body=[],nf=v=>E.fmtNum(v);
-  planBlocks(rows).forEach(b=>{const r=b.r,low=Math.min(...b.inv);
-    const id=(first)=>first?[{t:A.tn(r.tier),cls:'st '+TCLASS[r.tier]},{t:r.id},{t:r.name}]:[{t:''},{t:''},{t:''}];
-    body.push({id:r.id,c:[...id(1),{t:'Forecast Demand'},{t:''},...b.dem.map(v=>({t:nf(v),cls:'money'})),{t:nf(b.dem.reduce((a,v)=>a+v,0)),cls:'money'},{t:''},{t:val('note',r),cls:'wide'}]});
-    body.push({id:r.id,c:[...id(0),{t:'Receipts (Transit + PO)'},{t:''},...b.rec.map(v=>({t:v?nf(v):'',cls:'money'})),{t:nf(b.rec.reduce((a,v)=>a+v,0)),cls:'money'},{t:''},{t:''}]});
-    body.push({id:r.id,c:[...id(0),{t:'Projected On Hand',cls:'bold'},{t:nf(b.onHand),cls:'money'},...b.inv.map(v=>({t:nf(v),cls:'money'+(v<0?' bad':'')})),{t:''},{t:nf(low),cls:'money'+(low<0?' bad':'')},{t:''}]});
-    body.push({id:r.id,c:[...id(0),{t:'Peak / Promo Weeks'},{t:''},...b.mark.map(v=>({t:v,cls:v?'warn':''})),{t:''},{t:''},{t:''}]})});
-  return {html:gridHtml(heads,body,{empty:'Nothing needs attention.'}),n:rows.length};
+const MONTH_H=()=>E.BUCKETS.map((b,i)=>i===10?b+' (Part Forecast)':i>10?b+' (Forecast)':b);
+const MEAS=['Last Year POS','This Year POS (Actual To Date)','System Forecast','AI Forecast (Weeks Still To Come)','This Year Outlook (Actual Plus AI Forecast)','Comp Vs Last Year'];
+/* one block per Total, Line and Item: rounded units per month, so every total is the sum of the cells beneath it */
+function monthlyBlocks(){
+  const all=sheetRows('all'),mk=(level,line,r,list)=>{const z=()=>new Array(13).fill(0),b={level,line,id:r?r.id:null,name:r?r.name:level==='Total'?'All items':'All '+line+' items',tier:r?r.tier:null,ly:z(),ty:z(),fc:z(),ai:z(),out:z()};
+    list.forEach(x=>{const m=x.metrics.monthly;for(let i=0;i<13;i++){b.ly[i]+=Math.round(m.ly[i]);b.ty[i]+=Math.round(m.ty[i]);b.fc[i]+=Math.round(m.fc[i]);b.ai[i]+=Math.round(m.ai[i])}});
+    b.out=b.ty.map((x,i)=>x+b.ai[i]);return b};
+  const lines=D.subs.slice(),blocks=[mk('Total','All Lines',null,all)];
+  lines.forEach(l=>blocks.push(mk('Line',l,null,all.filter(r=>r.sub===l))));
+  all.filter(r=>itemLine==='All Lines'||r.sub===itemLine).forEach(r=>blocks.push(mk('Item',r.sub,r,[r])));
+  return blocks;
 }
+const fyOf=a=>a.slice(0,12).reduce((t,x)=>t+x,0);
+const compOf=(o,l)=>l>0?o/l-1:'';
+/* months with no weeks of that kind stay blank: no actuals after November, no AI forecast before November */
+const blankAt=(i,j)=>(i===1&&j>=11)||(i===3&&j<10);
+function monthlyGrid(){
+  const bl=monthlyBlocks(),heads=[{t:'Level'},{t:'Line'},{t:'SKU'},{t:'Product'},{t:'Measure'},...MONTH_H().map(t=>({t,cls:'money'})),{t:'2026 Total (Jan To Dec)',cls:'money'}],body=[],nf=v=>E.fmtNum(v);
+  bl.forEach(b=>{const grp=b.level!=='Item',cl=grp?'bold':'';
+    const id=first=>[{t:first?b.level:'',cls:cl},{t:first?b.line:'',cls:cl},{t:first&&b.id?b.id:'',cls:cl},{t:first?b.name:'',cls:'nw '+cl}];
+    const row=(i,vals,fy,cmp)=>body.push({id:b.id,cls:grp?'sumrow':'',c:[...id(i===0),{t:MEAS[i],cls:'nw '+(i===5?'bold':'')},...vals.map((v,j)=>cmp?{t:v===''?'':A.pctSN(v,0),cls:'money '+(v!==''&&Math.abs(v)>=0.15?'warn':'')}:{t:blankAt(i,j)?'':nf(v),cls:'money'+(j>9?' nxt':'')}),cmp?{t:fy===''?'':A.pctSN(fy,0),cls:'money '+(fy!==''&&Math.abs(fy)>=0.15?'warn':'')}:{t:nf(fy),cls:'money bold'}]});
+    row(0,b.ly,fyOf(b.ly));row(1,b.ty,fyOf(b.ty));row(2,b.fc,fyOf(b.fc));row(3,b.ai,fyOf(b.ai));row(4,b.out,fyOf(b.out));
+    row(5,b.out.map((o,i)=>compOf(o,b.ly[i])),compOf(fyOf(b.out),fyOf(b.ly)),true)});
+  return {html:gridHtml(heads,body,{empty:'Nothing here.'}),n:bl.filter(b=>b.level==='Item').length};
+}
+const POSK=['status','sku','product','sub','aim10','lym10','cmpm10','aim11','lym11','cmpm11','aim12','lym12','cmpm12','fc12','ai12','ly','vsly','aid12','salesvs','ytdcomp','peak','nextpromo','promo'];
+const SHIPK=['status','sku','product','sub','shm10','shm11','shm12','ship12','ai12','shipbuild','shipsig','ship','shipused','shipl8','posl8'];
+const DVSK=['status','sku','product','sub','fc12','ai12','onhand','prodq','orgq','transit','supply','dvsgap','cover','dvsstat','wos','stockout','orderby','nextarr','nextarrq','etachg','decision','going'];
 const NK=['status','sku','product','note','notedate','going'];
 let itemLine='All Lines';
 const LFK=['status','sku','product','filest','sub','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','suggest','addqty','addwhy','ordovr','plan','cmptxt','note'];
@@ -223,12 +229,15 @@ function accGrid(){
   const rows=accRows(),heads=['Line','Items','Forecast Accuracy','Miss (WMAPE)','Bias','Against Targets','Signal'].map((t,i)=>({t,cls:i>=1&&i<=4?'money':''}));
   return {html:gridHtml(heads,rows.map(x=>({c:[{t:x.line,cls:'bold'},{t:String(x.n),cls:'money'},{t:A.pctN(1-x.w),cls:'money'},{t:A.pctN(x.w),cls:'money'},{t:A.pctSN(x.b),cls:'money'},{t:tgtText(x.w,x.b),cls:({'On target':'','Watch':'warn','Off target':'bad'})[tgtText(x.w,x.b)]},{t:x.sig,cls:'wide'}]}))),n:rows.length-1};
 }
-const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['plan','12-Week Plan'],['acc','Forecast Accuracy'],['items','Seasonal And Promo Lifts'],['hist','Sales History'],['notes','Notes'],['dropped','New And Missing Items'],['recipe','Recipe']];
+const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['hist','Sales History'],['items','Seasonal And Promo Lifts'],['month','Monthly Demand'],['pos','POS Prediction'],['ship','Shipping Prediction'],['acc','Forecast Accuracy'],['dvs','Demand Vs Supply'],['notes','Notes'],['dropped','New And Missing Items']];
 function roleHtml(){
   if(tab==='all')return `<div class="role work"><b>Work here.</b> This is the only tab you type in. Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by and notes). Order Qty To Place is the new order you decide to place today. Orders already placed are In Transit and Open PO. Items marked New Today in the File Status column are new in the latest files. Every other tab reads from this sheet, so what you type shows up everywhere. To work the same list you saw on the Dashboard, filter Status and Decision here to the same choices.</div><div class="carry-box"><b>Reading the peak and promo columns, left to right:</b> Peak Weeks is when. Peak Lift, your Peak Lift Override and its Reason sit side by side so you can compare them, and Peak Lift Used is the one the sheet uses. Peak Bump is the extra units that means. Next come the promo columns: This year\'s promo weeks, last year\'s promo weeks, the units it sold and the lift it gave, whether it lands inside the peak, and Promo Extra Units. Peak Bump plus Promo Extra Units is shown in units, never averaged. Then Peak Cover and Units Short Of Peak Cover say whether stock and orders on the way already cover it. Further right the teal AI columns sit together: AI Recommended Qty (Stock Gap), AI Recommended Add (Peak + Promo) with AI Recommendation Why, and AI Recommended Qty (Total), recalculated when you type an override. Then come Order Qty To Place, which is what you decide, Variance Vs AI Qty and Your Qty Vs AI (Near AI Qty, Below AI Qty or Above AI Qty). Type an override and the bump, promo and order quantities update.</div>${colorKey()}`;
-  if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Pick a Decision and a Status to see the day at a glance. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div><div class="carry-box"><b>Today\'s files:</b> ${esc(carryText())}</div>`;
+  if(tab==='dash')return `<div class="role front"><b>Look here first. View only.</b> Start with the demand numbers at the top, then pick a Decision and a Status to see the items behind them. To act on what you see, go to the Master List (Work Here) and filter to the same choices.</div><div class="carry-box"><b>Today\'s files:</b> ${esc(carryText())}</div>`;
   if(tab==='dropped')return `<div class="role"><b>View only.</b> Every change in which items are in the files. New means the item is in the latest files but was not in the previous run\'s (it is also marked New Today on the Master List). Missing Today means it was in the previous file but is not in today\'s: The run lists it here with the work you had typed, so nothing is lost silently. Check the shared files to see what happened.</div>`;
-  if(tab==='recipe')return '';
+  if(tab==='month')return `<div class="role"><b>View only.</b> Demand by calendar month: The whole portfolio first, then each line, then each item. A week counts toward the month of its middle day, and last year uses the same week numbers, so every comp compares like weeks. This Year is actual sales for weeks that have sold, then the AI forecast. November mixes both, and December and January are forecast. Pick a line to see only its items. It is locked, so make changes on the Master List.</div>`;
+  if(tab==='pos')return `<div class="role"><b>View only.</b> What retailers are expected to sell to shoppers (POS) over the next 12 weeks, by month, against the same weeks last year. The AI forecast is the system forecast plus the extra units a confirmed promo adds. November starts with the first forecast week, and January 2027 compares with this January. It is locked, so make changes on the Master List.</div>`;
+  if(tab==='ship')return `<div class="role"><b>View only.</b> What is expected to ship to retailers over the next 12 weeks, by month. It is the AI POS forecast times the recent shipped to sold ratio (kept between 0.7 and 1.3), so it is an estimate and not a retailer order book. Shipments above POS mean retailers are building stock, and below means they are selling down. It is locked, so make changes on the Master List.</div>`;
+  if(tab==='dvs')return `<div class="role"><b>View only.</b> A quick check, one row per item, of whether supply covers demand. Demand is the system and AI forecast for the next 12 weeks, and supply is on hand plus what is in transit or on order. The detail behind each number stays on the Master List. It is locked, so make changes there.</div>`;
   return `<div class="role"><b>View only.</b> This tab reads from the Master List, so make changes there. It is locked so typing here does not get lost (in Excel: Review, then Unprotect Sheet, no password).</div>`;
 }
 const newCheck='New in the latest files, so nothing is typed yet. Check its forecast and launch plan, then type any note or order quantity on the Master List.';
@@ -242,7 +251,8 @@ function renderSheet(){
   let inner,count='';
   if(tab==='dash'){inner=dashHtml();count='Interactive'}
   else if(tab==='all'){const g=colGrid(FULLK,sheetRows('all'),null,INK);inner=g.html;count=`${g.n} items, every column`}
-  else if(tab==='plan'){const g=planGrid(sheetRows(rowsMode));inner=g.html;count=`${g.n} items, ${E.H} weeks`}
+  else if(tab==='month'){const g=monthlyGrid(),d=A.seasonData();inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> The portfolio and line totals always show every item. The item rows below show the line you pick.</div>`+g.html;count=`${g.n} items, by month`}
+  else if(tab==='pos'||tab==='ship'||tab==='dvs'){const k=tab==='pos'?POSK:tab==='ship'?SHIPK:DVSK,g=colGrid(k,sheetRows('all'));inner=g.html;count=`${g.n} items`}
   else if(tab==='acc'){const g=accGrid();inner=g.html;count='Last 13 weeks'}
   else if(tab==='items'){const d=A.seasonData(),its=d.items.filter(r=>itemLine==='All Lines'||r.sub===itemLine),g=colGrid(LFK,its);
     inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${d.lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Every item with a peak or a promo, by line. Read left to right: The peak (when, how big, your override and reason beside it, and the Peak Bump in units), then the promo (this year\'s weeks, last year\'s weeks and units sold, the lift it gave, whether it lands inside the peak, and the Promo Extra Units it adds on top), then whether stock covers it (Peak Cover and Units Short Of Peak Cover). Peak and promo are added in units, never averaged. Stock Last Peak shows items that were out of stock last year, when last year\'s sales understate demand. To change a lift, type an override on the Master List.</div>`+`<div class="note-box">${esc(seasonSummary(d))}</div>`+g.html+`<h3 class="sub-h">Where This Comes From</h3>`+gridHtml(['Topic','Where It Comes From','How'].map(t=>({t})),A.SEASON_SRC.map(x=>({c:[{t:x[0],cls:'bold'},{t:x[1],cls:'st'},{t:x[2],cls:'wide'}]})));count=`${g.n} items with a peak or promo`+(itemLine==='All Lines'?'':', '+itemLine)}
@@ -251,20 +261,18 @@ function renderSheet(){
     inner=`<div class="note-box line-pick"><label><b>Line</b> <select id="il">${A.seasonData().lines.map(l=>`<option ${l===itemLine?'selected':''}>${esc(l)}</option>`).join('')}</select></label> Units sold by week for 2024, 2025 and 2026, with the 2026 forecast, so you can see where inside a peak the units land: The first week, the last weeks, or the whole month. Each SKU has four rows. Orange weeks sold at least 1.5x that row\'s Normal Week (its middle week, left blank for items that sold in fewer than half the weeks, so nothing is highlighted for them). Monthly totals are on the left, weeks 1 to 52 on the right, and Wk 46 to Wk 52 are the weeks starting now. The forecast row shows the forecast for 2026; only Wk 46 to Wk 52 of the next 12 weeks fall in 2026. This reads the same sales history the peak weeks are calculated from, from the Reporting tool.</div>`+gridHtml(h,body,{empty:'No items.'});count=`${new Set(d.map(x=>x.id)).size} items`+(itemLine==='All Lines'?'':', '+itemLine)}
   else if(tab==='dropped'){const cl=changeList();inner=gridHtml(['Change','SKU','Product','Line','On Hand','Units On Order','Typed Note From Previous Run','Qty To Place','Needed By','What To Check'].map((t,i)=>({t,cls:i==4||i==5||i==7?'money':''})),cl.map(x=>({id:x.chg==='New'?x.id:null,cls:x.chg==='New'?'newrow':'',c:[{t:x.chg==='New'?'New Today':'Missing Today',cls:'st '+(x.chg==='New'?'t-new':'t-drop')},{t:x.id},{t:x.name},{t:x.sub},{t:E.fmtNum(x.onHand),cls:'money'},{t:E.fmtNum(x.po),cls:'money'},{t:x.note,cls:'wide'},{t:x.plan===''?'':E.fmtNum(x.plan),cls:'money'},{t:x.by},{t:x.check,cls:'wide'}]})),{empty:'Nothing new or missing today.'});count=A.NEWIDS.length+' new, '+A.droppedList().length+' missing'}
   else if(tab==='notes'){const g=colGrid(NK,sheetRows('all').filter(r=>A.noteFor(r.id)),'No notes yet.');inner=g.html;count=g.n+' notes'}
-  else{const it=recipeItems();inner=gridHtml(['Setting','What It Is Set To'].map(t=>({t})),it.map(r=>({c:[{t:r[0],cls:'st'},{t:r[1],cls:'wide'}]})));count='Saved with the sheet'}
+  else{inner='';count=''}
   v.innerHTML=`<div class="page"><div class="pg-h"><h1>Custom Spreadsheet</h1></div>
    <ul class="mini pg-sub"><li><b>This is what lands in your Excel file</b> on every run.</li><li><b>Click any row</b> to see the numbers behind it.</li><li><b>The download</b> keeps the same colors and formatting, with yellow dropdowns that change the boxes and the list.</li></ul>
    <div class="demo-note slim"><b>Columns are changed through your AI agent, not on this page.</b> The Dashboard columns are saved in the agent\'s recipe, so to add, remove or reorder them, tell your AI agent what you want and it updates the recipe for every future run. <a href="#" id="sh-how">See an example conversation</a></div>
    <div class="xl"><div class="xl-bar"><span class="fx">fx</span><b>Planning Sheet (Sample Data), ${esc(A.TODAY_SHORT)}</b><span class="mute" style="color:#555">${count}</span><span style="flex:1"></span>
-    ${tab==='plan'?`<span class="seg" role="group" aria-label="Rows"><button data-rows="attn" aria-pressed="${rowsMode==='attn'}">Needs attention</button><button data-rows="all" aria-pressed="${rowsMode==='all'}">All items</button></span>`:''}
-    <button class="btn sm" id="sh-custom">How To Change Columns</button>
+        <button class="btn sm" id="sh-custom">How To Change Columns</button>
     <button class="btn dl" id="sh-dl">Download Sheet</button></div>
    ${roleHtml()}${inner}
    <div class="xl-tabs" role="tablist">${TABS.map(([k,l])=>`<button role="tab" class="${k==='all'?'work':k==='dash'?'front':''}" aria-selected="${tab===k}" data-xt="${k}">${l}</button>`).join('')}</div></div>
-   <ul class="mini sec-sub" style="margin:10px 0 0"><li><b>Work in one place:</b> The light yellow Master List (Work Here) tab. Filter it and type notes, a peak lift override or the order quantity to place.</li><li><b>Everything else reads from it,</b> so it updates when the Master List does. Those tabs are locked so nothing typed there gets lost.</li><li><b>New And Missing Items</b> lists what is new or missing from the latest files.</li><li><b>The Dashboard</b> is the same list, easier to scan. Look there first.</li></ul><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
+   <ul class="mini sec-sub" style="margin:10px 0 0"><li><b>Work in one place:</b> The light yellow Master List (Work Here) tab. Filter it and type notes, a peak lift override or the order quantity to place.</li><li><b>Everything else reads from it,</b> so it updates when the Master List does. Those tabs are locked so nothing typed there gets lost.</li><li><b>New And Missing Items</b> lists what is new or missing from the latest files.</li><li><b>The Dashboard</b> is the same list, easier to scan, with demand first. Look there first.</li></ul><p class="simnote">Sample data, not Mattel data. The real file is built the same way from your own exports.</p></div>`;
   const il=$('#il',v);if(il)il.onchange=()=>{itemLine=il.value;renderSheet()};
   $$('[data-line]',v).forEach(e=>{const go2=()=>{itemLine=e.dataset.line;tab='items';renderSheet()};e.onclick=go2;e.onkeydown=ev=>{if(ev.key==='Enter')go2()}});
-  $$('[data-rows]',v).forEach(b=>b.onclick=()=>{rowsMode=b.dataset.rows;renderSheet()});
   $$('[data-xt]',v).forEach(b=>b.onclick=()=>{tab=b.dataset.xt;renderSheet()});
   const dd=$('#dd',v),ds=$('#ds',v);if(dd)dd.onchange=()=>{dashDec=dd.value;renderSheet()};if(ds)ds.onchange=()=>{dashStat=ds.value;renderSheet()};
   $$('[data-open]',v).forEach(e=>{e.onclick=()=>A.openSku(e.dataset.open);e.onkeydown=ev=>{if(ev.key==='Enter')A.openSku(e.dataset.open)}});
@@ -293,6 +301,10 @@ function downloadXlsx(){
     const slp=L('stocklp'),usd=L('used'),ov=L('ovr');
     if(slp)out.push({ref:`${slp}${first}:${slp}${last}`,rules:[{type:'expression',dxf:1,formula:`LEFT(${slp}${first},3)="Out"`}]});
     const cmp=L('cmptxt');if(cmp)out.push({ref:`${cmp}${first}:${cmp}${last}`,rules:[{type:'expression',dxf:4,formula:`LEFT(${cmp}${first},5)="Close"`},{type:'expression',dxf:0,formula:`LEFT(${cmp}${first},5)="Below"`},{type:'expression',dxf:1,formula:`LEFT(${cmp}${first},5)="Above"`}]});
+    const ds=L('dvsstat'),ss=L('shipsig');
+    if(ds)out.push({ref:`${ds}${first}:${ds}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Short"'},{type:'cellIs',op:'equal',dxf:3,formula:'"Excess"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Check the data"'}]});
+    if(ss)out.push({ref:`${ss}${first}:${ss}${last}`,rules:[{type:'cellIs',op:'equal',dxf:3,formula:'"Retailers building stock"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Retailers burning stock"'}]});
+    ['vsly','ytdcomp','cmpm10','cmpm11','cmpm12'].forEach(k=>{const c=L(k);if(c)out.push({ref:`${c}${first}:${c}${last}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${c}${first}),ABS(${c}${first})>=0.15)`}]})});
     const pcv=L('peakcover'),prm=L('promo');
     if(pcv)out.push({ref:`${pcv}${first}:${pcv}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Short"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Thin"'}]});
     if(prm)out.push({ref:`${prm}${first}:${prm}${last}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Confirmed, short"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Not confirmed"'}]});
@@ -301,7 +313,7 @@ function downloadXlsx(){
     const data=rows.map(r=>keys.map(k=>cellOf(k,r)));
     return {name,widths:keys.map(k=>COLS[k].w),rows:[hdrK(keys),...data],freeze:1,filter:data.length+1,cf:cfList(keys,2,data.length+1)};
   };
-  const rec=recipeItems(),DK=cols.slice();
+  const DK=cols.slice();
   const allRows=sheetRows('all'),N=allRows.length;
   const STATL=CONSTAT(),D0=dashDec,S0=dashStat;
   /* ---- Master List (Work Here): every item, every column, plus two hidden helper columns that drive the dashboard ---- */
@@ -337,7 +349,7 @@ function downloadXlsx(){
   const TN0=['At risk','Watch','Overstocked','No risk'];
   /* list tabs that read every cell from the Master List by SKU */
   const mkL=(rows,name,keys)=>{const si=keys.indexOf('sku');if(si<0)return mk(rows,name,keys);const sc=C(si),skuR=rng('sku');
-    const data=rows.map((r,i)=>{const er=i+2;return keys.map(k=>{if(k==='sku')return {v:r.id,s:'ctr'};
+    const data=rows.map((r,i)=>{const er=i+2;return keys.map(k=>{if(k==='sku')return {v:r.id,s:'ctr'};if(!FULLK.includes(k))return cellOf(k,r)||{v:'',s:'txt'};
       const Cc=COLS[k],rg=rng(k),m=`MATCH($${sc}${er},${skuR},0)`,v=wval(k,r);
       return {f:`IFERROR(IF(INDEX(${rg},${m})="","",INDEX(${rg},${m})),"")`,v:v,s:k==='status'?'ctr':DATEK.has(k)&&typeof v==='number'?'dt':sty(k)}})});
     const sh={name,widths:keys.map(k=>COLS[k].w),rows:[hdrK(keys),...data],freeze:1,filter:data.length+1,cf:cfList(keys,2,data.length+1)};
@@ -352,23 +364,20 @@ function downloadXlsx(){
     [{v:'Miss (WMAPE) adds up |actual - forecast| for every SKU and week over the last 13 weeks, then divides by total actual sales. Bias is (forecast - actual) divided by actual: Negative means the forecast runs low. Common targets: Miss under 25%, bias within 5% either way. Over 35% miss or 10% bias is off target.',s:'note'}]],
     cf:[{ref:`F2:F${AR}`,rules:[{type:'cellIs',op:'equal',dxf:0,formula:'"Off target"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Watch"'},{type:'cellIs',op:'equal',dxf:4,formula:'"On target"'}]}],merges:[`A${AR+3}:G${AR+3}`]};
   accSheet.rows[AR+2].h=48;
-  /* ---- 12-Week Plan: forecast, receipts and projected on hand for every item ---- */
-  const PB=planBlocks(allRows),wl=weekLabels(),W=E.H;
-  const plan={name:'12-Week Plan',widths:[13,11,32,24,12,...Array(W).fill(9),12,12,46],freeze:1,freezeCols:4,rows:[hdr(['Status','SKU','Product','Measure','On Hand Now',...wl,'12-Wk Total','Lowest Point','Note'])],cf:[]};
-  const wc0=5,wcN=4+W,tc=5+W,lc=6+W;
-  PB.forEach((b,i)=>{const r=b.r,r1=2+i*4,r2=r1+1,r3=r1+2,id=[{v:A.tn(r.tier),s:TS[r.tier]},{v:r.id,s:'txt'},{v:r.name,s:'txt'}];
-    const rd=Math.round,v3=x=>Math.round(x*1000)/1000;
-    plan.rows.push([...id,{v:'Forecast Demand',s:'txt'},{v:'',s:'txt'},...b.dem.map(x=>({v:v3(x),s:'int'})),{f:`SUM(${C(wc0)}${r1}:${C(wcN)}${r1})`,v:b.dem.reduce((a,x)=>a+v3(x),0),s:'int'},{v:'',s:'txt'},{f:`IFERROR(IF(INDEX(${rng('note')},MATCH($B${r1},${rng('sku')},0))="","",INDEX(${rng('note')},MATCH($B${r1},${rng('sku')},0))),"")`,v:val('note',r),s:'txt'}]);
-    plan.rows.push([...id,{v:'Receipts (Transit + PO)',s:'txt'},{v:'',s:'txt'},...b.rec.map(x=>({v:x||0,s:'int'})),{f:`SUM(${C(wc0)}${r2}:${C(wcN)}${r2})`,v:b.rec.reduce((a,x)=>a+x,0),s:'int'},{v:'',s:'txt'},{v:'',s:'txt'}]);
-    let prev=b.onHand;const proj=b.dem.map((d,h)=>{prev=prev+(b.rec[h]||0)-v3(d);return prev});
-    plan.rows.push([...id,{v:'Projected On Hand',s:'bold'},{v:b.onHand,s:'int'},...proj.map((x,h)=>({f:`${C(wc0+h-1)}${r3}+${C(wc0+h)}${r2}-${C(wc0+h)}${r1}`,v:x,s:'int'})),{v:'',s:'txt'},
-      {f:`MIN(${C(wc0)}${r3}:${C(wcN)}${r3})`,v:Math.min(...proj),s:'int'},{v:'',s:'txt'}]);
-    plan.rows.push([...id,{v:'Peak / Promo Weeks',s:'txt'},{v:'',s:'txt'},...b.mark.map(x=>({v:x,s:'ctr'})),{v:'',s:'txt'},{v:'',s:'txt'},{v:'',s:'txt'}]);
-  });
-  const pl=plan.rows.length;plan.filter=pl;
-  // first projected week starts from On Hand Now (column E)
-  plan.cf.push({ref:`${C(wc0)}2:${C(lc)}${pl}`,rules:[{type:'expression',dxf:0,formula:`AND($D2="Projected On Hand",ISNUMBER(${C(wc0)}2),${C(wc0)}2<0)`}]});
-  plan.cf.push({ref:`${C(wc0)}2:${C(wcN)}${pl}`,rules:[{type:'expression',dxf:1,formula:`AND($D2="Peak / Promo Weeks",${C(wc0)}2<>"")`}]});
+  /* ---- Monthly Demand: every item, line and the portfolio by calendar month ---- */
+  const keepL=itemLine;itemLine='All Lines';const MB=monthlyBlocks();itemLine=keepL;
+  const mon={name:'Monthly Demand',widths:[8,16,10,30,40,...Array(13).fill(12),15],freeze:1,freezeCols:5,cf:[],rows:[hdr(['Level','Line','SKU','Product','Measure',...MONTH_H(),'2026 Total (Jan To Dec)'])]};
+  {let rr=2;const c0=5,sm=(a,b,r)=>`SUM(${C(a)}${r}:${C(b)}${r})`;
+   MB.forEach(b=>{const grp=b.level!=='Item',tx=grp?'bold':'txt',R1=rr,R2=rr+1,R4=rr+3,R5=rr+4,idc=f=>[{v:f?b.level:'',s:tx},{v:f?b.line:'',s:tx},{v:f&&b.id?b.id:'',s:grp?'bold':'ctr'},{v:f?b.name:'',s:tx}];
+    const unit=(i,arr,first)=>{const r=rr+i;mon.rows.push([...idc(first),{v:MEAS[i],s:'txt'},...arr.map((v,j)=>blankAt(i,j)?{v:'',s:'int'}:{v,s:'int'}),{f:sm(c0,c0+11,r),v:fyOf(arr),s:'int'}])};
+    unit(0,b.ly,1);unit(1,b.ty,0);unit(2,b.fc,0);unit(3,b.ai,0);
+    mon.rows.push([...idc(0),{v:MEAS[4],s:'txt'},...b.out.map((v,j)=>({f:`N(${C(c0+j)}${R2})+N(${C(c0+j)}${R4})`,v,s:'int'})),{f:sm(c0,c0+11,R5),v:fyOf(b.out),s:'int'}]);
+    const cm=(col,o,l)=>({f:`IF(${C(col)}${R1}>0,${C(col)}${R5}/${C(col)}${R1}-1,"")`,v:compOf(o,l),s:'pctS'});
+    mon.rows.push([...idc(0),{v:MEAS[5],s:'bold'},...b.out.map((o,j)=>cm(c0+j,o,b.ly[j])),cm(c0+13,fyOf(b.out),fyOf(b.ly))]);rr+=6});
+   mon.filter=mon.rows.length;
+   mon.cf.push({ref:`${C(c0)}2:${C(c0+13)}${mon.rows.length}`,rules:[{type:'expression',dxf:1,formula:`AND($E2="${MEAS[5]}",ISNUMBER(${C(c0)}2),ABS(${C(c0)}2)>=0.15)`}]});}
+  const posSheet=mkL(sheetRows('all'),'POS Prediction',POSK),shipSheet=mkL(sheetRows('all'),'Shipping Prediction',SHIPK),dvsSheet=mkL(sheetRows('all'),'Demand Vs Supply',DVSK);
+  [posSheet,shipSheet,dvsSheet].forEach(x=>{x.freezeCols=3;x.fit=true});
   /* ---- Seasonal And Promo Lifts ---- */
   const SD=A.seasonData();
   const itemSheet=mkL(SD.items,'Seasonal And Promo Lifts',LFK);itemSheet.fit=true;itemSheet.freezeCols=3;
@@ -381,56 +390,53 @@ function downloadXlsx(){
   histSheet.cf.push({ref:`${C(18)}2:${C(69)}${HN+1}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${C(18)}2),$${C(5)}2>0,${C(18)}2>=1.5*$${C(5)}2)`}]});
   histSheet.cf.push({ref:`A2:A${HN+1}`,rules:TN0.map((t,j)=>({type:'cellIs',op:'equal',dxf:[0,1,3,4][j],formula:`"${A.tn(t)}"`}))});
   /* ---- Dashboard ---- */
-  const DW={status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:13,nextarrq:11,readyd:12,prodq:12,orgq:11,etachg:11,arr2:13,arr2q:11,aifdiff:11,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
+  const DW={sub:16,decision:21,sales4:11,fcst4:11,ytdcomp:11,fc12:12,ai12:12,ly:12,vsly:11,peak:14,status:12,sku:10,product:30,onhand:10,onorder:10,wos:9,fcstwk:9,salesvs:11,stockout:12,nextarr:13,nextarrq:11,readyd:12,prodq:12,orgq:11,etachg:11,arr2:13,arr2q:11,aifdiff:11,peakcover:10,nextpromo:17,gap:10,dollars:12,going:50,note:40,conf:10};
   const nd=DK.length,HC=nd; // helper column index on the dashboard
   const dash={name:'Dashboard',tab:'FF1F3864',fit:true,noGrid:true,widths:[...DK.map(k=>DW[k]||COLS[k].w),6],hide:[HC],rows:[],merges:[],cf:[],dv:[]};
   const R=n=>{while(dash.rows.length<n)dash.rows.push([]);return dash.rows[n-1]};
   const put=(r,c,o)=>{R(r)[c]=o};
   const fill=(r,c0,c1,sty)=>{for(let c=c0;c<=c1;c++)if(!R(r)[c])put(r,c,{v:'',s:sty})};
   const span=(r,c0,c1,o)=>{put(r,c0,o);fill(r,c0+1,c1,o.s);if(c1>c0)dash.merges.push(`${C(c0)}${r}:${C(c1)}${r}`)};
-  span(1,0,nd-1,{v:'Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
-  span(2,0,nd-1,{v:'VIEW ONLY. Look things over here, then do the work on the light yellow Master List (Work Here) tab and filter it to the same Decision and Status. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Pick one of each in the two yellow cells and the boxes and list rebuild. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first. Color key: Teal is the AI\'s recommendation, light yellow is where you type, red is a problem or needs action, orange is Watch (the planner should check it), blue is Overstocked or too many weeks of supply, green is No risk.',s:'note'});R(2).h=48;
+  span(1,0,nd-1,{v:'Demand Planning Dashboard (Sample Data), '+A.TODAY_SHORT,s:'title'});R(1).h=26;
+  span(2,0,nd-1,{v:'VIEW ONLY. Start with demand: How much is selling, how it compares with last year, and what the forecast and the AI expect next. Then pick a Decision and a Status in the two yellow cells and the boxes and list rebuild. Decision is the action an item needs. Status is how urgent it is, and "Needs attention" means anything flagged. Do the work on the light yellow Master List (Work Here) tab and filter it to the same choices. Sample data, not Mattel data. If Excel opens this in Protected View, click Enable Editing first. Color key: Teal is the AI\'s recommendation, light yellow is where you type, red is a problem or needs action, orange is Watch (the planner should check it), blue is Overstocked or too many weeks of supply, green is No risk.',s:'note'});R(2).h=48;
   put(4,0,{v:'Decision',s:'label'});span(4,1,2,{v:D0,s:'pick'});
   span(4,3,4,{v:'Status',s:'label'});span(4,5,7,{v:S0,s:'pick'});R(4).h=24;
   dash.dv.push({ref:'B4',title:'Decision',prompt:'Pick a decision to filter the list.',list:'"'+[ALLD,...DECL].join(',')+'"'},{ref:'F4',title:'Status',prompt:'Pick a status to filter the list.',list:'"'+STATL.join(',')+'"'});
   const q4=i=>[Math.round(i*nd/4),Math.round((i+1)*nd/4)-1],BOX=[0,1,2,3].map(q4),t6=i=>[Math.round(i*nd/6),Math.round((i+1)*nd/6)-1];
+  const K=st.res.kpi,AC=E.accuracyTotal(A.snap()),attn=allRows.filter(r=>r.headline).length,ST=A.snapTiles(),SG=A.signalTiles(),ch=st.settings.channelRatio;
+  const SUMV=k=>`SUM(${rng(k)})`,PCT=x=>`TEXT(${x},"+0.0%;-0.0%")`;
+  const tileRow=(r0,title,TL)=>{span(r0,0,nd-1,{v:title,s:'sect'});R(r0).h=22;
+    TL.forEach(([[c0,c1],t,val_,sub])=>{span(r0+1,c0,c1,{v:t,s:'boxT'});span(r0+2,c0,c1,val_);span(r0+3,c0,c1,Object.assign({s:'boxS'},sub))});R(r0+1).h=22;R(r0+2).h=40;R(r0+3).h=20};
+  const num=t=>+String(t).replace(/,/g,''),pc=t=>parseFloat(t)/100;
+  /* demand snapshot: live formulas over the Master List */
+  tileRow(6,'Demand Snapshot (all items, not filtered by the picks above)',[
+   [t6(0),ST[0][0],{f:`COUNTA(${rng('sku')})`,v:K.items,s:'boxN'},{f:`COUNTIF(${rAtt},"Yes")&" need attention today"`,v:ST[0][2]}],
+   [t6(1),ST[1][0],{f:SUMV('ai12'),v:num(ST[1][1]),s:'boxN'},{f:`${PCT(`SUMIFS(${rng('ai12')},${rng('ly')},">0")/SUM(${rng('ly')})-1`)}&" vs the same weeks last year"`,v:ST[1][2]}],
+   [t6(2),ST[2][0],{f:SUMV('ytd'),v:num(ST[2][1]),s:'boxN'},{f:`${PCT(`SUMIFS(${rng('ytd')},${rng('ytdly')},">0")/SUM(${rng('ytdly')})-1`)}&" vs the same weeks last year"`,v:ST[2][2]}],
+   [t6(3),ST[3][0],{f:`SUM(${rng('sales4')})/SUM(${rng('fcst4')})-1`,v:allRows.reduce((t,r)=>t+(typeof val('sales4',r)==='number'?val('sales4',r):0),0)/allRows.reduce((t,r)=>t+(typeof val('fcst4',r)==='number'?val('fcst4',r):0),0)-1,s:'boxPctS'},{f:`"Last 3 weeks: "&TEXT(SUM(${rng('sales4')}),"#,##0")&" sold vs "&TEXT(SUM(${rng('fcst4')}),"#,##0")&" forecast"`,v:ST[3][2]}],
+   [t6(4),ST[4][0],{f:"'Forecast Accuracy'!C2",v:1-AC.wmape,s:'boxPct'},{f:`"Miss (WMAPE) "&TEXT('Forecast Accuracy'!D2,"0.0%")&", last 13 weeks"`,v:ST[4][2]}],
+   [t6(5),ST[5][0],{f:"'Forecast Accuracy'!E2",v:AC.bias,s:'boxPctS'},{f:`IF('Forecast Accuracy'!E2<0,"Forecast runs low (sales beat it)","Forecast runs high")`,v:ST[5][2]}]]);
+  /* demand signals: counts over the Master List */
+  tileRow(11,'Demand Signals (all items, not filtered by the picks above)',[
+   [t6(0),SG[0][0],{f:`COUNTIF(${rng('salesvs')},">=0.15")`,v:num(SG[0][1]),s:'boxN'},{v:SG[0][2]}],
+   [t6(1),SG[1][0],{f:`COUNTIF(${rng('salesvs')},"<=-0.15")`,v:num(SG[1][1]),s:'boxN'},{v:SG[1][2]}],
+   [t6(2),SG[2][0],{f:`COUNTIF(${rng('nextpromo')},"<>None")`,v:num(SG[2][1]),s:'boxN'},{f:`COUNTIF(${rng('promo')},"Not confirmed")&" not yet confirmed"`,v:SG[2][2]}],
+   [t6(3),SG[3][0],{f:`COUNTIFS(${rng('peakwk')},"<>None in window",${rng('peakwk')},"<>n/a")`,v:num(SG[3][1]),s:'boxN'},{v:SG[3][2]}],
+   [t6(4),SG[4][0],{f:`COUNTIF(${rng('aid12')},">0")+COUNTIF(${rng('aid12')},"<0")`,v:num(SG[4][1]),s:'boxN'},{f:`TEXT(SUM(${rng('aid12')}),"+#,##0;-#,##0")&" units over 12 weeks"`,v:SG[4][2]}],
+   [t6(5),SG[5][0],{f:`COUNTIF(${rng('ship')},">=${ch}")`,v:num(SG[5][1]),s:'boxN'},{v:SG[5][2]}]]);
+  /* planner actions: the four decision boxes follow the two picks */
+  const rB=17;span(16,0,nd-1,{v:'Planner Actions (these boxes follow the Decision and Status picks)',s:'sect'});R(16).h=22;
   BOX.forEach(([c0,c1],i)=>{const lab=DECL[i],it=allRows.filter(r=>dName(r)===lab&&statOK(r)),dol=sumD(it);
-    span(6,c0,c1,{v:lab,s:'boxT'});
-    span(7,c0,c1,{f:`COUNTIFS(${rDec},${C(c0)}6,${rSM},1)`,v:it.length,s:'boxN'});
-    span(8,c0,c1,{f:`SUMIFS(${rng('dollars')},${rDec},${C(c0)}6,${rSM},1)`,v:dol,s:'boxS'});
-    dash.cf.push({ref:`${C(c0)}6:${C(c1)}8`,rules:[{type:'expression',dxf:5,formula:`$B$4=$${C(c0)}$6`}]})});
-  R(6).h=22;R(7).h=40;R(8).h=20;
-  /* portfolio snapshot: live formulas over the Master List */
-  const K=st.res.kpi,AC=E.accuracyTotal(A.snap()),attn=allRows.filter(r=>r.headline).length;
-  span(10,0,nd-1,{v:'Portfolio Snapshot (all items, not filtered by the picks above)',s:'sect'});R(10).h=22;
-  const sumP=allRows.reduce((t,r)=>t+r.metrics.onHand*r.price,0);
-  const TILE=[
-   [t6(0),'Items Tracked',{f:`COUNTA(${rng('sku')})`,v:K.items,s:'boxN'},{f:`COUNTIF(${rAtt},"Yes")&" need attention today"`,v:attn+' need attention today'}],
-   [t6(1),'Units On Hand',{f:`SUM(${rng('onhand')})`,v:K.onHand,s:'boxN'},{f:`TEXT(SUMPRODUCT(${rng('onhand')},${rng('price')})/1000000,"$0.00")&"M at unit price"`,v:'$'+(sumP/1e6).toFixed(2)+'M at unit price'}],
-   [t6(2),'On Order',{f:`SUM(${rng('transit')})+SUM(${rng('openpo')})`,v:K.transit+K.openPO,s:'boxN'},{f:`TEXT(SUM(${rng('transit')}),"#,##0")&" transit + "&TEXT(SUM(${rng('openpo')}),"#,##0")&" PO"`,v:E.fmtNum(K.transit)+' transit + '+E.fmtNum(K.openPO)+' PO'}],
-   [t6(3),'Weeks Of Supply',{f:`(SUM(${rng('onhand')})+SUM(${rng('transit')}))/SUM(${rng('fcstwk')})`,v:K.wos,s:'boxN1'},{f:`COUNTIFS(${rng('wos')},"<4",${rng('onhand')},">=0",${rng('fcstwk')},">0")&" items under 4 weeks, "&COUNTIF(${rng('wos')},">${ovr}")&" over ${ovr}"`,v:K.lowCover+' items under 4 weeks, '+K.highCover+' over '+ovr}],
-   [t6(4),'Forecast Accuracy',{f:"'Forecast Accuracy'!C2",v:1-AC.wmape,s:'boxPct'},{f:`"Miss (WMAPE) "&TEXT('Forecast Accuracy'!D2,"0.0%")&", last 13 weeks"`,v:'Miss (WMAPE) '+(AC.wmape*100).toFixed(1)+'%, last 13 weeks'}],
-   [t6(5),'Forecast Bias',{f:"'Forecast Accuracy'!E2",v:AC.bias,s:'boxPctS'},{f:`IF('Forecast Accuracy'!E2<0,"Forecast runs low (sales beat it)","Forecast runs high")`,v:AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high'}]];
-  TILE.forEach(([[c0,c1],t,val_,sub])=>{span(11,c0,c1,{v:t,s:'boxT'});span(12,c0,c1,val_);span(13,c0,c1,Object.assign({s:'boxS'},sub))});
-  R(11).h=22;R(12).h=40;R(13).h=20;
-  /* AI suggestions and your orders: a second row of tiles, live over the Master List */
-  const AT=A.aiTiles(),cnt=(f)=>f;
-  span(15,0,nd-1,{v:'AI Recommendations And Your Orders (all items, not filtered by the picks above)',s:'sect'});R(15).h=22;
-  const NOTN=`${rng('stockout')},"<>None",${rng('stockout')},"<>n/a"`;
-  const AITILE=[
-   [t6(0),AT[0],{f:`COUNTIF(${rng('ordovr')},">0")`},{f:`TEXT(SUM(${rng('ordovr')}),"#,##0")&" units in total"`}],
-   [t6(1),AT[1],{f:`COUNTIFS(${rng('onorder')},0,${NOTN})`},null],
-   [t6(2),AT[2],{f:`COUNTIFS(${rng('onorder')},">0",${NOTN})`},null],
-   [t6(3),AT[3],{f:`COUNTIF(${rng('peakcover')},"Thin")+COUNTIF(${rng('peakcover')},"Short")`},null],
-   [t6(4),AT[4],{f:`COUNTIF(${rng('plan')},">0")`},{f:`COUNTIF(${rng('cmptxt')},"Near AI Qty")&" near the AI Qty"`}],
-   [t6(5),AT[5],{f:`COUNTIF(${rng('cmptxt')},"Below*")+COUNTIF(${rng('cmptxt')},"Above*")`},null]];
-  AITILE.forEach(([[c0,c1],[t,n,sub],fN,fS])=>{span(16,c0,c1,{v:t,s:'boxT'});span(17,c0,c1,Object.assign({v:+String(n).replace(/,/g,''),s:'boxN'},fN));span(18,c0,c1,fS?Object.assign({v:sub,s:'boxS'},fS):{v:sub,s:'boxS'})});
-  R(16).h=22;R(17).h=40;R(18).h=20;
+    span(rB,c0,c1,{v:lab,s:'boxT'});
+    span(rB+1,c0,c1,{f:`COUNTIFS(${rDec},${C(c0)}${rB},${rSM},1)`,v:it.length,s:'boxN'});
+    span(rB+2,c0,c1,{f:`SUMIFS(${rng('dollars')},${rDec},${C(c0)}${rB},${rSM},1)`,v:dol,s:'boxS'});
+    dash.cf.push({ref:`${C(c0)}${rB}:${C(c1)}${rB+2}`,rules:[{type:'expression',dxf:5,formula:`$B$4=$${C(c0)}$${rB}`}]})});
+  R(rB).h=22;R(rB+1).h=40;R(rB+2).h=20;
   /* totals line + list header */
-  const first=22,last=21+N,matched0=allRows.filter(dashMatch);
-  span(20,0,2,{v:'Items matching your choices:',s:'label'});put(20,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
-  span(20,4,6,{v:'Total $ at stake:',s:'label'});put(20,7,{f:`SUMIFS(${rng('dollars')},${rShow},">0")`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(20,8,10,{v:'No decision needed:',s:'label'});put(20,11,{f:`IF($B$4="All decisions",D20-${BOX.map(b=>C(b[0])+'7').join('-')},0)`,v:matched0.filter(r=>!r.decision).length,s:'int'});R(20).h=24;
-  DK.forEach((k,c)=>put(21,c,{v:dh(k),s:AIS.has(k)?'headAI':'head'}));R(21).h=34;
+  const rT=21,hRow=22,first=23,last=22+N,matched0=allRows.filter(dashMatch);
+  span(rT,0,2,{v:'Items matching your choices:',s:'label'});put(rT,3,{f:`COUNT(${rShow})`,v:run,s:'int'});
+  span(rT,4,6,{v:'Total $ at stake:',s:'label'});put(rT,7,{f:`SUMIFS(${rng('dollars')},${rShow},">0")`,v:sumD(allRows.filter(dashMatch)),s:'money0'});span(rT,8,10,{v:'No decision needed:',s:'label'});put(rT,11,{f:`IF($B$4="All decisions",D${rT}-${BOX.map(b=>C(b[0])+(rB+1)).join('-')},0)`,v:matched0.filter(r=>!r.decision).length,s:'int'});R(rT).h=24;
+  DK.forEach((k,c)=>put(hRow,c,{v:dh(k),s:AIS.has(k)?'headAI':'head'}));R(hRow).h=34;
   const CTRK=new Set(['status','sku','stockout','orderby','readyd','nextarr','arr2','peakcover','promo','nextpromo','peak','peakwk','abc','attn','gaptype','conf','notedate']),STY=new Proxy({dollars:'money0',nextarr:'dt',arr2:'dt',stockout:'dt',orderby:'dt'},{get:(o,k)=>o[k]||(AIS.has(k)?sty(k):CTRK.has(k)?'ctr':COLS[k]&&COLS[k].num||'txt')});
   const matched=allRows.filter(dashMatch);
   for(let i=0;i<N;i++){const row=first+i,src=matched[i],hc=`$${C(HC)}${row}`;
@@ -449,14 +455,8 @@ function downloadXlsx(){
     ...(CL.length?CL.map(x=>[{v:x.chg==='New'?'New Today':'Missing Today',s:'ctr'},{v:x.id,s:'ctr'},{v:x.name,s:'txt'},{v:x.sub,s:'txt'},{v:x.onHand,s:'int'},{v:x.po,s:'int'},{v:x.note,s:'txt'},x.plan===''?{v:'',s:'txt'}:{v:x.plan,s:'int'},{v:x.by,s:'ctr'},{v:x.check,s:'txt'}]):[[{v:'Nothing new or missing today.',s:'txt'}]])],cf:[{ref:`A2:A${DR}`,rules:[{type:'cellIs',op:'equal',dxf:3,formula:'"New Today"'},{type:'cellIs',op:'equal',dxf:1,formula:'"Missing Today"'}]}]};
   span(3,0,nd-1,{f:`COUNTIF(${rng('filest')},"New Today")&" new items in the latest files (marked New Today on the Master List, nothing typed yet). "&SUMPRODUCT(--(((${rng('note')}<>"")+(${rng('ovr')}<>"")+(${rng('plan')}<>""))>0))&" items carry typed work from the previous file. "&COUNTIF('New And Missing Items'!$A$2:$A$${DR},"Missing Today")&" items from the previous run are missing from today\'s files (see New And Missing Items)."`,v:carryText(),s:'note'});R(3).h=22;
   const notesSheet=mkL(allRows.filter(r=>A.noteFor(r.id)),'Notes',NK);
-  const sheets=[dash,dataSheet,plan,accSheet,itemSheet,histSheet,
-   notesSheet,dropSheet,
-   {name:'Recipe',fit:true,widths:[30,110],rows:[hdr(['Setting','What It Is Set To']),...rec.map(r=>[{v:r[0],s:'bold'},{v:r[1],s:'txt'}]),[{v:'Where To Work',s:'bold'},{v:'Work on the light yellow Master List (Work Here) tab. It is the only tab you type in: Filter any column, and type in the light yellow columns (peak override, order quantity to place, needed by, note and note date). Every other tab reads from it, so what you type shows on the Dashboard, 12-Week Plan, Seasonal And Promo Lifts, Notes and New And Missing Items tabs (the Sales History tab shows each item\'s status, product and line from it). Changes only flow one way, from the Master List out, so those other tabs are locked to stop typing that would be lost. To edit one anyway: Review, then Unprotect Sheet (no password).',s:'txt'}],
-   [{v:'One File Per Planner',s:'bold'},{v:'Each planner has their own file, built from their own demand line, so nobody shares edits and there is no need to track who wrote a note. To set one up for someone else, give them the same recipe and point it at the files for their line.',s:'txt'}],
-   [{v:'Does It Work On Its Own?',s:'bold'},{v:'Yes. Every number and formula is inside this one file, so it works after you download it, with no links to other files. It does not refresh by itself: Each run the run builds a new file. In the real setup the run opens the previous file first and copies the light yellow columns across by SKU, so typed work carries forward.',s:'txt'}],
-   [{v:'What Updates And What Does Not',s:'bold'},{v:'Notes and the Dashboard, Seasonal And Promo Lifts, Notes and New And Missing Items lists update as soon as you change the Master List. Sales History keeps its weekly numbers from the Reporting tool, so they only change with the scheduled run. Calculated columns such as Weeks Of Supply and Stock-Out Week are written by the scheduled run, so retyping On Hand by hand will not recompute them. Fix numbers in the source system and let the next run rebuild them.',s:'txt'}],
-   [{v:'Dashboard',s:'bold'},{v:'Two dropdown pickers (decision and status) drive the four count boxes and the list. Hidden columns on the Master List sheet and on the Dashboard feed it, so do not delete them.',s:'txt'}]],freeze:1}];
-  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal And Promo Lifts','Sales History','New And Missing Items'].includes(sh.name))});
+  const sheets=[dash,dataSheet,histSheet,itemSheet,mon,posSheet,shipSheet,accSheet,dvsSheet,notesSheet,dropSheet];
+  sheets.forEach((sh,i)=>{if(i>0&&sh.name!==MASTER)sh.tab=sh.tab||'FFA6A6A6';if(sh.name!==MASTER)sh.prot=true;sh.fit=sh.fit||(sh.name!==MASTER&&['Notes','Seasonal And Promo Lifts','Sales History','New And Missing Items','POS Prediction','Shipping Prediction','Demand Vs Supply'].includes(sh.name))});
   const blob=MiniXlsx.build(sheets),a=document.createElement('a');
   a.href=URL.createObjectURL(blob);a.download='Planning-Sheet-SAMPLE-'+A.TODAY_ISO+'.xlsx';document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800);
@@ -655,28 +655,30 @@ function renderOptions(){
 /* ---------- customize ---------- */
 const hello=()=>({w:'ai',t:'This is a simulated practice chat. Tap an example below, or type a request. Nothing on this site changes.'});
 let msgs=[hello()];
-const SUG=['I need the supplier lead time.','Show me last year\'s sales for the same weeks.','Add the ABC class.','Add the peak months and promo status.','Show the peak lift and how many extra units it means.','Show which items were out of stock last peak.','Show the AI forecast next to the system forecast.','Compare my order quantity with the AI Recommended Qty.','Show how many units to add for the peak and promo, and why.','Show last year\'s promo weeks and the units it sold.','Show whether the promo falls inside the peak weeks.','Add the order quantity I plan to place.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
-const PAT=[['aifdiff',/ai.*(vs|versus|minus|differ).*(system )?forecast|forecast.*(difference|gap).*ai/],['nextarrq',/arrival (qty|quantity|units)|units arriving/],['arr2',/second arrival|2nd arrival|later arrival/],['aifcst',/ai (suggested )?forecast|forecast.*(from|by) (the )?ai|ai.*forecast/],['cmpai',/difference.*ai|minus ai|how far.*ai/],['cmptxt',/compare.*ai|compared to (the )?ai|vs\.? (the )?ai|close to (the )?ai|match (the )?ai|my (qty|quantity).*ai/],['stocklp',/out of stock last|stock last peak|stock.?out last (year|peak)|was there (even )?stock/],['totlift',/peak (\+|and|plus) promo|total (extra |lift )?units|promo and peak units/],['promoext',/promo extra|extra units.*promo|promo.*extra|units.*promo (add|brings)|promo.*units.*add/],['overlap',/overlap|(inside|during|in) (the )?peak.*promo|promo.*(inside|during|falls? in|in) (the )?peak|promo.*peak weeks/],['lypromo',/last (year'?s? )?promo|promo.*last year|previous promo|promo weeks? (from )?last/],['lyunits',/promo units|units sold.*promo|promo.*units sold/],['bump',/peak bump|extra units|bump/],['peakgap',/short of peak|units short.*peak|peak (gap|shortfall)/],['addwhy',/why.*(add|order)|reason.*(add|suggest|order)|explain.*(add|suggest)/],['addqty',/(add|order) (more )?(for|to cover) (the )?(peak|promo)|suggested add|units to add|how many (more )?units.*(peak|promo)|ai (suggest|recommend)/],['ordovr',/total (suggested )?(qty|quantity)|order (qty|quantity) with override|with override/],['ovrwhy',/override reason/],['ovr',/override|my own peak|change the peak/],['plan',/(qty|quantity|order).*(to place|i plan|planned|place)|plan to order/],['needby',/needed by|need.?by date/],['suggest',/suggested order|how much (should i|to) order|order qty|order quantity/],['peaklift',/peak lift|how (big|much).*peak/],['filest',/new items?|new today|new skus?/],['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
+const SUG=['Show last year\'s sales next to the forecast.','Add the POS prediction by month.','Add the shipment prediction by month.','Show the year to date comp against last year.','Show the AI forecast next to the system forecast.','Show me last year\'s sales for the same weeks.','Add the ABC class.','I need the supplier lead time.','Add the peak months and promo status.','Show the peak lift and how many extra units it means.','Show which items were out of stock last peak.','Compare my order quantity with the AI Recommended Qty.','Show how many units to add for the peak and promo, and why.','Show last year\'s promo weeks and the units it sold.','Show whether the promo falls inside the peak weeks.','Add the order quantity I plan to place.','Add forecast accuracy for each item.','Add a column for my notes.','Remove confidence.','Show all items, not just the ones that need attention.'];
+const PAT=[['ytdcomp',/\bcomps?\b|year.to.date|\bytd\b/],['vsly',/(vs|versus|against|compared (with|to)) last year|ai.*last year/],['fc12',/system forecast.*(12|next|month)|next 12.*system/],['ai12',/ai forecast.*(12|next|month)|next 12.*ai/],['fcst4',/forecast.*last (3|three) weeks/],['aifdiff',/ai.*(vs|versus|minus|differ).*(system )?forecast|forecast.*(difference|gap).*ai/],['nextarrq',/arrival (qty|quantity|units)|units arriving/],['arr2',/second arrival|2nd arrival|later arrival/],['aifcst',/ai (suggested )?forecast|forecast.*(from|by) (the )?ai|ai.*forecast/],['cmpai',/difference.*ai|minus ai|how far.*ai/],['cmptxt',/compare.*ai|compared to (the )?ai|vs\.? (the )?ai|close to (the )?ai|match (the )?ai|my (qty|quantity).*ai/],['stocklp',/out of stock last|stock last peak|stock.?out last (year|peak)|was there (even )?stock/],['totlift',/peak (\+|and|plus) promo|total (extra |lift )?units|promo and peak units/],['promoext',/promo extra|extra units.*promo|promo.*extra|units.*promo (add|brings)|promo.*units.*add/],['overlap',/overlap|(inside|during|in) (the )?peak.*promo|promo.*(inside|during|falls? in|in) (the )?peak|promo.*peak weeks/],['lypromo',/last (year'?s? )?promo|promo.*last year|previous promo|promo weeks? (from )?last/],['lyunits',/promo units|units sold.*promo|promo.*units sold/],['bump',/peak bump|extra units|bump/],['peakgap',/short of peak|units short.*peak|peak (gap|shortfall)/],['addwhy',/why.*(add|order)|reason.*(add|suggest|order)|explain.*(add|suggest)/],['addqty',/(add|order) (more )?(for|to cover) (the )?(peak|promo)|suggested add|units to add|how many (more )?units.*(peak|promo)|ai (suggest|recommend)/],['ordovr',/total (suggested )?(qty|quantity)|order (qty|quantity) with override|with override/],['ovrwhy',/override reason/],['ovr',/override|my own peak|change the peak/],['plan',/(qty|quantity|order).*(to place|i plan|planned|place)|plan to order/],['needby',/needed by|need.?by date/],['suggest',/suggested order|how much (should i|to) order|order qty|order quantity/],['peaklift',/peak lift|how (big|much).*peak/],['filest',/new items?|new today|new skus?/],['peakcover',/peak cover|thin (cover|stock)|cover into (the )?peak|enough (stock )?for (the )?peak/],['peak',/peak|seasonal|spike|busy (month|season)/],['lift',/lift|promo (impact|effect)/],['nextpromo',/next promo|when .*promo|promo (date|week|calendar)/],['promo',/promo/],['abc',/\babc\b/],['acc',/accuracy|forecast (error|miss)|\bbias\b/],['transit',/in transit|on the water|inbound/],['openpo',/open po|purchase order|\bpos?\b(?! (data|file))/],['nextarr',/next arrival|when .*arriv|\beta\b|delivery date/],['orderby',/order by|when (do i|should i) order/],['stockout',/stock.?out|run out|when .*(out of stock|run out)/],['salesvs',/sales vs|vs forecast|forecast vs|actual vs/],['fcstwk',/forecast (per|a|each) week|weekly forecast|forecast units/],['sales4',/last (3|three) weeks|recent sales/],['ship',/shipped|sell.?in|sell.?through|channel/],['price',/unit price|price|cost/],['gap',/unit gap|how many (units )?short|units short/],['wos',/weeks? of (stock|supply|cover)|how many weeks|wos|\bcover\b/],['ly',/last year|same weeks/],['lt',/lead ?time/],['supplier',/supplier|vendor/],['onhand',/on hand|inventory|how much stock|stock (we have|on)/],['onorder',/on order/],['supply',/total supply|supply units/],['note',/\bnotes?\b|comment/],['conf',/confidence|how sure/],['dollars',/dollar|\$|money|value/],['sub',/subcategor|category|\bline\b/],['todo',/what to do|next step|action/]];
 const RM=/remove|hide|drop|don'?t need|do not need|get rid|take out|without|delete/;
 function reply(text){
   const t=text.toLowerCase();
-  if(/show all|all items|every (item|sku)|not just/.test(t))return 'I would set the Planning Dashboard to start on all statuses, not only the items that need attention. <b>Next run:</b> Your planning spreadsheet opens that way.';
-  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t))return 'I would set the Planning Dashboard to start on the items that need attention. <b>Next run:</b> Your planning spreadsheet opens that way.';
+  const TABR=[[/pos.*predict|predict.*pos|pos forecast/,'POS Prediction','the AI forecast of what retailers will sell to shoppers, by month, next to the same weeks last year'],[/ship.*predict|predict.*ship|shipments? (forecast|by month)/,'Shipping Prediction','what is expected to ship to retailers, by month, from the POS forecast and the recent shipped to sold ratio'],[/monthly|by month|each month/,'Monthly Demand','last year, this year and the forecast for every month, by line and by item']];
+  const tr=TABR.find(x=>x[0].test(t));if(tr)return `Your spreadsheet has a ${tr[1]} tab: ${tr[2]}. This practice chat does not change anything. With your real AI agent you could ask for a different layout, such as weekly instead of monthly.`;
+  if(/show all|all items|every (item|sku)|not just/.test(t))return 'I would set the Demand Planning Dashboard to start on all statuses, not only the items that need attention. <b>Next run:</b> Your planning spreadsheet opens that way.';
+  if(/only.*attention|needs? attention/.test(t)&&!/add|column/.test(t))return 'I would set the Demand Planning Dashboard to start on the items that need attention. <b>Next run:</b> Your planning spreadsheet opens that way.';
   const hit=PAT.find(p=>p[1].test(t));
   if(hit){const k=hit[0],C=COLS[k],has=cols.includes(k);
     if(RM.test(t)){if(C.core)return `I would keep "${C.h}" because the spreadsheet is hard to read without it. I can hide any of the other columns.`;
-      if(!has)return `"${C.h}" is not on the Planning Dashboard right now.`;
-      return `I would remove "${C.h}" from the Planning Dashboard and from your saved recipe. It stays on the Master List. <b>Next run:</b> Your planning spreadsheet no longer shows it there.`}
-    if(has)return `"${C.h}" is already on your Planning Dashboard. This example does not change anything.`;
-    return `I can add "${C.h}" to the Planning Dashboard (${C.src||'it is on the Master List'}).${INK.includes(k)?' You would type it on the Master List and it shows on the dashboard. It carries over to the next run by SKU.':''} <b>Next run:</b> Your planning spreadsheet includes it.`}
+      if(!has)return `"${C.h}" is not on the Demand Planning Dashboard right now.`;
+      return `I would remove "${C.h}" from the Demand Planning Dashboard and from your saved recipe. It stays on the Master List. <b>Next run:</b> Your planning spreadsheet no longer shows it there.`}
+    if(has)return `"${C.h}" is already on your Demand Planning Dashboard. This example does not change anything.`;
+    return `I can add "${C.h}" to the Demand Planning Dashboard (${C.src||'it is on the Master List'}).${INK.includes(k)?' You would type it on the Master List and it shows on the dashboard. It carries over to the next run by SKU.':''} <b>Next run:</b> Your planning spreadsheet includes it.`}
   return 'I only know a few requests in this practice chat. With your real AI agent you explain it in your own words, and it works out which data to use. If the data is not in your files, it asks where to find it or what file to add.';
 }
 /* demo video: a looping scripted conversation */
 let demoId=0,demoPaused=false;
 const SCENES=[
- {you:'I do not see the supplier lead time on my sheet.',ai:'Supplier lead time is in your Anaplan export, so I can add it. I will put Lead Time (Weeks) next to Order By on the Planning Dashboard and the Master List.',ok:'Your Custom Metrics have been updated. Your next custom spreadsheet will include Lead Time (Weeks).'},
- {you:'Show the AI forecast next to the system forecast.',ai:'I will add AI Forecast Per Week and AI Vs System Forecast right after the system forecast column.',ok:'Your Custom Metrics have been updated. Your next custom spreadsheet will include both columns.'},
- {you:'I changed the colors by hand in this file. Here it is.',file:'Planning-Sheet-edited.xlsx',ai:'Thanks. Comparing it with your saved metrics, I see you color Watch rows orange and moved Order By beside Stock-Out Week. I will use both from now on.',ok:'Your Custom Metrics have been updated. Every future run keeps your format.'}];
+ {you:'I need POS and shipment predictions by month.',ai:'I can build both from your sales history and the forecast. I will add a POS Prediction tab and a Shipping Prediction tab, with each month next to the same weeks last year.',ok:'Your Custom Metrics have been updated. Your next custom spreadsheet will include both tabs.'},
+ {you:'Show last year\'s sales next to the forecast, by month.',ai:'Last year\'s sales are in your Tableau export, so I can add them. I will add a Monthly Demand tab with last year, this year and the forecast for every month, by line and by item.',ok:'Your Custom Metrics have been updated. Your next custom spreadsheet will include the Monthly Demand tab.'},
+ {you:'I changed the colors by hand in this file. Here it is.',file:'Planning-Sheet-edited.xlsx',ai:'Thanks. Comparing it with your saved metrics, I see you color Watch rows orange and moved Peak Months beside the AI forecast. I will use both from now on.',ok:'Your Custom Metrics have been updated. Every future run keeps your format.'}];
 function startDemo(){
   const box=$('#vid');if(!box)return;const id=++demoId;
   const bubble=(cls,html)=>{const d=document.createElement('div');d.className='vmsg '+cls;d.innerHTML=html;box.appendChild(d);box.scrollTop=box.scrollHeight;return d};
@@ -694,7 +696,7 @@ function startDemo(){
     if(!await hold(2200))return}})();
 }
 let emailKind='top';
-const EMAILF={top:['Top Items','The five biggest items, then what is new or missing in the files.'],risk:['At Risk Only','A short list of what needs action now.'],week:['Weekly Summary','Counts by status, decisions to make and the biggest three.'],supplier:['By Supplier','Items grouped by supplier, so each call or email to a supplier is one list.'],short:['Three Lines','The short version to read on a phone.']};
+const EMAILF={top:['Top Items','Demand first, then the five biggest items and what is new or missing in the files.'],risk:['At Risk Only','Demand first, then a short list of what needs action now.'],week:['Weekly Summary','Demand first, then counts by status, decisions to make and the biggest three.'],supplier:['By Supplier','Demand first, then items grouped by supplier, so each call or email to a supplier is one list.'],short:['Three Lines','The short version to read on a phone, with the demand forecast first.']};
 function renderEmail(){
   const F=EMAILF;
   $('#v-email').innerHTML=`<div class="page"><div class="pg-h"><h1>Custom Email</h1><span class="pill">Recommended Option</span></div>
@@ -735,7 +737,7 @@ function renderCustom(){
    <div class="sug">${shown.map(x=>`<button class="chip" data-sug="${SUG.indexOf(x)}">${esc(x)}</button>`).join('')}<button class="chip more" id="sug-more">${moreEx?'Show Fewer':'More Examples'}</button></div>
    <form class="chat-in" id="chat-f"><input type="text" id="chat-t" placeholder="Type a request (simulated, changes nothing)" aria-label="Message"><button class="btn pri" type="submit">Send</button></form></div>
   <details class="card fold" data-id="metrics"${open('metrics')}><summary><h2 class="fold-h">Your Custom Metrics</h2><span class="conf">Read only. Changes only through your agent.</span></summary>
-   <h3 class="rh">Planning Dashboard Columns</h3><ol class="two">${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
+   <h3 class="rh">Demand Planning Dashboard Columns</h3><ol class="two">${cols.map(k=>`<li>${esc(COLS[k].h)}</li>`).join('')}</ol>
    <h3 class="rh">Master List</h3><p>Every column, with light yellow columns to type in: ${INK.map(k=>esc(COLS[k].h)).join(', ')}. They carry over to the next run by SKU.</p>
    <h3 class="rh">Tabs</h3><p>${TABS.map(t=>esc(t[1])).join(', ')}.</p>
    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn pri" data-nav="sheet">Preview The Spreadsheet</button><button class="btn dl" id="c-dl">Download Sheet</button></div></details>
