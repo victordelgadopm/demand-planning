@@ -173,7 +173,7 @@
     // planner fields shown in every view (display only, no flags depend on them)
     { const sh8 = sum(sku.ship.y2026, 37, 45), pp8 = sum(pos26, 37, 45), a13 = sum(pos26, 32, 45), f13 = sum(f26, 32, 45);
       let err = 0; for (let i = 32; i < 45; i++) err += Math.abs(pos26[i] - f26[i]);
-      Object.assign(metrics, { fcstWk: meanF, sales4: sum(pos26, 42, 45), fcst4: sum(f26, 42, 45), price, shipRatio: pp8 > 0 ? sh8 / pp8 : null,
+      Object.assign(metrics, { fcstWk: meanF, price, shipRatio: pp8 > 0 ? sh8 / pp8 : null,
         acc13: a13 > 0 ? Math.max(0, 1 - err / a13) : null, bias13: a13 > 0 ? (f13 - a13) / a13 : null, fcstValue: needPlan * price });
       const arr = [].concat((inv.transit || []).map(t => ({ h: t.etaH, qty: t.qty })), (inv.pos || []).map(p => ({ h: p.etaH, qty: p.qty })));
       arr.sort((a, b) => a.h - b.h);
@@ -247,7 +247,7 @@
       let lyW = 0; for (let h = 0; h < H; h++) lyW += lyValue(sku, h).v;
       const fc12 = sum(F), ai12 = sum(metrics.aiWk), ytd = sum(pos26, 0, 45), ytdLY = sum(sku.pos.y2025 || [], 0, 45);
       const ship12 = sum(md.shipPred);
-      Object.assign(metrics, { monthly: md, fc12, ai12, ly12: lyW, fc12vsLY: lyW > 0 && !sku.isNew ? fc12 / lyW - 1 : null, ai12vsLY: lyW > 0 && !sku.isNew ? ai12 / lyW - 1 : null,
+      Object.assign(metrics, { lmpos: md.ty[9], lmfc: md.fc[9], monthly: md, fc12, ai12, ly12: lyW, fc12vsLY: lyW > 0 && !sku.isNew ? fc12 / lyW - 1 : null, ai12vsLY: lyW > 0 && !sku.isNew ? ai12 / lyW - 1 : null,
         aiVsSys: ai12 - fc12, ytd, ytdLY, ytdComp: ytdLY > 0 && !sku.isNew ? ytd / ytdLY - 1 : null, ship12, shipBuild: ship12 - ai12, shipLast8: sum(sku.ship.y2026, 37, 45), posLast8: sum(pos26, 37, 45) }); }
 
     // data checks
@@ -389,7 +389,7 @@
     kpi.wos = kpi.fcstWk > 0 ? (kpi.onHand + kpi.transit) / kpi.fcstWk : 0;
     { const old = rows.filter(r => !r.isNew), M = r => r.metrics, T = f => sum(rows.map(r => f(M(r)))), To = f => sum(old.map(r => f(M(r))));
       kpi.dem = { fc12: T(m => m.fc12), ai12: T(m => m.ai12), ly12: To(m => m.ly12), ai12Old: To(m => m.ai12), ai12Value: sum(rows.map(r => M(r).ai12 * r.price)),
-        ytd: To(m => m.ytd), ytdLY: To(m => m.ytdLY), sales4: To(m => m.sales4), fcst4: To(m => m.fcst4), ship8: sum(rows.map(r => M(r).shipLast8)), pos8: sum(rows.map(r => M(r).posLast8)),
+        ytd: To(m => m.ytd), ytdLY: To(m => m.ytdLY), lmpos: To(m => m.lmpos), lmfc: To(m => m.lmfc), ship8: sum(rows.map(r => M(r).shipLast8)), pos8: sum(rows.map(r => M(r).posLast8)),
         promoItems: rows.filter(r => M(r).promo && M(r).promo.status !== 'None' && M(r).promo.status !== 'Last year only' && M(r).promo.next).length,
         aiDiffItems: rows.filter(r => Math.round(M(r).aiVsSys / 12) !== 0).length, aiAdd: T(m => m.aiVsSys) }; }
     return { rows, tiers, dec, accepted, kpi, settings: S, total: rows.length };

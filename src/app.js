@@ -53,7 +53,7 @@ const sumM=a=>[10,11,12].reduce((t,b)=>t+Math.round(a[b]),0);
 function pv(k,r){const m=r.metrics,nw=r.isNew;
   switch(k){
    case 'ytd':return Math.round(m.ytd);case 'ytdly':return Math.round(m.ytdLY);case 'ytdcomp':return m.ytdComp==null?'':r3(m.ytdComp);
-   case 'fcst4':return nw?'':Math.round(m.fcst4);
+   case 'fcst4':return nw?'':Math.round(m.lmfc);
    case 'fc12':return sumM(m.monthly.fcF);case 'ai12':return sumM(m.monthly.ai);case 'ly':return sumM(m.monthly.lyF);
    case 'vsly':{const l=sumM(m.monthly.lyF);return nw||l<=0?'':r3(sumM(m.monthly.ai)/l-1)}case 'aid12':return sumM(m.monthly.ai)-sumM(m.monthly.fcF);
    case 'aim10':case 'aim11':case 'aim12':return Math.round(m.monthly.ai[+k.slice(3)]);
@@ -67,8 +67,8 @@ function pv(k,r){const m=r.metrics,nw=r.isNew;
    case 'cover':{const a=sumM(m.monthly.ai);return a>0?Math.round(Math.round(m.supply||0)/(a/12*52/12)*10)/10:''}
    case 'dvsstat':return m.onHand<0?'Check the data':Math.round(m.supply||0)<sumM(m.monthly.ai)?'Short':(!nw&&m.wos>st.settings.overstockWOS)?'Excess':'Covered';
    case 'onhand':return m.onHand;case 'transit':return m.transit;case 'openpo':return m.openPO;case 'onorder':return m.transit+m.openPO;case 'supply':return Math.round(m.supply||0);
-   case 'fcstwk':return Math.round(m.fcstWk);case 'sales4':return nw?'':Math.round(m.sales4);
-   case 'salesvs':return nw||!(m.fcst4>0)?'':r3(m.sales4/m.fcst4-1);
+   case 'fcstwk':return Math.round(m.fcstWk);case 'sales4':return nw?'':Math.round(m.lmpos);
+   case 'salesvs':return nw||!(m.lmfc>0)?'':r3(m.lmpos/m.lmfc-1);
    case 'wos':return nw||m.wos==null?'':Math.round(m.wos*10)/10;
    case 'stockout':return nw||m.onHand<0?'n/a':(m.stockOutDate||'None');
    case 'orderby':return nw||m.onHand<0?'n/a':(m.orderBy||'None');
@@ -146,17 +146,17 @@ function aiTiles(){const rows=st.res.rows,n=f=>rows.filter(f).length,so=r=>{cons
 const sumPv=(rows,k,f)=>rows.reduce((t,r)=>{const v=pv(k,r);return t+(typeof v==='number'&&(!f||f(r))?v:0)},0);
 function snapTiles(){const r=st.res,K=r.kpi,AC=E.accuracyTotal(snap()),rows=r.rows,attn=rows.filter(x=>x.headline).length,
     ai=sumPv(rows,'ai12'),lyS=sumPv(rows,'ly'),aiL=sumPv(rows,'ai12',x=>pv('ly',x)>0),yt=sumPv(rows,'ytd'),ytL=sumPv(rows,'ytdly'),ytA=sumPv(rows,'ytd',x=>pv('ytdly',x)>0),s4=sumPv(rows,'sales4'),f4=sumPv(rows,'fcst4');
-  return [['Items Tracked',fmt(K.items),attn+' need attention today'],['AI Forecast, Next 12 Weeks',fmt(ai),pctSN(aiL/lyS-1)+' vs the same weeks last year'],
+  return [['Items Tracked',fmt(K.items),attn+' need attention today'],['AI Forecast, Nov To Jan',fmt(ai),pctSN(aiL/lyS-1)+' vs the same weeks last year'],
     ['POS Year To Date',fmt(yt),pctSN(ytA/ytL-1)+' vs the same weeks last year'],
-    ['Sales vs Forecast',pctSN(s4/f4-1),'Last 3 weeks: '+fmt(s4)+' sold vs '+fmt(f4)+' forecast'],
-    ['Forecast Accuracy',pctN(1-AC.wmape),'Miss (WMAPE) '+pctN(AC.wmape)+', last 13 weeks'],
+    ['Sales vs Forecast',pctSN(s4/f4-1),'October: '+fmt(s4)+' sold vs '+fmt(f4)+' forecast'],
+    ['Forecast Accuracy',pctN(1-AC.wmape),'Miss (WMAPE) '+pctN(AC.wmape)+', last quarter'],
     ['Forecast Bias',pctSN(AC.bias),AC.bias<0?'Forecast runs low (sales beat it)':'Forecast runs high']]}
 function signalTiles(){const rows=st.res.rows,n=f=>rows.filter(f).length,v=(k,x)=>pv(k,x),num=x=>typeof x==='number',ch=st.settings.channelRatio;
-  return [['Selling Above Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)>=0.15)),'last 3 weeks, 15% or more above forecast'],
-    ['Selling Below Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)<=-0.15)),'last 3 weeks, 15% or more below forecast'],
+  return [['Selling Above Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)>=0.15)),'October, 15% or more above forecast'],
+    ['Selling Below Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)<=-0.15)),'October, 15% or more below forecast'],
     ['Promos Coming',fmt(n(x=>v('nextpromo',x)!=='None')),n(x=>v('promo',x)==='Not confirmed')+' not yet confirmed'],
     ['Peak Season Ahead',fmt(n(x=>v('peakwk',x)!=='None in window'&&v('peakwk',x)!=='n/a')),'with peak weeks in the next 12 weeks'],
-    ['AI Differs From System',fmt(n(x=>num(v('aid12',x))&&v('aid12',x)!==0)),(sumPv(rows,'aid12')>0?'+':'')+fmt(sumPv(rows,'aid12'))+' units over 12 weeks'],
+    ['AI Differs From System',fmt(n(x=>num(v('aid12',x))&&v('aid12',x)!==0)),(sumPv(rows,'aid12')>0?'+':'')+fmt(sumPv(rows,'aid12'))+' units, Nov to Jan'],
     ['Shipping Ahead Of Sales',fmt(n(x=>num(v('ship',x))&&v('ship',x)>=ch)),'shipped '+ch+'x or more of sold, 8 weeks']]}
 
 /* ---------- state ---------- */
@@ -477,7 +477,7 @@ function itemBlocks(sku,res){
   const arr2=m.nextArr2?[['2nd arrival',V('arr2')+', '+fmt(m.nextArr2.qty)+' units','planning']]:[];
   const b1=blk('Stock And Orders',[['On hand',V('onhand'),'planning'],['In production',V('prodq'),'planning'],['At origin',V('orgq'),'planning'],['In transit',V('transit'),'planning'],['Open PO',V('openpo'),'planning'],['Next arrival',m.nextArr?V('nextarr')+', '+fmt(m.nextArr.qty)+' units':'None','planning'],...arr2,
     ['Weeks of supply',V('wos'),'calc'],['Stock-out week',V('stockout'),'calc'],['Order by',V('orderby'),'calc']]);
-  const b2=blk('Forecast',[['System forecast per week',V('fcstwk'),'planning'],['AI forecast per week',V('aifcst'),'ai'],['AI vs system forecast',V('aifdiff'),'calc'],['Sales vs forecast (last 3 weeks)',V('salesvs'),'calc']]);
+  const b2=blk('Forecast',[['System forecast per week',V('fcstwk'),'planning'],['AI forecast per week',V('aifcst'),'ai'],['AI vs system forecast',V('aifdiff'),'calc'],['October sales vs forecast',V('salesvs'),'calc']]);
   const b3=blk('Peak And Promo',[['Peak weeks in the next 12',V('peakwk'),'calc'],['Peak cover',V('peakcover'),'calc'],['Peak lift',V('peaklift'),'calc'],['This year promo (weeks starting)',V('nextpromo')+(m.promo.name?' ('+m.promo.name+')':''),'sharepoint'],['Last year promo (weeks starting)',V('lypromo'),'calc'],['Promo and peak overlap',V('overlap'),'calc']]);
   const b4=blk('Your Order And The AI',[['AI recommended qty (stock gap)',V('suggest'),'ai'],['AI recommended add (peak + promo)',V('addqty'),'ai'],['AI recommended qty (total)',V('ordovr'),'ai'],['Your qty to place',pv('plan',res)===''?'None typed':fmt(pv('plan',res))+(pv('needby',res)?', needed by '+pv('needby',res):''),'sheet'],['Your qty vs AI',V('cmptxt'),'calc']]);
   const pc=m.peakCover;
@@ -631,9 +631,9 @@ function flowPanel(id){
 }
 function emailText(kind){
   const live=st.res.rows.filter(r=>r.headline).sort((a,b)=>E.TIER_ORDER[a.tier]-E.TIER_ORDER[b.tier]||b.dollars-a.dollars),t=st.res.tiers,at=live.filter(r=>r.tier==='At risk'),T=snapTiles();
-  const dem=r=>{const sv=pv('salesvs',r),a=pv('ai12',r),l=pv('ly',r);return '   Demand: '+(sv===''?'':'Sales '+pctSN(sv,0)+' vs forecast (last 3 weeks), ')+'AI forecast '+fmt(a)+' over 12 weeks'+(l>0?', '+fmt(l)+' the same weeks last year':'')+'\n'};
+  const dem=r=>{const sv=pv('salesvs',r),a=pv('ai12',r),l=pv('ly',r);return '   Demand: '+(sv===''?'':'Sales '+pctSN(sv,0)+' vs forecast in October, ')+'AI forecast '+fmt(a)+' over 12 weeks'+(l>0?', '+fmt(l)+' the same weeks last year':'')+'\n'};
   const line=(r,i)=>`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n${dem(r)}${r.dollars>0?'   '+money(r.dollars)+' at stake\n':''}\n`;
-  const demand=`Demand:\n  - AI forecast, next 12 weeks: ${T[1][1]} units, ${T[1][2]}\n  - POS year to date: ${T[2][1]} units, ${T[2][2]}\n  - Sales vs forecast, last 3 weeks: ${T[3][1]} (${T[3][2]})\n\n`;
+  const demand=`Demand:\n  - AI forecast, Nov to Jan: ${T[1][1]} units, ${T[1][2]}\n  - POS year to date: ${T[2][1]} units, ${T[2][2]}\n  - October sales vs forecast: ${T[3][1]} (${T[3][2]})\n\n`;
   const files=()=>{let b='';const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing: ${x.name} (${x.id}), check the shared files\n`);b+='\n'}return b};
   const health=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept.\n\n`;
   const foot='Attached: Planning-Sheet.xlsx (the custom spreadsheet)\nSample data, not Mattel data.';

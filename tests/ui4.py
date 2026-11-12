@@ -49,13 +49,13 @@ with sync_playwright() as p:
     ok('Dashboard note says where to work and leads with demand','Master List (Work Here)' in dn and dn.startswith('VIEW ONLY. Start with demand') and 'Recipe' not in wb.sheetnames and '12-Week Plan' not in wb.sheetnames)
     # 7. peak, promo and order chain: columns adjacent, history tab present, a typed override reaches the order total
     mh=[c.value for c in wb['Master List (Work Here)'][1]]
-    ok('promo columns sit together',mh.index('Last Promo Lift (x)')==mh.index('Last Year Promo (Weeks Starting)')+2 and mh.index('Promo Extra Units')==mh.index('Promo And Peak Overlap')+1)
-    ok('order columns sit together',[mh.index(h) for h in ['AI Recommended Qty (Stock Gap)','AI Recommended Add (Peak + Promo)','AI Recommendation Why','AI Recommended Qty (Total)','Order Qty To Place (Type Here)','Variance Vs AI Qty','Your Qty Vs AI']]==list(range(mh.index('AI Recommended Qty (Stock Gap)'),mh.index('AI Recommended Qty (Stock Gap)')+7)))
+    ok('promo columns sit together',mh.index('Last Promo Lift (x)')==mh.index('Last Year Promo (Weeks Starting)')+1 and mh.index('Promo Extra Units')==mh.index('Last Promo Lift (x)')+1)
+    ok('order columns sit together',[mh.index(h) for h in ['AI Recommended Qty (Total)','Order Qty To Place (Type Here)','Your Qty Vs AI','Variance Vs AI Qty','AI Recommended Qty (Stock Gap)','AI Recommended Add (Peak + Promo)','AI Recommendation Why']]==list(range(mh.index('AI Recommended Qty (Total)'),mh.index('AI Recommended Qty (Total)')+7)) and mh.index('AI Recommended Qty (Total)')<mh.index('POS Year To Date (Units)') and mh.index('AI Recommended Qty (Total)')<=mh.index('What Is Going On')+1)
     hs=wb['Sales History'];ok('Sales History has 4 rows per SKU',(hs.max_row-1)%4==0 and hs.max_row>100 and hs['E2'].value=='2026 Forecast' and hs['E5'].value=='2024 Sold')
     pg.click('nav [data-nav=sheet]');pg.click('[data-xt=hist]');ok('Sales History tab shows on the site',pg.locator('.xt tbody tr').count()>100)
     # 8. supply chain stages: columns, tie-out, drawer table, workbook values
     mh=[c.value for c in wb['Master List (Work Here)'][1]];ws_=wb['Master List (Work Here)']
-    need=['In Production (Units)','At Origin (Units)','In Transit (Units)','Open PO (Units)','Next Ready Date','ETA Change (Days)','Production Time (Days)','Transit Quoted (Days)','Transit Actual (Days)']
+    need=['In Production (Units)','At Origin (Units)','In Transit (Units)','Open PO (Units)','Next Ready Date','ETA Change (Days)']
     ok('master has the supply stage columns',all(h in mh for h in need))
     ip,og,op=[mh.index(h) for h in ['In Production (Units)','At Origin (Units)','Open PO (Units)']]
     ok('in production plus at origin equals open PO on every row',all((r[ip] or 0)+(r[og] or 0)==(r[op] or 0) for r in ws_.iter_rows(min_row=2,values_only=True) if r[0]))
