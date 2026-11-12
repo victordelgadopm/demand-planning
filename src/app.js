@@ -155,7 +155,7 @@ function signalTiles(){const rows=st.res.rows,n=f=>rows.filter(f).length,v=(k,x)
   return [['Selling Above Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)>=0.15)),'October, 15% or more above forecast'],
     ['Selling Below Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)<=-0.15)),'October, 15% or more below forecast'],
     ['Promos Coming',fmt(n(x=>v('nextpromo',x)!=='None')),n(x=>v('promo',x)==='Not confirmed')+' not yet confirmed'],
-    ['Peak Season Ahead',fmt(n(x=>v('peakwk',x)!=='None in window'&&v('peakwk',x)!=='n/a')),'with peak weeks in the next 12 weeks'],
+    ['Strong Peak Ahead',fmt(n(x=>num(v('peaklift',x))&&v('peaklift',x)>=2.5)),'peak weeks sell 2.5x or more a normal week'],
     ['AI Differs From System',fmt(n(x=>num(v('aid12',x))&&v('aid12',x)!==0)),(sumPv(rows,'aid12')>0?'+':'')+fmt(sumPv(rows,'aid12'))+' units, Nov to Jan'],
     ['Shipping Ahead Of Sales',fmt(n(x=>num(v('ship',x))&&v('ship',x)>=ch)),'shipped '+ch+'x or more of sold, 8 weeks']]}
 

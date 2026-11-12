@@ -1077,7 +1077,7 @@ function signalTiles(){const rows=st.res.rows,n=f=>rows.filter(f).length,v=(k,x)
   return [['Selling Above Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)>=0.15)),'October, 15% or more above forecast'],
     ['Selling Below Forecast',fmt(n(x=>num(v('salesvs',x))&&v('salesvs',x)<=-0.15)),'October, 15% or more below forecast'],
     ['Promos Coming',fmt(n(x=>v('nextpromo',x)!=='None')),n(x=>v('promo',x)==='Not confirmed')+' not yet confirmed'],
-    ['Peak Season Ahead',fmt(n(x=>v('peakwk',x)!=='None in window'&&v('peakwk',x)!=='n/a')),'with peak weeks in the next 12 weeks'],
+    ['Strong Peak Ahead',fmt(n(x=>num(v('peaklift',x))&&v('peaklift',x)>=2.5)),'peak weeks sell 2.5x or more a normal week'],
     ['AI Differs From System',fmt(n(x=>num(v('aid12',x))&&v('aid12',x)!==0)),(sumPv(rows,'aid12')>0?'+':'')+fmt(sumPv(rows,'aid12'))+' units, Nov to Jan'],
     ['Shipping Ahead Of Sales',fmt(n(x=>num(v('ship',x))&&v('ship',x)>=ch)),'shipped '+ch+'x or more of sold, 8 weeks']]}
 
@@ -1765,8 +1765,8 @@ const COLS={
  shm10:{h:'Nov 2026 Shipment Prediction (From '+FW0+')',w:16,num:'int',src:'calculated by the AI: the AI POS forecast times the recent shipped to sold ratio, for the weeks in November from '+FW0+' on'},
  shm11:{h:'Dec 2026 Shipment Prediction',w:14,num:'int',src:'calculated by the AI: the AI POS forecast times the recent shipped to sold ratio, for December'},
  shm12:{h:'Jan 2027 Shipment Prediction',w:14,num:'int',src:'calculated by the AI: the AI POS forecast times the recent shipped to sold ratio, for the weeks in January 2027'},
- ship12:{h:'Shipment Prediction, Next 12 Weeks (Units)',w:15,num:'int',src:'calculated by the AI: the AI POS forecast times the shipped to sold ratio used (the recent 8 week ratio, kept between 0.7 and 1.3)'},
- shipbuild:{h:'Shipments Minus POS, Next 12 Weeks (Units)',w:15,num:'intS',src:'calculated: predicted shipments minus predicted POS. Positive means retailers are building stock, negative means they are selling down what they hold'},
+ ship12:{h:'Shipment Prediction, Nov To Jan (Units)',w:15,num:'int',src:'calculated by the AI: the AI POS forecast times the shipped to sold ratio used (the recent 8 week ratio, kept between 0.7 and 1.3)'},
+ shipbuild:{h:'Shipments Minus POS, Nov To Jan (Units)',w:15,num:'intS',src:'calculated: predicted shipments minus predicted POS. Positive means retailers are building stock, negative means they are selling down what they hold'},
  shipsig:{h:'Channel Signal',w:22,src:'calculated: Retailers building stock when shipments ran 5% or more above sales over the last 8 weeks, burning stock when 5% or more below, otherwise in line with sales'},
  shipused:{h:'Shipped ÷ Sold Used',w:12,num:'x2',src:'calculated: the recent 8 week shipped to sold ratio, kept between 0.7 and 1.3, used to turn POS into shipments'},
  shipl8:{h:'Shipped, Last 8 Weeks (Units)',w:13,num:'int',src:'from the Reporting tool: units shipped to retailers over the last 8 weeks'},
@@ -1958,7 +1958,7 @@ const SHIPK=['status','sku','product','sub','shm10','shm11','shm12','ship12','ai
 const DVSK=['status','sku','product','sub','fc12','ai12','onhand','prodq','orgq','transit','supply','dvsgap','cover','dvsstat','wos','stockout','orderby','nextarr','nextarrq','etachg','decision','going'];
 const NK=['status','sku','product','note','notedate','going'];
 let itemLine='All Lines';
-const LFK=['status','sku','product','filest','sub','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','suggest','addqty','addwhy','ordovr','plan','cmptxt','note'];
+const LFK=['status','sku','product','sub','filest','peak','peakwk','peaklift','ovr','ovrwhy','used','bump','promo','nextpromo','lypromo','lyunits','lift','overlap','promoext','totlift','stocklp','peakcover','peakgap','suggest','addqty','addwhy','ordovr','plan','cmptxt','note'];
 const seasonSummary=d=>`${d.n.promo} of ${d.n.items} items have a promo this year or last year (${d.n.ty} this year, ${d.n.unconf} not yet confirmed). ${d.n.thin} of the ${d.n.peak} items with a peak in the next 12 weeks would run thin or short.`;
 const TABS=[['dash','Dashboard'],['all','Master List (Work Here)'],['hist','Sales History'],['items','Seasonal And Promo Lifts'],['month','Monthly Demand'],['pos','POS Prediction'],['ship','Shipping Prediction'],['dvs','Demand Vs Supply'],['notes','Notes'],['dropped','New And Missing Items']];
 function roleHtml(){
@@ -2142,7 +2142,7 @@ function downloadXlsx(){
    [t6(0),SG[0][0],{f:`COUNTIF(${rng('salesvs')},">=0.15")`,v:num(SG[0][1]),s:'boxN'},{v:SG[0][2]}],
    [t6(1),SG[1][0],{f:`COUNTIF(${rng('salesvs')},"<=-0.15")`,v:num(SG[1][1]),s:'boxN'},{v:SG[1][2]}],
    [t6(2),SG[2][0],{f:`COUNTIF(${rng('nextpromo')},"<>None")`,v:num(SG[2][1]),s:'boxN'},{f:`COUNTIF(${rng('promo')},"Not confirmed")&" not yet confirmed"`,v:SG[2][2]}],
-   [t6(3),SG[3][0],{f:`COUNT(${rng('peaklift')})`,v:num(SG[3][1]),s:'boxN'},{v:SG[3][2]}],
+   [t6(3),SG[3][0],{f:`COUNTIF(${rng('peaklift')},">=2.5")`,v:num(SG[3][1]),s:'boxN'},{v:SG[3][2]}],
    [t6(4),SG[4][0],{f:`COUNTIF(${rng('aid12')},">0")+COUNTIF(${rng('aid12')},"<0")`,v:num(SG[4][1]),s:'boxN'},{f:`TEXT(SUM(${rng('aid12')}),"+#,##0;-#,##0")&" units, Nov to Jan"`,v:SG[4][2]}],
    [t6(5),SG[5][0],{f:`COUNTIF(${rng('ship')},">=${ch}")`,v:num(SG[5][1]),s:'boxN'},{v:SG[5][2]}]]);
   /* planner actions: the four decision boxes follow the two picks */
