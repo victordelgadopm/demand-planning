@@ -221,7 +221,7 @@ function sinceHtml(){
   const col=(cls,title,sub,items,fmt,cap)=>{const shown=cap?items.slice(0,cap):items,more=items.length-shown.length;
     return `<div class="sc ${cls}"><div class="sc-h"><span>${title}</span><b>${items.length}</b></div><div class="sc-sub">${sub}</div>
     ${items.length?`<ul>${shown.map(fmt).join('')}</ul>${more>0?`<div class="sc-more">and ${more} more in the list below</div>`:''}`:'<div class="sc-none">None today</div>'}</div>`};
-  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since The Last Run</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} missing items. They are listed on the New And Missing Items tab of the Custom Spreadsheet.</p>
+  return `<h2 class="sec-h" style="margin-top:6px">What Changed Since The Last Run</h2><p class="sec-sub">Four groups, so you know where to look. Click a name to open it.</p><p class="sec-sub"><b>In the files today:</b> ${NEWIDS.length} new items and ${droppedList().length} missing items. They are listed on the Data Check And Changes tab of the Custom Spreadsheet.</p>
    <div class="since4" data-g="since">
     ${col('c-new','New Risk','Became a problem overnight',newRisk,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
     ${col('c-worse','Getting Worse','Was already flagged, now bigger',worse,([i,w])=>`<li>${lk(i)}<span class="w">${w}</span></li>`)}
@@ -633,7 +633,7 @@ function emailText(kind){
   const live=st.res.rows.filter(r=>r.headline).sort((a,b)=>E.TIER_ORDER[a.tier]-E.TIER_ORDER[b.tier]||b.dollars-a.dollars),t=st.res.tiers,at=live.filter(r=>r.tier==='At risk'),T=snapTiles();
   const dem=r=>{const sv=pv('salesvs',r),a=pv('ai12',r),l=pv('ly',r);return '   Demand: '+(sv===''?'':'Sales '+pctSN(sv,0)+' vs forecast in October, ')+'AI forecast '+fmt(a)+' over 12 weeks'+(l>0?', '+fmt(l)+' the same weeks last year':'')+'\n'};
   const line=(r,i)=>`${i+1}. [${tn(r.tier)}] ${r.name} (${r.id})\n   ${r.headline}\n${dem(r)}${r.dollars>0?'   '+money(r.dollars)+' at stake\n':''}\n`;
-  const demand=`Demand:\n  - AI forecast, Nov to Jan: ${T[1][1]} units, ${T[1][2]}\n  - POS year to date: ${T[2][1]} units, ${T[2][2]}\n  - October sales vs forecast: ${T[3][1]} (${T[3][2]})\n\n`;
+  const demand=`Demand:\n  - AI forecast, Nov to Jan: ${T[1][1]} units, ${T[1][2]}\n  - POS year to date: ${T[2][1]} units, ${T[2][2]}\n  - October sales vs forecast: ${T[3][1]} (${T[3][2]})\n  - Data check: ${(window.__app.chkEmail||(()=>'Not run'))()}\n\n`;
   const files=()=>{let b='';const dl=droppedList();if(NEWIDS.length||dl.length){b+='In the files:\n';NEWIDS.forEach(i=>{const r=rowOf(i);if(r)b+=`  - New: ${r.name} (${i}), nothing typed yet\n`});dl.forEach(x=>b+=`  - Missing: ${x.name} (${x.id}), check the shared files\n`);b+='\n'}return b};
   const health=`Data health: ${D.loadReport.filter(r=>r.status==='quarantined').length} file held back, 1 new field kept.\n\n`;
   const foot='Attached: Planning-Sheet.xlsx (the custom spreadsheet)\nSample data, not Mattel data.';

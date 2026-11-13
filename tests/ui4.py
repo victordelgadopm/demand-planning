@@ -20,7 +20,7 @@ with sync_playwright() as p:
     pg.fill('#chat-t','Add the date the units are needed by.');pg.click('#chat-f button');pg.wait_for_timeout(100)
     ok('order qty request names the Master List',('Master List' in pg.locator('#msgs').inner_text()) and 'Needed By' in pg.locator('#msgs').inner_text())
     pg.evaluate("document.querySelectorAll('#v-custom details').forEach(d=>d.open=true)");rc=pg.locator('#v-custom').inner_text()
-    ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'New And Missing Items' in rc and 'Seasonal And Promo Lifts' in rc)
+    ok('recipe panel lists Master List green columns and tabs','Master List' in rc and 'Peak Lift Override' in rc and 'Data Check And Changes' in rc and 'Seasonal And Promo Lifts' in rc)
     # 3. no stale wording on any page or sheet tab
     allt=[]
     for v in ['home','sheet','custom','visual']:

@@ -53,7 +53,7 @@ with sync_playwright() as p:
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Dashboard']
-    ok('xlsx 10 sheets in demand-first order, no Recipe or 12-Week Plan',wb.sheetnames==['Dashboard','Master List (Work Here)','Sales History','Seasonal And Promo Lifts','Monthly Demand','POS Prediction','Shipping Prediction','Demand Vs Supply','Notes','New And Missing Items'])
+    ok('xlsx 10 sheets in demand-first order, no Recipe or 12-Week Plan',wb.sheetnames==['Dashboard','Master List (Work Here)','Sales History','Seasonal And Promo Lifts','Monthly Demand','POS Prediction','Shipping Prediction','Demand Vs Supply','Notes','Data Check And Changes'])
     ok('xlsx matches default columns','Lead Time (Weeks)' not in [c.value for c in ws[22]])
     wm=wb['Master List (Work Here)'];ok('master frozen+filter',wm.freeze_panes=='D2' and wm.auto_filter.ref is not None)
     ok('xlsx status colored',wb['Master List (Work Here)']['A2'].fill.fgColor.rgb=='FFF8D7DA')
@@ -78,10 +78,11 @@ with sync_playwright() as p:
     # new and dropped items, peak override, seasonal calendar
     pg.click('nav [data-nav=sheet]');pg.wait_for_timeout(100)
     pg.click('[data-xt=all]');ok('3 new items marked New Today on the master list, no row shading',pg.locator('tr.newrow').count()==0 and pg.locator('td.t-new').count()==3)
-    pg.click('[data-xt=dropped]');ok('new and dropped tab lists 3 new and 2 missing',pg.locator('.xt tbody tr').count()==5 and pg.locator('.xt td.t-drop').count()==2)
+    pg.click('[data-xt=dropped]');ok('new and dropped tab lists 3 new and 2 missing',pg.locator('.xt td.t-new').count()>=1 and pg.locator('.xt td.t-drop').count()==2 and pg.locator('.xt td.t-ok').count()==8 and pg.locator('.dcheck.ok').count()==1)
     ok('Seasonal Calendar and Since Yesterday tabs are gone',pg.locator('[data-xt=season]').count()==0 and pg.locator('[data-xt=since]').count()==0)
     pg.click('[data-xt=items]');pg.select_option('#il','Collector');ok('line filter on Seasonal And Promo Lifts',pg.locator('#il').input_value()=='Collector' and pg.locator('.xt').first.locator('tbody tr').count()==18 and 'Where This Comes From' in pg.locator('#v-sheet').inner_text())
-    wd=wb['New And Missing Items'];ok('xlsx new and dropped sheet has 5 rows',wd.max_row==6)
+    wd=wb['Data Check And Changes'];ok('xlsx check sheet has 8 check rows and 5 change rows',wd.max_row==19 and wd['A1'].value=='Check Results' and wd['A13'].value=='New And Missing Items')
+    wv=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx',data_only=True);ok('xlsx check rows all say Matched and the Dashboard stamp passes',all(wv['Data Check And Changes'].cell(r,1).value=='Matched' for r in range(4,12)) and any('Data Check Passed' in str(c.value or '') for c in wv['Dashboard'][1]))
     hm=[c.value for c in wm[1]];ok('xlsx master has file status and order columns',all(h in hm for h in ['File Status','Peak Lift (x)','Stock Last Peak','AI Recommended Qty (Stock Gap)','AI Recommended Add (Peak + Promo)','AI Recommendation Why','AI Recommended Qty (Total)']))
     fs=hm.index('File Status')+1;ok('xlsx 3 New Today cells',sum(1 for r in range(2,125) if wm.cell(r,fs).value=='New Today')==3)
     ok('override has number validation',any(d.type=='decimal' for d in wm.data_validations.dataValidation))
