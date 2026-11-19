@@ -1977,6 +1977,8 @@ const newCheck='New in the latest files, so nothing is typed yet. Check its fore
 function changeList(){const out=[];A.NEWIDS.forEach(id=>{const r=A.rowOf(id);if(r)out.push({chg:'New',id,name:r.name,sub:r.sub,onHand:r.metrics.onHand,po:r.metrics.transit+r.metrics.openPO,note:'',plan:'',by:'',check:newCheck})});
   A.droppedList().forEach(x=>out.push({chg:'Missing Today',id:x.id,name:x.name,sub:x.sub,onHand:x.onHand,po:x.po,note:x.note,plan:x.plan,by:x.by,check:dropCheck(x)}));return out}
 const dropCheck=x=>'Not in the latest files. Check the shared files for a discontinue, a rename or a missing row.'+(x.po>0?' It still has '+E.fmtNum(x.po)+' units on order, so confirm with the supplier.':'')+(x.plan?' You had an order to place for '+E.fmtNum(x.plan)+' units, so confirm that order was placed.':'');
+/* Lookup by key: XLOOKUP for Excel 365 (saved with the _xlfn. prefix Excel needs); the older INDEX and MATCH pair only when a test asks for it */
+const lookupBy=(key,keyR,retR)=>window.__legacyLookup?`IFERROR(IF(INDEX(${retR},MATCH(${key},${keyR},0))="","",INDEX(${retR},MATCH(${key},${keyR},0))),"")`:`IF(_xlfn.XLOOKUP(${key},${keyR},${retR},"")="","",_xlfn.XLOOKUP(${key},${keyR},${retR},""))`;
 const sumQ=a=>(a||[]).reduce((t,x)=>t+(x.qty||0),0),sumW=(a,x,y)=>(a||[]).slice(x,y).reduce((t,v)=>t+v,0);
 const CHKDEF=[
  ['POS Year To Date (Units)','Reporting tool','ytd','Raw weekly POS added up per item and compared with the sheet',(q,r)=>Math.round(sumW(q.pos.y2026,0,45)),0],
@@ -2104,8 +2106,8 @@ function downloadXlsx(){
   /* list tabs that read every cell from the Master List by SKU */
   const mkL=(rows,name,keys)=>{const si=keys.indexOf('sku');if(si<0)return mk(rows,name,keys);const sc=C(si),skuR=rng('sku');
     const data=rows.map((r,i)=>{const er=i+2;return keys.map(k=>{if(k==='sku')return {v:r.id,s:'ctr'};if(!FULLK.includes(k))return cellOf(k,r)||{v:'',s:'txt'};
-      const Cc=COLS[k],rg=rng(k),m=`MATCH($${sc}${er},${skuR},0)`,v=wval(k,r);
-      return {f:`IFERROR(IF(INDEX(${rg},${m})="","",INDEX(${rg},${m})),"")`,v:v,s:k==='status'?'ctr':DATEK.has(k)&&typeof v==='number'?'dt':sty(k)}})});
+      const Cc=COLS[k],rg=rng(k),v=wval(k,r);
+      return {f:lookupBy(`$${sc}${er}`,skuR,rg),v:v,s:k==='status'?'ctr':DATEK.has(k)&&typeof v==='number'?'dt':sty(k)}})});
     const sh={name,widths:keys.map(k=>COLS[k].w),rows:[hdrK(keys),...data],freeze:1,filter:data.length+1,cf:cfList(keys,2,data.length+1)};
     const stc=keys.indexOf('status');if(stc>=0&&data.length)sh.cf.push({ref:`${C(stc)}2:${C(stc)}${data.length+1}`,rules:TN0.map((t,j)=>({type:'cellIs',op:'equal',dxf:[0,1,3,4][j],formula:`"${A.tn(t)}"`}))});
     return sh};
@@ -2130,7 +2132,7 @@ function downloadXlsx(){
   const HD=A.histData('All Lines'),skuR0=rng('sku'),HK=['status','product','sub'],HN=HD.length;
   const histSheet={name:'Sales History',widths:[13,10,30,16,14,11,...Array(12).fill(8),...Array(52).fill(7)],freeze:1,freezeCols:5,fit:true,cf:[],
     rows:[hdr(['Status','SKU','Product','Line','Row','Normal Week (Units)',...A.HIST_MON,...Array.from({length:52},(_,i)=>'Wk '+(i+1))]),
-      ...HD.map((x,i)=>{const er=i+2,mm=`MATCH($B${er},${skuR0},0)`,pick=k=>({f:`IFERROR(IF(INDEX(${rng(k)},${mm})="","",INDEX(${rng(k)},${mm})),"")`,v:k==='status'?val('status',x.r):k==='product'?x.r.name:x.r.sub,s:k==='status'?'ctr':'txt'});
+      ...HD.map((x,i)=>{const er=i+2,pick=k=>({f:lookupBy(`$B${er}`,skuR0,rng(k)),v:k==='status'?val('status',x.r):k==='product'?x.r.name:x.r.sub,s:k==='status'?'ctr':'txt'});
         return [pick('status'),{v:x.id,s:'ctr'},pick('product'),pick('sub'),{v:x.label,s:'bold'},{v:x.norm>0?x.norm:'',s:'int'},...x.mo.map(v=>({v:v==null?'':v,s:'int'})),...x.wk.map(v=>({v:v==null?'':v,s:'int'}))]})],filter:HN+1};
   histSheet.cf.push({ref:`${C(18)}2:${C(69)}${HN+1}`,rules:[{type:'expression',dxf:1,formula:`AND(ISNUMBER(${C(18)}2),$${C(5)}2>0,${C(18)}2>=1.5*$${C(5)}2)`}]});
   histSheet.cf.push({ref:`A2:A${HN+1}`,rules:TN0.map((t,j)=>({type:'cellIs',op:'equal',dxf:[0,1,3,4][j],formula:`"${A.tn(t)}"`}))});

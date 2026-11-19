@@ -52,6 +52,10 @@ with sync_playwright() as p:
     nav=pg.locator('nav button').all_inner_texts();ok('nav order',nav==['How It Works','Customize','Custom Spreadsheet','Visual View','Custom Email','Setup Options'])
     with pg.expect_download() as d: pg.click('#sh-dl')
     d.value.save_as('/tmp/claude-0/t3.xlsx')
+    pg.evaluate('window.__legacyLookup=true')
+    with pg.expect_download() as d2: pg.click('#sh-dl')
+    d2.value.save_as('/tmp/claude-0/t3_legacy.xlsx')
+    pg.evaluate('window.__legacyLookup=false')
     wb=openpyxl.load_workbook('/tmp/claude-0/t3.xlsx');ws=wb['Dashboard']
     ok('xlsx 10 sheets in demand-first order, no Recipe or 12-Week Plan',wb.sheetnames==['Dashboard','Master List (Work Here)','Sales History','Seasonal And Promo Lifts','Monthly Demand','POS Prediction','Shipping Prediction','Demand Vs Supply','Notes','Data Check And Changes'])
     ok('xlsx matches default columns','Lead Time (Weeks)' not in [c.value for c in ws[22]])
